@@ -37,7 +37,6 @@ final class AppIconButton: NSView {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func draw(_ dirtyRect: NSRect) {
-        let onGlass = BarBackgroundFactory.usesGlass
         let lift: CGFloat = pressed ? -1 : (hovering ? 2 : 0)
         // 图标纵向居中（Dock 同款），运行点在图标下方近底边
         let iconSide = Layout.iconSize
@@ -46,17 +45,13 @@ final class AppIconButton: NSView {
             let circle = NSBezierPath(ovalIn: NSRect(x: (bounds.width - 46) / 2,
                                                      y: (bounds.height - 46) / 2,
                                                      width: 46, height: 46))
-            if onGlass {
-                // 玻璃底随亮暗自动翻转
-                NSColor.labelColor.withAlphaComponent(0.12).setFill()
-                circle.fill()
-            } else {
-                NSColor.white.withAlphaComponent(0.14).setFill()
-                circle.fill()
-                NSColor.black.withAlphaComponent(0.18).setStroke()
-                circle.lineWidth = 1
-                circle.stroke()
-            }
+            // 玻璃会按后方内容改变明暗；用系统强调色表达 hover，避免 labelColor 在局部背景上失去对比。
+            let accent = NSColor.controlAccentColor
+            accent.withAlphaComponent(0.16).setFill()
+            circle.fill()
+            accent.withAlphaComponent(0.62).setStroke()
+            circle.lineWidth = 1
+            circle.stroke()
         }
         let iconRect = NSRect(x: (bounds.width - iconSide) / 2,
                               y: iconY,
@@ -66,22 +61,20 @@ final class AppIconButton: NSView {
                         from: .zero,
                         operation: .sourceOver,
                         fraction: 1)
-        drawWindowDots(onGlass: onGlass)
+        drawWindowDots()
     }
 
     /// 点点：实心=活跃窗口、空心=最小化，>5 收敛为数字；
     /// 无 AX 信息或零收录窗口不画（降级/零窗口与 Dock 语义一致：不误导）
-    private func drawWindowDots(onGlass: Bool) {
+    private func drawWindowDots() {
         guard entry.isRunning, let windows = entry.windows, !windows.isEmpty else { return }
         let active = windows.filter { !$0.isMinimized }.count
-        let accent: NSColor = onGlass ? .labelColor : NSColor.white.withAlphaComponent(0.95)
-        let rim: NSColor? = onGlass ? nil : NSColor.black.withAlphaComponent(0.35)
 
         if windows.count > 5 {
             let text = "\(windows.count)" as NSString
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: NSFont.systemFont(ofSize: 9.5, weight: .medium),
-                .foregroundColor: accent,
+                .foregroundColor: NSColor.controlAccentColor,
             ]
             let size = text.size(withAttributes: attributes)
             text.draw(at: NSPoint(x: bounds.midX - size.width / 2, y: 2.5), withAttributes: attributes)
@@ -92,21 +85,24 @@ final class AppIconButton: NSView {
         let total = CGFloat(active + mini - 1) * Layout.dotPitch + Layout.dotSize
         var x = bounds.midX - total / 2
         for index in 0..<(active + mini) {
-            let path = NSBezierPath(ovalIn: NSRect(x: x, y: Layout.dotBaseline,
-                                                   width: Layout.dotSize, height: Layout.dotSize))
-            // 空实同构：同一外圈描边定径，实心仅多填内芯，两者视觉外径一致
-            path.lineWidth = 1.2
-            if index < active {
-                accent.setFill()
-                path.fill()
-                (rim ?? accent).setStroke()
-                path.stroke()
-            } else {
-                accent.setStroke()
-                path.stroke()
-            }
+            let rect = NSRect(x: x, y: Layout.dotBaseline,
+                              width: Layout.dotSize, height: Layout.dotSize)
+            // 单一强调色：实心=活跃窗口，空心=最小化窗口；不叠加黑白轮廓，避免视觉刺眼。
+            drawIndicator(in: rect, filled: index < active)
             x += Layout.dotPitch
         }
+    }
+
+    private func drawIndicator(in rect: NSRect, filled: Bool) {
+        let accent = NSColor.controlAccentColor
+        let path = NSBezierPath(ovalIn: rect)
+        path.lineWidth = 1.1
+        if filled {
+            accent.setFill()
+            path.fill()
+        }
+        accent.setStroke()
+        path.stroke()
     }
 
     /// 悬停态由控制器鼠标采样轮询驱动：非激活悬浮窗上 tracking area 的
