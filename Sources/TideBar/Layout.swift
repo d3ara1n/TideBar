@@ -19,6 +19,20 @@ enum Layout {
     static let iconSlot: CGFloat = 52
     static let barHPadding: CGFloat = 10
 
+    // 点点（窗口状态）：实心=活跃、空心=最小化，>5 收敛为数字
+    static let dotSize: CGFloat = 4.5
+    static let dotPitch: CGFloat = 7
+    static let dotBaseline: CGFloat = 4.5
+
+    // 潮涌（二级展开）
+    static let surgePressDelay: TimeInterval = 0.4
+    static let surgeWidth: CGFloat = 260
+    static let surgeRowHeight: CGFloat = 28
+    static let surgeVPadding: CGFloat = 6
+    static let surgeGap: CGFloat = 8
+    static let surgeStaggerStep: TimeInterval = 0.025
+    static let surgeDismissDebounce: TimeInterval = 0.3
+
     // 接近热区（收起态触发展开）：胶囊外扩范围
     static let hotMarginX: CGFloat = 120
     static let hotMarginBelow: CGFloat = 18

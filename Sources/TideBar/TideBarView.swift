@@ -7,9 +7,12 @@ import QuartzCore
 @MainActor
 final class GlassBarBackgroundView: NSView {
     private let glass = NSGlassEffectView(frame: .zero)
+    /// nil = 胶囊（height/2）；数值 = 定圆角（潮涌圈角卡片）
+    private let fixedCornerRadius: CGFloat?
 
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
+    init(cornerRadius: CGFloat? = nil) {
+        self.fixedCornerRadius = cornerRadius
+        super.init(frame: .zero)
         glass.tintColor = .clear
         glass.style = .regular
         let placeholder = NSView()
@@ -29,8 +32,9 @@ final class GlassBarBackgroundView: NSView {
     override func layout() {
         super.layout()
         glass.frame = bounds
-        glass.cornerRadius = bounds.height / 2
-        glass.layer?.cornerRadius = bounds.height / 2
+        let radius = fixedCornerRadius ?? bounds.height / 2
+        glass.cornerRadius = radius
+        glass.layer?.cornerRadius = radius
     }
 }
 
@@ -41,8 +45,8 @@ enum BarBackgroundFactory {
         return false
     }
 
-    static func makeGlassIfAvailable() -> NSView? {
-        if #available(macOS 26.0, *) { return GlassBarBackgroundView(frame: .zero) }
+    static func makeGlassIfAvailable(cornerRadius: CGFloat? = nil) -> NSView? {
+        if #available(macOS 26.0, *) { return GlassBarBackgroundView(cornerRadius: cornerRadius) }
         return nil
     }
 }
@@ -52,6 +56,7 @@ enum BarBackgroundFactory {
 @MainActor
 final class IconRowView: NSView {
     var onLaunch: ((AppEntry) -> Void)?
+    var onSurge: ((AppEntry, NSRect) -> Void)?
     private var buttons: [AppIconButton] = []
 
     /// rebuildAll = true：整体重建（展开动画完整重播）
@@ -60,10 +65,7 @@ final class IconRowView: NSView {
         if rebuildAll {
             buttons.forEach { $0.removeFromSuperview() }
             buttons = apps.map { app in
-                let button = AppIconButton(entry: app)
-                button.onClick = { [weak self] entry in
-                    self?.onLaunch?(entry)
-                }
+                let button = makeButton(app)
                 addSubview(button)
                 return button
             }
@@ -73,19 +75,16 @@ final class IconRowView: NSView {
 
         var kept = Dictionary(uniqueKeysWithValues: buttons.map { ($0.entry.id, $0) })
         var next: [AppIconButton] = []
-        var newcomers: [(button: AppIconButton, index: Int)] = []
-        for (index, app) in apps.enumerated() {
+        var newcomers: [AppIconButton] = []
+        for app in apps {
             if let existing = kept.removeValue(forKey: app.id) {
                 existing.update(entry: app)
                 next.append(existing)
             } else {
-                let button = AppIconButton(entry: app)
-                button.onClick = { [weak self] entry in
-                    self?.onLaunch?(entry)
-                }
+                let button = makeButton(app)
                 addSubview(button)
                 next.append(button)
-                newcomers.append((button, index))
+                newcomers.append(button)
             }
         }
         for gone in kept.values {
@@ -100,8 +99,22 @@ final class IconRowView: NSView {
         }
         buttons = next
         needsLayout = true
-        for (button, _) in newcomers {
+        for button in newcomers {
             rise(button, delay: 0)
+        }
+    }
+
+    private func makeButton(_ app: AppEntry) -> AppIconButton {
+        let button = AppIconButton(entry: app)
+        button.onClick = { [weak self] entry in self?.onLaunch?(entry) }
+        button.onSurge = { [weak self] entry, frame in self?.onSurge?(entry, frame) }
+        return button
+    }
+
+    /// 悬停轮询：命中之外的按钮全部清悬停
+    func setHover(hit: AppIconButton?) {
+        for button in buttons {
+            button.setHovered(button === hit)
         }
     }
 
@@ -164,6 +177,15 @@ final class TideBarView: NSView {
     private let tideline = CALayer()
     private let iconRow = IconRowView()
     private(set) var isExpandedState = false
+    /// 潮涌触发透传（携图标 frame，面板内容坐标）
+    var onSurge: ((AppEntry, NSRect) -> Void)?
+
+    /// 悬停轮询驱动（屏幕坐标 → 命中图标高亮）
+    func updateHover(atScreen point: NSPoint) {
+        guard let window else { return }
+        let local = convert(window.convertPoint(fromScreen: point), from: nil)
+        iconRow.setHover(hit: iconRow.hitTest(local) as? AppIconButton)
+    }
     /// 展开代数：状态切换即递增，使未决的延迟隐藏失效（防误杀下一次展开的潮体）
     private var expandGeneration = 0
 
@@ -184,7 +206,8 @@ final class TideBarView: NSView {
         silhouette.backgroundColor = Self.waterColor
         silhouette.borderWidth = 1
         silhouette.borderColor = NSColor.white.withAlphaComponent(0.16).cgColor
-        silhouette.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+        // 锚点钉在底边中心（汐线处）：潮体从汐线涌起、退回落回汐线，不从几何中心胀开
+        silhouette.anchorPoint = CGPoint(x: 0.5, y: 0.0)
         silhouette.opacity = 0
         layer?.addSublayer(silhouette)
         if let glass {
@@ -209,7 +232,8 @@ final class TideBarView: NSView {
         breath.repeatCount = .infinity
         breath.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         tideline.add(breath, forKey: "breath")
-        iconRow.onLaunch = { $0.activate() }
+        iconRow.onLaunch = { $0.primaryClick() }
+        iconRow.onSurge = { [weak self] entry, frame in self?.onSurge?(entry, frame) }
     }
 
     @available(*, unavailable)
@@ -234,9 +258,10 @@ final class TideBarView: NSView {
                                                               height: Layout.capsuleHeight))
         tideline.position = CGPoint(x: bounds.midX, y: 2 + Layout.capsuleHeight / 2)
         tideline.cornerRadius = Layout.capsuleHeight / 2
-        // 潮体几何恒为全幅胶囊，形变只在 transform——几何设置不会打断动画
+        // 潮体几何恒为全幅胶囊，形变只在 transform——几何设置不会打断动画；
+        // 锚点在底边中心（汐线上沿），收起态缩放后正落在汐线位置
         silhouette.bounds = CGRect(origin: .zero, size: bounds.size)
-        silhouette.position = CGPoint(x: bounds.midX, y: bounds.midY)
+        silhouette.position = CGPoint(x: bounds.midX, y: 2)
         silhouette.cornerRadius = bounds.height / 2
         if !isExpandedState, silhouette.opacity == 0 {
             silhouette.transform = collapsedTransform

@@ -29,6 +29,13 @@ final class TideBarController {
     private var lastSampleTime: CFTimeInterval = 0
     private var fullscreenCache: [CGDirectDisplayID: (time: CFTimeInterval, value: Bool)] = [:]
 
+    // 潮涌：同一时刻只存在一个，归属于触发它的屏
+    private var surgePanel: SurgePanel?
+    private var surgeBundleID: String?
+    private var surgeWindowCount = 0
+    private var surgeOriginDisplayID: CGDirectDisplayID?
+    private var surgeDismissWork: DispatchWorkItem?
+
     func start() {
         registry.onChange = { [weak self] in self?.appsDidChange() }
         registry.start()
@@ -64,6 +71,7 @@ final class TideBarController {
     // MARK: - 面板生命周期
 
     private func rebuildPanels() {
+        dismissSurge(animated: false)
         for state in screens.values {
             state.collapseDebounce?.cancel()
             state.panel.orderOut(nil)
@@ -77,8 +85,13 @@ final class TideBarController {
             let panel = TidePanel(contentRect: frame)
             let view = TideBarView(frame: NSRect(origin: .zero, size: frame.size))
             panel.contentView = view
+            let state = ScreenState(screen: screen, panel: panel, view: view)
+            view.onSurge = { [weak self, weak state] entry, iconFrame in
+                guard let self, let state else { return }
+                self.showSurge(entry: entry, state: state, iconFrame: iconFrame)
+            }
             panel.orderFrontRegardless()
-            screens[displayID] = ScreenState(screen: screen, panel: panel, view: view)
+            screens[displayID] = state
         }
     }
 
@@ -133,15 +146,35 @@ final class TideBarController {
                 continue
             }
             if state.isExpanded {
-                let keep = state.panel.frame.insetBy(dx: -Layout.keepMargin, dy: -Layout.keepMargin)
+                var keep = state.panel.frame.insetBy(dx: -Layout.keepMargin, dy: -Layout.keepMargin)
+                // 潮涌在场时滞留区并入潮涌面板，鼠标在列表上不触发收起
+                if let surge = surgePanel, surgeOriginDisplayID == displayID(of: state.screen) {
+                    keep = keep.union(surge.frame)
+                }
                 if keep.contains(location) {
                     cancelCollapse(state)
                 } else {
                     scheduleCollapse(state)
                 }
+                state.view.updateHover(atScreen: location)
             } else if hotZone(for: state.screen).contains(location) {
                 expand(state)
             }
+        }
+        updateSurgeHover(at: location)
+    }
+
+    /// 潮涌悬停与离场判定：命中面板内则行高亮 + 取消收起；否则重排收起防抖
+    private func updateSurgeHover(at location: NSPoint) {
+        guard let panel = surgePanel, panel.isVisible else { return }
+        guard panel.frame.contains(location) else {
+            scheduleSurgeDismiss()
+            return
+        }
+        cancelSurgeDismiss()
+        if let list = panel.contentView as? SurgeView {
+            let local = list.convert(panel.convertPoint(fromScreen: location), from: nil)
+            list.setHover(at: local)
         }
     }
 
@@ -159,6 +192,9 @@ final class TideBarController {
     private func collapse(_ state: ScreenState, animated: Bool) {
         state.isExpanded = false
         cancelCollapse(state)
+        if surgeOriginDisplayID == displayID(of: state.screen) {
+            dismissSurge(animated: animated)
+        }
         state.panel.ignoresMouseEvents = true
         state.view.setExpanded(false, immediate: !animated)
     }
@@ -209,6 +245,12 @@ final class TideBarController {
     // MARK: - 数据与屏幕变更
 
     private func appsDidChange() {
+        // 潮涌在场时：其 app 的窗口数变了（开/关窗）则列表已过期，收掉
+        if let surgeBundleID,
+           let entry = registry.entries.first(where: { $0.id == surgeBundleID }),
+           entry.windows?.count != surgeWindowCount {
+            dismissSurge(animated: true)
+        }
         for state in screens.values {
             let target = barFrame(for: state.screen)
             if state.isExpanded {
@@ -228,5 +270,83 @@ final class TideBarController {
     private func screensChanged() {
         fullscreenCache.removeAll()
         rebuildPanels()
+    }
+
+    // MARK: - 潮涌
+
+    private func showSurge(entry: AppEntry, state: ScreenState, iconFrame: NSRect) {
+        guard let windows = entry.windows, !windows.isEmpty else { return }
+        dismissSurge(animated: false)
+
+        let list = SurgeView(windows: windows, screen: state.screen, appIcon: entry.icon)
+        list.onPick = { [weak self] window in
+            self?.dismissSurge(animated: true)
+            if let app = entry.runningApp {
+                AXReader.raise(window, app: app)
+            }
+        }
+
+        let height = CGFloat(windows.count) * Layout.surgeRowHeight + Layout.surgeVPadding * 2
+        let anchor = state.panel.convertToScreen(state.view.convert(iconFrame, to: nil))
+        let visible = state.screen.visibleFrame
+        let x = min(max(anchor.midX - Layout.surgeWidth / 2, visible.minX + 8),
+                    visible.maxX - Layout.surgeWidth - 8)
+        let y = state.panel.frame.maxY + Layout.surgeGap
+
+        let panel = SurgePanel(contentRect: NSRect(x: x, y: y,
+                                                   width: Layout.surgeWidth,
+                                                   height: min(height, visible.maxY - y)))
+        panel.contentView = list
+        panel.orderFrontRegardless()
+        panel.makeKey()   // 玻璃采样需要 key（同汐线展开的理由）
+        surgePanel = panel
+        surgeBundleID = entry.id
+        surgeWindowCount = windows.count
+        surgeOriginDisplayID = displayID(of: state.screen)
+        list.riseRows()
+        NSLog("TideBar surge shown for %@ (%d windows)", entry.id, windows.count)
+    }
+
+    private func dismissSurge(animated: Bool) {
+        cancelSurgeDismiss()
+        guard let panel = surgePanel else { return }
+        let originDisplayID = surgeOriginDisplayID
+        surgePanel = nil
+        surgeBundleID = nil
+        surgeWindowCount = 0
+        surgeOriginDisplayID = nil
+        // key 还给原屏的汐线面板（玻璃采样），若它仍展开
+        if let id = originDisplayID, let state = screens[id], state.isExpanded {
+            state.panel.makeKey()
+        }
+        if animated, let list = panel.contentView as? SurgeView {
+            let total = list.dropRows()
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = total
+                panel.animator().alphaValue = 0
+            }, completionHandler: {
+                MainActor.assumeIsolated {
+                    panel.orderOut(nil)
+                    panel.close()
+                }
+            })
+        } else {
+            panel.orderOut(nil)
+            panel.close()
+        }
+    }
+
+    /// 离开潮涌面板后的收起防抖（与汐线收起同律）
+    private func scheduleSurgeDismiss() {
+        surgeDismissWork?.cancel()
+        let bridge = MainThreadBridge { [weak self] in self?.dismissSurge(animated: true) }
+        let work = DispatchWorkItem { bridge() }
+        surgeDismissWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Layout.surgeDismissDebounce, execute: work)
+    }
+
+    private func cancelSurgeDismiss() {
+        surgeDismissWork?.cancel()
+        surgeDismissWork = nil
     }
 }

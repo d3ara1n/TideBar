@@ -39,6 +39,11 @@ enum Motion {
     static let iconRiseStiffness: CGFloat = 340
     static let iconRiseDamping: CGFloat = 26
 
+    // MARK: 潮涌（二级展开，复用涌潮弹性）
+
+    /// 列表行升起位移（从图标栏背后起跳）
+    static let surgeRowRiseOffset: CGFloat = -12
+
     // MARK: 退潮（收起，总长约 0.22s）
 
     static let collapseDuration = 0.22

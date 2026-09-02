@@ -8,6 +8,30 @@ struct AppEntry: Identifiable {
     let icon: NSImage
     let isRunning: Bool
     let runningApp: NSRunningApplication?
+    /// 窗口快照：nil = 无 AX 信息（降级）或未运行；[] = 运行中零收录窗口
+    let windows: [WindowSnapshot]?
+
+    /// 点点状态摘要（活跃数/最小化数，nil=不画），供变更判定
+    var dotSignature: String {
+        guard isRunning, let windows else { return "nil" }
+        let mini = windows.filter(\.isMinimized).count
+        return "\(windows.count - mini)/\(mini)"
+    }
+
+    /// 主点击：仅剩最小化窗口 → 还原最近一个；否则 activate
+    /// （activate 隐含 raise 最近窗口，与 Dock 一致；无 AX 信息时同为 M1 行为）
+    func primaryClick() {
+        if let app = runningApp {
+            if let windows, !windows.isEmpty, windows.allSatisfy(\.isMinimized) {
+                AXReader.raise(windows.last!, app: app)
+                return
+            }
+            activate()
+        } else if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
+            let config = NSWorkspace.OpenConfiguration()
+            Task { try? await NSWorkspace.shared.openApplication(at: url, configuration: config) }
+        }
+    }
 
     /// 点击：运行中 → 激活 + 补发 reopen（对齐 Dock：无窗口时 app 会新开窗口）；
     /// 固定未运行 → 启动。reopen 事件若需 TCC 授权则静默跳过（零权限原则）
@@ -39,7 +63,7 @@ struct AppEntry: Identifiable {
     }
 }
 
-/// 固定 + 运行 app 的合并视图（M1：图标、运行指示点、点击启动/激活）
+/// 固定 + 运行 app 的合并视图：图标、点点（窗口状态）、点击切换/还原
 @MainActor
 final class AppRegistry {
     /// 默认固定项（bundle id），UserDefaults `tidebar.pinned`（[String]）可覆盖
@@ -51,6 +75,7 @@ final class AppRegistry {
     private(set) var entries: [AppEntry] = []
     var onChange: (() -> Void)?
 
+    private let windowStore = WindowStore()
     private var refreshDebounce: DispatchWorkItem?
     private var observers: [NSObjectProtocol] = []
 
@@ -63,6 +88,8 @@ final class AppRegistry {
                 bridge()
             })
         }
+        windowStore.onUpdate = { [weak self] _ in self?.refreshSoon() }
+        windowStore.start()
         refresh()
     }
 
@@ -106,7 +133,8 @@ final class AppRegistry {
                                           name: name(for: bundleID, app: app),
                                           icon: icon(for: bundleID, app: app),
                                           isRunning: app != nil,
-                                          runningApp: app))
+                                          runningApp: app,
+                                          windows: app != nil ? windowStore.snapshots(for: bundleID) : nil))
             seen.insert(bundleID)
         }
         var runningEntries: [AppEntry] = []
@@ -116,15 +144,16 @@ final class AppRegistry {
                                            name: name(for: bundleID, app: app),
                                            icon: icon(for: bundleID, app: app),
                                            isRunning: true,
-                                           runningApp: app))
+                                           runningApp: app,
+                                           windows: windowStore.snapshots(for: bundleID)))
         }
         runningEntries.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
         let newEntries = pinnedEntries + runningEntries
-        // 仅在可见内容变化（增删项或运行状态翻转）时通知 UI；
+        // 仅在可见内容变化（增删项、运行状态翻转、点点状态变化）时通知 UI；
         // helper 子进程的启停噪音在此被吸收，不触发图标栏重建
-        let oldSignature = entries.map { "\($0.id):\($0.isRunning)" }
-        let newSignature = newEntries.map { "\($0.id):\($0.isRunning)" }
+        let oldSignature = entries.map { "\($0.id):\($0.isRunning):\($0.dotSignature)" }
+        let newSignature = newEntries.map { "\($0.id):\($0.isRunning):\($0.dotSignature)" }
         entries = newEntries
         if oldSignature != newSignature {
             onChange?()
