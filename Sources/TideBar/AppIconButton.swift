@@ -45,11 +45,11 @@ final class AppIconButton: NSView {
             let circle = NSBezierPath(ovalIn: NSRect(x: (bounds.width - 46) / 2,
                                                      y: (bounds.height - 46) / 2,
                                                      width: 46, height: 46))
-            // 玻璃会按后方内容改变明暗；用系统强调色表达 hover，避免 labelColor 在局部背景上失去对比。
-            let accent = NSColor.controlAccentColor
-            accent.withAlphaComponent(0.16).setFill()
+            // Clear 玻璃保持可读性，hover 回归系统语义黑白色。
+            let tone = NSColor.labelColor
+            tone.withAlphaComponent(0.12).setFill()
             circle.fill()
-            accent.withAlphaComponent(0.62).setStroke()
+            tone.withAlphaComponent(0.52).setStroke()
             circle.lineWidth = 1
             circle.stroke()
         }
@@ -74,7 +74,7 @@ final class AppIconButton: NSView {
             let text = "\(windows.count)" as NSString
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: NSFont.systemFont(ofSize: 9.5, weight: .medium),
-                .foregroundColor: NSColor.controlAccentColor,
+                .foregroundColor: NSColor.labelColor,
             ]
             let size = text.size(withAttributes: attributes)
             text.draw(at: NSPoint(x: bounds.midX - size.width / 2, y: 2.5), withAttributes: attributes)
@@ -94,14 +94,14 @@ final class AppIconButton: NSView {
     }
 
     private func drawIndicator(in rect: NSRect, filled: Bool) {
-        let accent = NSColor.controlAccentColor
+        let tone = NSColor.labelColor
         let path = NSBezierPath(ovalIn: rect)
         path.lineWidth = 1.1
         if filled {
-            accent.setFill()
+            tone.setFill()
             path.fill()
         }
-        accent.setStroke()
+        tone.setStroke()
         path.stroke()
     }
 

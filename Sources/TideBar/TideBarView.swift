@@ -14,7 +14,7 @@ final class GlassBarBackgroundView: NSView {
         self.fixedCornerRadius = cornerRadius
         super.init(frame: .zero)
         glass.tintColor = .clear
-        glass.style = .regular
+        glass.style = .clear
         let placeholder = NSView()
         placeholder.autoresizingMask = [.width, .height]
         glass.contentView = placeholder
