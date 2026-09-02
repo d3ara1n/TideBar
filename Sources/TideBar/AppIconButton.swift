@@ -32,8 +32,13 @@ final class AppIconButton: NSView {
     override func draw(_ dirtyRect: NSRect) {
         let onGlass = BarBackgroundFactory.usesGlass
         let lift: CGFloat = pressed ? -1 : (hovering ? 2 : 0)
+        // 图标纵向居中（Dock 同款），运行点在图标下方近底边
+        let iconSide = Layout.iconSize
+        let iconY = (bounds.height - iconSide) / 2 + lift
         if hovering {
-            let circle = NSBezierPath(ovalIn: NSRect(x: (bounds.width - 46) / 2, y: 13, width: 46, height: 46))
+            let circle = NSBezierPath(ovalIn: NSRect(x: (bounds.width - 46) / 2,
+                                                     y: (bounds.height - 46) / 2,
+                                                     width: 46, height: 46))
             if onGlass {
                 // 玻璃底随亮暗自动翻转
                 NSColor.labelColor.withAlphaComponent(0.12).setFill()
@@ -46,9 +51,8 @@ final class AppIconButton: NSView {
                 circle.stroke()
             }
         }
-        let iconSide = Layout.iconSize
         let iconRect = NSRect(x: (bounds.width - iconSide) / 2,
-                              y: 17 + lift,
+                              y: iconY,
                               width: iconSide,
                               height: iconSide)
         entry.icon.draw(in: iconRect,
@@ -56,7 +60,7 @@ final class AppIconButton: NSView {
                         operation: .sourceOver,
                         fraction: 1)
         if entry.isRunning {
-            let dot = NSBezierPath(ovalIn: NSRect(x: bounds.midX - 2.25, y: 7, width: 4.5, height: 4.5))
+            let dot = NSBezierPath(ovalIn: NSRect(x: bounds.midX - 2.25, y: 4.5, width: 4.5, height: 4.5))
             if onGlass {
                 // 玻璃底：运行点随亮暗模式自动翻转（亮=深色点，暗=白点）
                 NSColor.labelColor.setFill()
