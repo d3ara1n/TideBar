@@ -1,6 +1,66 @@
 import AppKit
 import TideBarCore
 
+/// 视觉子树不参与命中；事件始终由完整的 52pt 图标槽接收。
+@MainActor
+private class PassthroughView: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+@MainActor
+private final class IconArtworkView: NSView {
+    var icon: NSImage {
+        didSet { needsDisplay = true }
+    }
+
+    init(icon: NSImage) {
+        self.icon = icon
+        super.init(frame: .zero)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("not supported") }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let side = Layout.iconSize
+        let rect = NSRect(x: (bounds.width - side) / 2,
+                          y: (bounds.height - side) / 2,
+                          width: side,
+                          height: side)
+        icon.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+    }
+}
+
+@MainActor
+private final class HoverHaloView: PassthroughView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = 1
+        updateAppearance()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("not supported") }
+
+    override func layout() {
+        super.layout()
+        layer?.cornerRadius = bounds.height / 2
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateAppearance()
+    }
+
+    private func updateAppearance() {
+        let tone = NSColor.labelColor
+        layer?.backgroundColor = tone.withAlphaComponent(0.12).cgColor
+        layer?.borderColor = tone.withAlphaComponent(0.52).cgColor
+    }
+}
+
 /// 展开态的单个 app 图标：悬停高亮 + 点点（窗口状态）+ 点击启动/切换/还原
 @MainActor
 final class AppIconButton: NSView {
@@ -11,6 +71,18 @@ final class AppIconButton: NSView {
     /// 潮涌触发，携图标 frame（位于 IconRowView 坐标系，即面板内容坐标）
     var onSurge: ((AppEntry, NSRect) -> Void)?
 
+    private enum VisualTransition {
+        case enter
+        case exit
+        case press
+    }
+
+    private static let visualSide: CGFloat = 46
+    /// 左下角 transform 原点放在图标底边中心；视觉内容相对它向左右各展开一半。
+    private let motionPivot = PassthroughView(frame: .zero)
+    private let visualContainer = PassthroughView(frame: .zero)
+    private let haloView = HoverHaloView(frame: .zero)
+    private let artworkView: IconArtworkView
     private var hovering = false
     private var pressed = false
     private var pressTimer: Timer?
@@ -20,8 +92,18 @@ final class AppIconButton: NSView {
 
     init(entry: AppEntry) {
         self.entry = entry
+        self.artworkView = IconArtworkView(icon: entry.icon)
         super.init(frame: NSRect(x: 0, y: 0, width: Layout.iconSlot, height: Layout.expandedHeight))
-        wantsLayer = true   // 错峰升起动画走 layer transform/opacity
+        wantsLayer = true   // 根层只承担整栏错峰升降，hover 使用独立视觉层避免 transform 争用
+        motionPivot.wantsLayer = true
+        motionPivot.layer?.masksToBounds = false
+        visualContainer.wantsLayer = true
+        artworkView.wantsLayer = true
+        visualContainer.addSubview(haloView)
+        visualContainer.addSubview(artworkView)
+        motionPivot.addSubview(visualContainer)
+        addSubview(motionPivot)
+        haloView.layer?.opacity = 0
     }
 
     @available(*, unavailable)
@@ -30,39 +112,33 @@ final class AppIconButton: NSView {
     /// 就地刷新条目（运行状态、图标、点点变化），不动视图身份与交互状态
     func update(entry newEntry: AppEntry) {
         guard newEntry.id == entry.id else { return }
-        let redraw = newEntry.isRunning != entry.isRunning || !newEntry.icon.isEqual(entry.icon)
+        let iconChanged = !newEntry.icon.isEqual(entry.icon)
+        let redraw = newEntry.isRunning != entry.isRunning
             || newEntry.dotSignature != entry.dotSignature
         entry = newEntry
+        if iconChanged { artworkView.icon = newEntry.icon }
         if redraw { needsDisplay = true }
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    override func layout() {
+        super.layout()
+        let side = Self.visualSide
+        motionPivot.frame = NSRect(x: bounds.midX,
+                                   y: (bounds.height - side) / 2,
+                                   width: 1,
+                                   height: 1)
+        visualContainer.frame = NSRect(x: -side / 2,
+                                       y: 0,
+                                       width: side,
+                                       height: side)
+        haloView.frame = visualContainer.bounds
+        artworkView.frame = visualContainer.bounds
+    }
+
     override func draw(_ dirtyRect: NSRect) {
-        let lift: CGFloat = pressed ? -1 : (hovering ? 2 : 0)
-        // 图标纵向居中（Dock 同款），运行点在图标下方近底边
-        let iconSide = Layout.iconSize
-        let iconY = (bounds.height - iconSide) / 2 + lift
-        if hovering {
-            let circle = NSBezierPath(ovalIn: NSRect(x: (bounds.width - 46) / 2,
-                                                     y: (bounds.height - 46) / 2,
-                                                     width: 46, height: 46))
-            // Clear 玻璃保持可读性，hover 回归系统语义黑白色。
-            let tone = NSColor.labelColor
-            tone.withAlphaComponent(0.12).setFill()
-            circle.fill()
-            tone.withAlphaComponent(0.52).setStroke()
-            circle.lineWidth = 1
-            circle.stroke()
-        }
-        let iconRect = NSRect(x: (bounds.width - iconSide) / 2,
-                              y: iconY,
-                              width: iconSide,
-                              height: iconSide)
-        entry.icon.draw(in: iconRect,
-                        from: .zero,
-                        operation: .sourceOver,
-                        fraction: 1)
+        // 窗口点不跟随图标 hover 缩放，避免状态信息晃动。
         drawWindowDots()
     }
 
@@ -108,11 +184,67 @@ final class AppIconButton: NSView {
     }
 
     /// 悬停态由控制器鼠标采样轮询驱动：非激活悬浮窗上 tracking area 的
-    /// entered/exited 合成不可靠（有状态机失步案例），改用确定性命中测试
+    /// entered/exited 合成不可靠（有状态机失步案例），改用确定性命中测试。
     func setHovered(_ on: Bool) {
         guard hovering != on else { return }
         hovering = on
-        needsDisplay = true
+        animateVisualState(on ? .enter : .exit)
+    }
+
+    private func animateVisualState(_ transition: VisualTransition) {
+        guard let visualLayer = motionPivot.layer, let haloLayer = haloView.layer else { return }
+        let haloOpacity: Float = hovering ? (pressed ? 0.82 : 1) : 0
+
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            visualLayer.removeAnimation(forKey: "motion.transform.translation.y")
+            visualLayer.removeAnimation(forKey: "motion.transform.scale")
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            visualLayer.setValue(0, forKeyPath: "transform.translation.y")
+            visualLayer.setValue(1, forKeyPath: "transform.scale")
+            CATransaction.commit()
+            Motion.basic(visualLayer, keyPath: "opacity", to: pressed ? Float(0.82) : Float(1),
+                         duration: Motion.pressDuration)
+            Motion.basic(haloLayer, keyPath: "opacity", to: haloOpacity,
+                         duration: Motion.hoverExitDuration)
+            return
+        }
+
+        Motion.basic(visualLayer, keyPath: "opacity", to: Float(1),
+                     duration: Motion.pressDuration)
+        let offset: CGFloat
+        let scale: CGFloat
+        switch transition {
+        case .enter:
+            offset = Motion.hoverLift
+            scale = Motion.hoverScale
+            Motion.spring(visualLayer, keyPath: "transform.translation.y", to: offset,
+                          stiffness: Motion.hoverStiffness, damping: Motion.hoverDamping,
+                          minDuration: Motion.hoverEnterDuration)
+            Motion.spring(visualLayer, keyPath: "transform.scale", to: scale,
+                          stiffness: Motion.hoverStiffness, damping: Motion.hoverDamping,
+                          minDuration: Motion.hoverEnterDuration)
+            Motion.basic(haloLayer, keyPath: "opacity", to: haloOpacity,
+                         duration: Motion.hoverEnterDuration)
+        case .exit:
+            offset = 0
+            scale = 1
+            Motion.basic(visualLayer, keyPath: "transform.translation.y", to: offset,
+                         duration: Motion.hoverExitDuration, curve: .easeIn)
+            Motion.basic(visualLayer, keyPath: "transform.scale", to: scale,
+                         duration: Motion.hoverExitDuration, curve: .easeIn)
+            Motion.basic(haloLayer, keyPath: "opacity", to: haloOpacity,
+                         duration: Motion.hoverExitDuration, curve: .easeIn)
+        case .press:
+            offset = Motion.pressOffset
+            scale = Motion.pressScale
+            Motion.basic(visualLayer, keyPath: "transform.translation.y", to: offset,
+                         duration: Motion.pressDuration)
+            Motion.basic(visualLayer, keyPath: "transform.scale", to: scale,
+                         duration: Motion.pressDuration)
+            Motion.basic(haloLayer, keyPath: "opacity", to: haloOpacity,
+                         duration: Motion.pressDuration)
+        }
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -120,9 +252,10 @@ final class AppIconButton: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        hovering = true
         pressed = true
         surged = false
-        needsDisplay = true
+        animateVisualState(.press)
         // 长按计时：期内松开视为点击，超时触发潮涌并吞掉本次点击
         pressTimer = Timer.scheduledTimer(withTimeInterval: Layout.surgePressDelay, repeats: false) { [weak self] _ in
             MainThreadBridge { [weak self] in
@@ -130,7 +263,7 @@ final class AppIconButton: NSView {
                 self.pressTimer = nil
                 self.surged = true
                 self.pressed = false
-                self.needsDisplay = true
+                self.animateVisualState(.enter)
                 self.onSurge?(self.entry, self.frame)
             }.call()
         }
@@ -138,13 +271,14 @@ final class AppIconButton: NSView {
 
     override func mouseDragged(with event: NSEvent) {
         let inside = bounds.contains(convert(event.locationInWindow, from: nil))
-        if pressed != inside {
+        if pressed != inside || hovering != inside {
             pressed = inside
+            hovering = inside
             if !inside {
                 pressTimer?.invalidate()
                 pressTimer = nil
             }
-            needsDisplay = true
+            animateVisualState(inside ? .press : .exit)
         }
     }
 
@@ -154,7 +288,7 @@ final class AppIconButton: NSView {
         let wasPressed = pressed
         pressed = false
         hovering = bounds.contains(convert(event.locationInWindow, from: nil))
-        needsDisplay = true
+        animateVisualState(hovering ? .enter : .exit)
         guard wasPressed, hovering, !surged else { return }
         if event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.option) {
             onSurge?(entry, frame)

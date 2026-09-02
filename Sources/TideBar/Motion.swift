@@ -39,6 +39,19 @@ enum Motion {
     static let iconRiseStiffness: CGFloat = 340
     static let iconRiseDamping: CGFloat = 26
 
+    // MARK: 图标轻浮潮（悬停与按压）
+
+    /// hover 在独立视觉层完成，不占用图标按钮根层的整栏波浪 transform。
+    static let hoverLift: CGFloat = 3
+    static let hoverScale: CGFloat = 1.06
+    static let hoverEnterDuration = 0.17
+    static let hoverStiffness: CGFloat = 520
+    static let hoverDamping: CGFloat = 34
+    static let hoverExitDuration = 0.11
+    static let pressOffset: CGFloat = -0.5
+    static let pressScale: CGFloat = 0.98
+    static let pressDuration = 0.07
+
     // MARK: 潮涌（二级展开，复用涌潮弹性）
 
     /// 列表行升起位移（从图标栏背后起跳）
