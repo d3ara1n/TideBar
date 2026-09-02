@@ -16,6 +16,9 @@ enum Layout {
     static let dotSize: CGFloat = 4.5
     static let dotPitch: CGFloat = 7
     static let dotBaseline: CGFloat = 4.5
+    /// 无可显示窗口点时的运行态短线，与圆点共用基线。
+    static let runningDashWidth: CGFloat = 10
+    static let runningDashHeight: CGFloat = 3
 
     // 潮涌（二级展开）
     static let surgePressDelay: TimeInterval = 0.4

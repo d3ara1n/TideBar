@@ -138,12 +138,12 @@ final class AppIconButton: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        // 窗口点不跟随图标 hover 缩放，避免状态信息晃动。
+        // 运行短线和窗口点不跟随 hover 缩放，保证状态信息稳定。
         drawWindowDots()
+        drawRunningWithoutWindowsIndicator()
     }
 
-    /// 点点：实心=活跃窗口、空心=最小化，>5 收敛为数字；
-    /// 无 AX 信息或零收录窗口不画（降级/零窗口与 Dock 语义一致：不误导）
+    /// 点点：实心=活跃窗口、空心=最小化，>5 收敛为数字。
     private func drawWindowDots() {
         guard entry.isRunning, let windows = entry.windows, !windows.isEmpty else { return }
         let active = windows.filter { !$0.isMinimized }.count
@@ -169,6 +169,22 @@ final class AppIconButton: NSView {
             drawIndicator(in: rect, filled: index < active)
             x += Layout.dotPitch
         }
+    }
+
+    /// AX 未知与已知零窗口均没有可绘制窗口点，以短线明确表达进程仍在运行。
+    private func drawRunningWithoutWindowsIndicator() {
+        guard entry.isRunning else { return }
+        if let windows = entry.windows, !windows.isEmpty { return }
+
+        let rect = NSRect(x: bounds.midX - Layout.runningDashWidth / 2,
+                          y: Layout.dotBaseline + (Layout.dotSize - Layout.runningDashHeight) / 2,
+                          width: Layout.runningDashWidth,
+                          height: Layout.runningDashHeight)
+        let path = NSBezierPath(roundedRect: rect,
+                                xRadius: Layout.runningDashHeight / 2,
+                                yRadius: Layout.runningDashHeight / 2)
+        NSColor.labelColor.withAlphaComponent(0.78).setFill()
+        path.fill()
     }
 
     private func drawIndicator(in rect: NSRect, filled: Bool) {
