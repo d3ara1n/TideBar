@@ -11,7 +11,15 @@ final class GlassBarBackgroundView: NSView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         glass.tintColor = .clear
-        glass.style = .clear   // 去掉背景采样底色：无边框悬浮窗中 regular 样式会渲染矩形黑色采样层
+        glass.style = .regular
+        let placeholder = NSView()
+        placeholder.autoresizingMask = [.width, .height]
+        glass.contentView = placeholder
+        // regular 材质的背景采样层覆盖全窗口矩形且不受 cornerRadius 约束，
+        // 必须用 layer 裁剪把它裁进胶囊形（alt-tab 同款）
+        glass.wantsLayer = true
+        glass.layer?.masksToBounds = true
+        glass.layer?.cornerCurve = .continuous
         addSubview(glass)
     }
 
@@ -22,6 +30,7 @@ final class GlassBarBackgroundView: NSView {
         super.layout()
         glass.frame = bounds
         glass.cornerRadius = bounds.height / 2
+        glass.layer?.cornerRadius = bounds.height / 2
     }
 }
 
