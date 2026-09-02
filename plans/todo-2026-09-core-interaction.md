@@ -8,14 +8,14 @@
 
 ## 范围
 
-- [ ] 汐线渲染：2~3pt 白色胶囊贴底边（panel 配置见 decisions.md「交互与技术约定」；接近检测按「2026-09 调研修订」条目 3：全局 mouseMoved monitor + local monitor + 低频轮询兜底，汐线保持点击穿透）
-- [ ] 展开态：~64pt 高图标栏，圆角背景
-- [ ] 图标：固定 + 运行 app（`NSRunningApplication.icon` 兜底链 + KVO `runningApplications` 250ms 去抖）与运行指示点
-- [ ] 点击启动/激活：NSWorkspace
-- [ ] 细线 ↔ 图标栏过渡动画（NSAnimationContext / layer 动画），panel frame 随高度调整
-- [ ] 收起防抖：mouse exited 后 300ms 延迟收起，期间 re-enter 取消
-- [ ] 全屏 Space 检测：全屏时保持细线态
-- [ ] 多屏支持：每屏一个 panel + 屏幕参数变更通知
+- [x] 汐线渲染：2~3pt 白色胶囊贴底边（panel 配置见 decisions.md「交互与技术约定」；接近检测按「2026-09 调研修订」条目 3：全局 mouseMoved monitor + local monitor + 低频轮询兜底，汐线保持点击穿透）
+- [x] 展开态：~64pt 高图标栏，圆角背景
+- [x] 图标：固定 + 运行 app（`NSRunningApplication.icon` 兜底链 + NSWorkspace 启停通知 250ms 去抖）与运行指示点
+- [x] 点击启动/激活/重开：NSWorkspace + reopen Apple event（Dock 同款；若被 TCC 拦则静默降级为仅激活）
+- [x] 细线 ↔ 图标栏过渡动画（NSAnimationContext / layer 动画），panel frame 随高度调整
+- [x] 收起防抖：mouse exited 后 300ms 延迟收起，期间 re-enter 取消
+- [x] 全屏 Space 检测：全屏时保持细线态（零权限启发式：普通层窗口铺满整屏）
+- [x] 多屏支持：每屏一个 panel + 屏幕参数变更通知
 
 ## 权限
 
@@ -23,7 +23,7 @@
 
 ## 验证前提
 
-验证机手动执行系统 Dock 隐藏（命令见 decisions.md「架构」；向导属 M3，不在本期）。delay-1000 期间 Cmd+M 的窗口暂无落点，属预期——M2 窗口瓦片接替。
+测试期不隐藏系统 Dock：TideBar 悬浮于屏幕底边上方 `offsetY`（UserDefaults 键 `tidebar.offsetY`，缺省 140pt）避开重叠；固定项可用 `tidebar.pinned`（bundle id 数组）覆盖。手感验证通过后，手动执行 Dock 隐藏命令（见 decisions.md「架构」；向导属 M3）做贴底复验。
 
 ## 验收
 
