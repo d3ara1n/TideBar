@@ -2,7 +2,7 @@ import AppKit
 
 /// 实现层参数（决策边界内 agent 自主，调手感时改这里）
 enum Layout {
-    // 汐线（收起态白色胶囊）
+    // 汐线（收起态随亮暗模式自适应的胶囊）
     static let capsuleWidth: CGFloat = 160
     static let capsuleHeight: CGFloat = 3
 

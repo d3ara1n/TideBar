@@ -14,7 +14,6 @@ final class GlassBarBackgroundView: NSView {
     init(cornerRadius: CGFloat? = nil) {
         self.fixedCornerRadius = cornerRadius
         super.init(frame: .zero)
-        glass.tintColor = .clear
         glass.style = .clear
         let placeholder = NSView()
         placeholder.autoresizingMask = [.width, .height]
@@ -25,6 +24,7 @@ final class GlassBarBackgroundView: NSView {
         glass.layer?.masksToBounds = true
         glass.layer?.cornerCurve = .continuous
         addSubview(glass)
+        updateGlassTint()
     }
 
     @available(*, unavailable)
@@ -36,6 +36,18 @@ final class GlassBarBackgroundView: NSView {
         let radius = fixedCornerRadius ?? bounds.height / 2
         glass.cornerRadius = radius
         glass.layer?.cornerRadius = radius
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateGlassTint()
+    }
+
+    private func updateGlassTint() {
+        let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        glass.tintColor = dark
+            ? NSColor.black.withAlphaComponent(0.55)
+            : NSColor.white.withAlphaComponent(0.92)
     }
 }
 
