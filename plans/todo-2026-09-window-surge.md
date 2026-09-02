@@ -8,7 +8,7 @@
 
 ## 前置探针（半日，先于一切开发）
 
-- [ ] AX 探针工具：对真实 app 集（Finder / Safari / Chrome / Electron 类 / Java 类 / Terminal / 微信等）逐项打印 `kAXWindows` / `kAXMinimized` / `kAXTitle` / `kAXDocument` 实测值
+- [ ] AX 探针工具：对真实 app 集（Finder / Safari / Chrome / Electron 类 / Java 类 / Terminal / 微信等）逐项打印 `kAXWindows` / `kAXMinimized` / `kAXTitle` / `kAXDocument` / `kAXPosition`（屏幕归属）实测值
 - [ ] 产出覆盖表；读不到窗口的 app 占比或名单不可接受 → 本档复盘，降级方案再议
 
 ## 范围
@@ -18,6 +18,7 @@
 - [ ] 点击升级：raise 最近非最小化窗口；仅剩最小化窗口则还原最近一个
 - [ ] 潮涌（SurgePanel）：长按（~0.4s，期间松开视为点击）或 ⌥+点击触发，从图标上方错峰升起，收起反向退落
 - [ ] 列表项：窗口标题为主 + 文档图标（`kAXDocument` → `NSWorkspace.icon(forFile:)`，失败退回 app 图标），最小化窗口暗显
+- [ ] 屏幕归属：潮涌列表本屏窗口在前正常显示，他屏窗口靠后暗显（与最小化暗显同语言）；点点保持全局窗口计数（含他屏）
 - [ ] 右键菜单：窗口列表直达 + 常规项（退出 / 在 Finder 显示）
 - [ ] 还原/聚焦：`kAXMinimized=false` + `kAXRaiseAction` + `activateIgnoringOtherApps`
 - [ ] 降级：AX 读不到窗口的 app 保持 M1 行为（纯图标 + activate，不画点点）
