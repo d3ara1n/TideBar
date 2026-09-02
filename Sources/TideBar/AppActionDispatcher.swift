@@ -4,6 +4,20 @@ import TideBarCore
 /// 应用级系统动作的唯一入口。UI 能力只负责展示，执行前再次按统一身份校验策略。
 @MainActor
 enum AppActionDispatcher {
+    static func hide(_ entry: AppEntry) {
+        for (pid, app) in entry.runningAppsByPID.sorted(by: { $0.key < $1.key }) {
+            guard let bundleIdentifier = app.bundleIdentifier,
+                  AppIdentity(bundleIdentifier) == entry.identity
+            else {
+                NSLog("TideBar hide skipped for mismatched pid %d", pid)
+                continue
+            }
+            if !app.hide() {
+                NSLog("TideBar hide request failed: %@ (pid %d)", bundleIdentifier, pid)
+            }
+        }
+    }
+
     static func terminate(_ entry: AppEntry) {
         let behavior = AppBehavior.resolve(for: entry.identity)
         guard entry.canTerminate, behavior.canTerminate else {

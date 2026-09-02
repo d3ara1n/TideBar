@@ -117,3 +117,13 @@ defaults delete com.apple.dock autohide-delay && killall Dock
 3. **Finder 仅代表通用规则收录窗口**：Finder 只有在窗口知识已知且至少有一个收录窗口时显示；标准窗口或最小化窗口均计入，桌面 AX 元素由通用规则自然排除，不增加 Finder 窗口类型特判。已知零窗口、AX 未授权、尚未完成枚举或读取降级时均隐藏；固定配置只决定其出现时的位置，不能使其常驻。
 4. **动作能力由模型约束**：菜单只展示模型允许的动作，受保护的终止动作统一通过执行入口再次读取当前模型并校验规范身份对应的行为。Finder 不具备终止能力，不提供“退出”，也不尝试在终止 Finder 后恢复桌面。
 5. **identity 与内容修订分离**：identity 只负责复用视图；进程、能力或可观测窗口模型变化必须替换最新模型。被跟踪条目消失、窗口知识降级或可观测窗口模型变化时，已展开潮涌立即失效并关闭。
+
+## 2026-09 应用右键菜单范围
+
+1. **只承诺通用菜单**：窗口直达、打开/激活、隐藏、固定切换、退出和在 Finder 中显示由 TideBar 自行构建；不承诺复刻系统 Dock 的完整菜单。
+2. **不继承其他应用的自定义 Dock 菜单**：`applicationDockMenu(_:)` 只允许应用向系统 Dock 提供自己的菜单，没有供第三方进程读取任意应用菜单的公开 API。TideBar 不把 Dock 私有 API 或瞬态 AX 菜单抓取作为基础设施。
+3. **增强能力重新立项**：最近项目及其文档图标、针对特定应用的专属动作均为未来可选能力，不纳入通用菜单实现；若立项，需重新评估数据来源、权限与系统版本稳定性。
+
+来源：
+- Apple `NSApplicationDelegate.applicationDockMenu(_:)`：https://developer.apple.com/documentation/appkit/nsapplicationdelegate/applicationdockmenu(_:)
+- Apple `NSDockTilePlugIn`：https://developer.apple.com/documentation/appkit/nsdocktileplugin

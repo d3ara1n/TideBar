@@ -96,6 +96,9 @@ final class TideBarController {
             let view = TideBarView(frame: NSRect(origin: .zero, size: frame.size))
             panel.contentView = view
             let state = ScreenState(screen: screen, panel: panel, view: view)
+            view.onHide = { [weak self] identity in
+                self?.registry.requestHide(of: identity)
+            }
             view.onTerminate = { [weak self] identity in
                 self?.registry.requestTermination(of: identity)
             }

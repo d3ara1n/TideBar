@@ -66,6 +66,7 @@ private final class HoverHaloView: PassthroughView {
 final class AppIconButton: NSView {
     private(set) var entry: AppEntry
     var onClick: ((AppEntry) -> Void)?
+    var onHide: ((AppIdentity) -> Void)?
     var onTerminate: ((AppIdentity) -> Void)?
     var onSetPinned: ((AppIdentity, Bool) -> Void)?
     /// 潮涌触发，携图标 frame（位于 IconRowView 坐标系，即面板内容坐标）
@@ -334,6 +335,25 @@ final class AppIconButton: NSView {
             }
             if addedWindow { menu.addItem(.separator()) }
         }
+        if entry.isRunning {
+            let hide = NSMenuItem(title: "隐藏", action: #selector(MenuAction.run), keyEquivalent: "h")
+            hide.keyEquivalentModifierMask = .command
+            let identity = entry.identity
+            let requestHide = onHide
+            let action = MenuAction { requestHide?(identity) }
+            menuActions.append(action)
+            hide.target = action
+            menu.addItem(hide)
+        } else {
+            let open = NSMenuItem(title: "打开", action: #selector(MenuAction.run), keyEquivalent: "")
+            let entry = entry
+            let launch = onClick
+            let action = MenuAction { launch?(entry) }
+            menuActions.append(action)
+            open.target = action
+            menu.addItem(open)
+        }
+
         let pin = NSMenuItem(title: entry.isPinned ? "取消固定" : "固定到 TideBar",
                              action: #selector(MenuAction.run),
                              keyEquivalent: "")

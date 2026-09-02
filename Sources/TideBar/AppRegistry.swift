@@ -144,6 +144,15 @@ final class AppRegistry {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
     }
 
+    func requestHide(of identity: AppIdentity) {
+        refresh()
+        guard let entry = entries.first(where: { $0.identity == identity }) else {
+            NSLog("TideBar hide ignored for unavailable app: %@", identity.bundleIdentifier)
+            return
+        }
+        AppActionDispatcher.hide(entry)
+    }
+
     func requestTermination(of identity: AppIdentity) {
         refresh()
         guard let entry = entries.first(where: { $0.identity == identity }) else {
