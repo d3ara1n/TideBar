@@ -1,5 +1,6 @@
 import AppKit
 import QuartzCore
+import TideBarCore
 
 // MARK: - 玻璃背景（macOS 26+）
 
@@ -56,6 +57,7 @@ enum BarBackgroundFactory {
 @MainActor
 final class IconRowView: NSView {
     var onLaunch: ((AppEntry) -> Void)?
+    var onTerminate: ((AppIdentity) -> Void)?
     var onSurge: ((AppEntry, NSRect) -> Void)?
     private var buttons: [AppIconButton] = []
 
@@ -107,6 +109,7 @@ final class IconRowView: NSView {
     private func makeButton(_ app: AppEntry) -> AppIconButton {
         let button = AppIconButton(entry: app)
         button.onClick = { [weak self] entry in self?.onLaunch?(entry) }
+        button.onTerminate = { [weak self] identity in self?.onTerminate?(identity) }
         button.onSurge = { [weak self] entry, frame in self?.onSurge?(entry, frame) }
         return button
     }
@@ -177,6 +180,7 @@ final class TideBarView: NSView {
     private let tideline = CALayer()
     private let iconRow = IconRowView()
     private(set) var isExpandedState = false
+    var onTerminate: ((AppIdentity) -> Void)?
     /// 潮涌触发透传（携图标 frame，面板内容坐标）
     var onSurge: ((AppEntry, NSRect) -> Void)?
 
@@ -233,6 +237,7 @@ final class TideBarView: NSView {
         breath.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         tideline.add(breath, forKey: "breath")
         iconRow.onLaunch = { $0.primaryClick() }
+        iconRow.onTerminate = { [weak self] identity in self?.onTerminate?(identity) }
         iconRow.onSurge = { [weak self] entry, frame in self?.onSurge?(entry, frame) }
     }
 

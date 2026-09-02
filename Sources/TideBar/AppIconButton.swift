@@ -1,10 +1,12 @@
 import AppKit
+import TideBarCore
 
 /// 展开态的单个 app 图标：悬停高亮 + 点点（窗口状态）+ 点击启动/切换/还原
 @MainActor
 final class AppIconButton: NSView {
     private(set) var entry: AppEntry
     var onClick: ((AppEntry) -> Void)?
+    var onTerminate: ((AppIdentity) -> Void)?
     /// 潮涌触发，携图标 frame（位于 IconRowView 坐标系，即面板内容坐标）
     var onSurge: ((AppEntry, NSRect) -> Void)?
 
@@ -27,11 +29,10 @@ final class AppIconButton: NSView {
     /// 就地刷新条目（运行状态、图标、点点变化），不动视图身份与交互状态
     func update(entry newEntry: AppEntry) {
         guard newEntry.id == entry.id else { return }
-        if newEntry.isRunning != entry.isRunning || newEntry.icon !== entry.icon
-            || newEntry.dotSignature != entry.dotSignature {
-            entry = newEntry
-            needsDisplay = true
-        }
+        let redraw = newEntry.isRunning != entry.isRunning || !newEntry.icon.isEqual(entry.icon)
+            || newEntry.dotSignature != entry.dotSignature
+        entry = newEntry
+        if redraw { needsDisplay = true }
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -167,8 +168,10 @@ final class AppIconButton: NSView {
         let menu = NSMenu()
         menuActions.removeAll()
 
-        if let windows = entry.windows, let app = entry.runningApp, !windows.isEmpty {
+        if let windows = entry.windows, !windows.isEmpty {
+            var addedWindow = false
             for (index, window) in windows.enumerated() {
+                guard let app = entry.runningApp(for: window) else { continue }
                 let item = NSMenuItem(title: window.title ?? "窗口 \(index + 1)",
                                       action: #selector(MenuAction.run),
                                       keyEquivalent: "")
@@ -176,18 +179,21 @@ final class AppIconButton: NSView {
                 menuActions.append(action)
                 item.target = action
                 menu.addItem(item)
+                addedWindow = true
             }
-            menu.addItem(.separator())
+            if addedWindow { menu.addItem(.separator()) }
         }
-        if let app = entry.runningApp {
+        if entry.canTerminate, entry.runningApp != nil {
             let quit = NSMenuItem(title: "退出", action: #selector(MenuAction.run), keyEquivalent: "q")
             quit.keyEquivalentModifierMask = .command
-            let action = MenuAction { _ = app.terminate() }
+            let identity = entry.identity
+            let terminate = onTerminate
+            let action = MenuAction { terminate?(identity) }
             menuActions.append(action)
             quit.target = action
             menu.addItem(quit)
         }
-        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: entry.id) {
+        if let url = entry.applicationURL {
             let reveal = NSMenuItem(title: "在 Finder 中显示",
                                     action: #selector(MenuAction.run),
                                     keyEquivalent: "")

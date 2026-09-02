@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import TideBarCore
 
 /// 编排者：每屏一个 panel；接近检测三重兜底（全局 monitor + local monitor + 低频轮询）；
 /// 展开/收起状态机与 300ms 防抖；全屏 Space 抑制展开
@@ -31,8 +32,8 @@ final class TideBarController {
 
     // 潮涌：同一时刻只存在一个，归属于触发它的屏
     private var surgePanel: SurgePanel?
-    private var surgeBundleID: String?
-    private var surgeWindowCount = 0
+    private var surgeIdentity: AppIdentity?
+    private var surgeWindowRevision: WindowKnowledge<WindowContentRevision>?
     private var surgeOriginDisplayID: CGDirectDisplayID?
     private var surgeDismissWork: DispatchWorkItem?
 
@@ -70,8 +71,9 @@ final class TideBarController {
 
     // MARK: - 面板生命周期
 
-    /// 配置模式切换后重新计算贴底位置和面板层级。
+    /// 配置变化先刷新应用模型，再按最新配置重建面板。
     func configurationDidChange() {
+        registry.refresh()
         rebuildPanels()
     }
 
@@ -91,6 +93,9 @@ final class TideBarController {
             let view = TideBarView(frame: NSRect(origin: .zero, size: frame.size))
             panel.contentView = view
             let state = ScreenState(screen: screen, panel: panel, view: view)
+            view.onTerminate = { [weak self] identity in
+                self?.registry.requestTermination(of: identity)
+            }
             view.onSurge = { [weak self, weak state] entry, iconFrame in
                 guard let self, let state else { return }
                 self.showSurge(entry: entry, state: state, iconFrame: iconFrame)
@@ -250,11 +255,12 @@ final class TideBarController {
     // MARK: - 数据与屏幕变更
 
     private func appsDidChange() {
-        // 潮涌在场时：其 app 的窗口数变了（开/关窗）则列表已过期，收掉
-        if let surgeBundleID,
-           let entry = registry.entries.first(where: { $0.id == surgeBundleID }),
-           entry.windows?.count != surgeWindowCount {
-            dismissSurge(animated: true)
+        // 条目消失、窗口知识降级或任意窗口内容变化时，现有潮涌模型即过期。
+        if let surgeIdentity {
+            let currentRevision = registry.entries.first(where: { $0.id == surgeIdentity })?.windowRevision
+            if currentRevision != surgeWindowRevision {
+                dismissSurge(animated: true)
+            }
         }
         for state in screens.values {
             let target = barFrame(for: state.screen)
@@ -286,7 +292,7 @@ final class TideBarController {
         let list = SurgeView(windows: windows, screen: state.screen, appIcon: entry.icon)
         list.onPick = { [weak self] window in
             self?.dismissSurge(animated: true)
-            if let app = entry.runningApp {
+            if let app = entry.runningApp(for: window) {
                 AXReader.raise(window, app: app)
             }
         }
@@ -305,11 +311,11 @@ final class TideBarController {
         panel.orderFrontRegardless()
         panel.makeKey()   // 玻璃采样需要 key（同汐线展开的理由）
         surgePanel = panel
-        surgeBundleID = entry.id
-        surgeWindowCount = windows.count
+        surgeIdentity = entry.id
+        surgeWindowRevision = entry.windowRevision
         surgeOriginDisplayID = displayID(of: state.screen)
         list.riseRows()
-        NSLog("TideBar surge shown for %@ (%d windows)", entry.id, windows.count)
+        NSLog("TideBar surge shown for %@ (%d windows)", entry.id.bundleIdentifier, windows.count)
     }
 
     private func dismissSurge(animated: Bool) {
@@ -317,8 +323,8 @@ final class TideBarController {
         guard let panel = surgePanel else { return }
         let originDisplayID = surgeOriginDisplayID
         surgePanel = nil
-        surgeBundleID = nil
-        surgeWindowCount = 0
+        surgeIdentity = nil
+        surgeWindowRevision = nil
         surgeOriginDisplayID = nil
         // key 还给原屏的汐线面板（玻璃采样），若它仍展开
         if let id = originDisplayID, let state = screens[id], state.isExpanded {
