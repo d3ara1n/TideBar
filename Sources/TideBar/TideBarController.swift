@@ -13,6 +13,7 @@ final class TideBarController {
         let view: TideBarView
         var isExpanded = false
         var collapseDebounce: DispatchWorkItem?
+        var collapseHeldUntilMouseMoves = false
 
         init(screen: NSScreen, panel: TidePanel, view: TideBarView) {
             self.screen = screen
@@ -42,17 +43,19 @@ final class TideBarController {
         registry.start()
         rebuildPanels()
 
-        // 接近检测：全局 monitor 为主，local monitor 兜自家激活，轮询兜静止光标
-        let sample = MainThreadBridge { [weak self] in self?.sampleMouse() }
+        // 接近检测：全局 monitor 为主，local monitor 兜自家激活，轮询兜静止光标。
+        // 真实移动与轮询分流，菜单动作可保持展开直到用户再次移动鼠标。
+        let movementSample = MainThreadBridge { [weak self] in self?.sampleMouse(isMovement: true) }
+        let pollSample = MainThreadBridge { [weak self] in self?.sampleMouse(isMovement: false) }
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { _ in
-            sample()
+            movementSample()
         }
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { event in
-            sample()
+            movementSample()
             return event
         }
         pollTimer = Timer.scheduledTimer(withTimeInterval: Layout.pollInterval, repeats: true) { _ in
-            sample()
+            pollSample()
         }
 
         let screenBridge = MainThreadBridge { [weak self] in self?.screensChanged() }
@@ -71,7 +74,7 @@ final class TideBarController {
 
     // MARK: - 面板生命周期
 
-    /// 配置变化先刷新应用模型，再按最新配置重建面板。
+    /// 结构配置变化先刷新应用模型，再按最新配置重建面板；固定列表单独原地刷新。
     func configurationDidChange() {
         registry.refresh()
         rebuildPanels()
@@ -95,6 +98,12 @@ final class TideBarController {
             let state = ScreenState(screen: screen, panel: panel, view: view)
             view.onTerminate = { [weak self] identity in
                 self?.registry.requestTermination(of: identity)
+            }
+            view.onSetPinned = { [weak self, weak state] identity, pinned in
+                guard let self, let state else { return }
+                state.collapseHeldUntilMouseMoves = true
+                self.cancelCollapse(state)
+                self.registry.setPinned(pinned, for: identity)
             }
             view.onSurge = { [weak self, weak state] entry, iconFrame in
                 guard let self, let state else { return }
@@ -142,7 +151,13 @@ final class TideBarController {
 
     // MARK: - 鼠标采样与状态机
 
-    private func sampleMouse() {
+    private func sampleMouse(isMovement: Bool) {
+        if isMovement {
+            for state in screens.values {
+                state.collapseHeldUntilMouseMoves = false
+            }
+        }
+
         let now = CACurrentMediaTime()
         guard now - lastSampleTime >= Layout.mouseSampleThrottle else { return }
         lastSampleTime = now
@@ -156,6 +171,11 @@ final class TideBarController {
                 continue
             }
             if state.isExpanded {
+                if state.collapseHeldUntilMouseMoves {
+                    cancelCollapse(state)
+                    state.view.updateHover(atScreen: location)
+                    continue
+                }
                 var keep = state.panel.frame.insetBy(dx: -Layout.keepMargin, dy: -Layout.keepMargin)
                 // 潮涌在场时滞留区并入潮涌面板，鼠标在列表上不触发收起
                 if let surge = surgePanel, surgeOriginDisplayID == displayID(of: state.screen) {
@@ -201,6 +221,7 @@ final class TideBarController {
 
     private func collapse(_ state: ScreenState, animated: Bool) {
         state.isExpanded = false
+        state.collapseHeldUntilMouseMoves = false
         cancelCollapse(state)
         if surgeOriginDisplayID == displayID(of: state.screen) {
             dismissSurge(animated: animated)

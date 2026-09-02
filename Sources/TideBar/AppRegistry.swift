@@ -5,11 +5,14 @@ import UniformTypeIdentifiers
 /// 图标栏的一个条目：固定项与运行项去重合并后的视图模型
 struct AppEntry: Identifiable {
     let identity: AppIdentity
+    /// 固定配置保留采集到的原始 bundle identifier，不用规范化身份代替 locator。
+    let bundleIdentifier: String
     /// 启动、显示安装位置等系统操作使用解析后的 URL，不反查规范化身份。
     let applicationURL: URL?
     let name: String
     let icon: NSImage
 
+    let isPinned: Bool
     let preferredProcessIdentifier: pid_t?
     let runningAppsByPID: [pid_t: NSRunningApplication]
     let windowKnowledge: WindowKnowledge<WindowSnapshot>
@@ -35,6 +38,7 @@ struct AppEntry: Identifiable {
         AppContentRevision(identity: identity,
                            name: name,
                            applicationPath: applicationURL?.path,
+                           isPinned: isPinned,
                            preferredProcessIdentifier: preferredProcessIdentifier,
                            processIdentifiers: Array(runningAppsByPID.keys),
                            canTerminate: canTerminate,
@@ -101,9 +105,6 @@ struct AppEntry: Identifiable {
 /// 固定 + 运行 app 的合并视图：图标、点点（窗口状态）、点击切换/还原
 @MainActor
 final class AppRegistry {
-    /// 默认固定项（bundle id），UserDefaults `tidebar.pinned`（[String]）可覆盖
-    private static let defaultPinned = ["com.apple.Finder", "com.apple.Safari", "com.apple.mail",
-                                        "com.apple.Notes", "com.apple.Music", "com.apple.Terminal"]
     /// 不进任务栏的系统进程
     private static let hiddenApps: Set<AppIdentity> = [AppIdentity("com.apple.dock")]
 
@@ -123,6 +124,12 @@ final class AppRegistry {
                 bridge()
             })
         }
+        let pinnedBridge = MainThreadBridge { [weak self] in self?.refresh() }
+        observers.append(NotificationCenter.default.addObserver(
+            forName: AppConfiguration.pinnedDidChange, object: nil, queue: .main
+        ) { _ in
+            pinnedBridge()
+        })
         windowStore.onUpdate = { [weak self] _ in self?.refreshSoon() }
         windowStore.start()
         refresh()
@@ -146,9 +153,18 @@ final class AppRegistry {
         AppActionDispatcher.terminate(entry)
     }
 
+    func setPinned(_ pinned: Bool, for identity: AppIdentity) {
+        refresh()
+        guard let entry = entries.first(where: { $0.identity == identity }) else {
+            NSLog("TideBar pin change ignored for unavailable app: %@", identity.bundleIdentifier)
+            return
+        }
+        AppConfiguration.shared.setPinned(pinned, bundleIdentifier: entry.bundleIdentifier)
+    }
+
     func refresh() {
         let workspace = NSWorkspace.shared
-        let pinned = AppConfiguration.shared.pinnedBundleIDs ?? Self.defaultPinned
+        let pinned = AppConfiguration.shared.effectivePinnedBundleIDs
         let running = workspace.runningApplications.filter {
             guard $0.activationPolicy == .regular, let bundleIdentifier = $0.bundleIdentifier else {
                 return false
@@ -201,9 +217,11 @@ final class AppRegistry {
             guard app != nil || applicationURL != nil else { continue }
 
             let entry = AppEntry(identity: description.identity,
+                                 bundleIdentifier: locator,
                                  applicationURL: applicationURL,
                                  name: name(locator: locator, app: app, applicationURL: applicationURL),
                                  icon: icon(app: app, applicationURL: applicationURL),
+                                 isPinned: description.isPinned,
                                  preferredProcessIdentifier: app?.processIdentifier,
                                  runningAppsByPID: appsByPID,
                                  windowKnowledge: windowKnowledge,

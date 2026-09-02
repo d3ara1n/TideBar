@@ -70,6 +70,7 @@ enum BarBackgroundFactory {
 final class IconRowView: NSView {
     var onLaunch: ((AppEntry) -> Void)?
     var onTerminate: ((AppIdentity) -> Void)?
+    var onSetPinned: ((AppIdentity, Bool) -> Void)?
     var onSurge: ((AppEntry, NSRect) -> Void)?
     private var buttons: [AppIconButton] = []
 
@@ -122,6 +123,7 @@ final class IconRowView: NSView {
         let button = AppIconButton(entry: app)
         button.onClick = { [weak self] entry in self?.onLaunch?(entry) }
         button.onTerminate = { [weak self] identity in self?.onTerminate?(identity) }
+        button.onSetPinned = { [weak self] identity, pinned in self?.onSetPinned?(identity, pinned) }
         button.onSurge = { [weak self] entry, frame in self?.onSurge?(entry, frame) }
         return button
     }
@@ -193,6 +195,7 @@ final class TideBarView: NSView {
     private let iconRow = IconRowView()
     private(set) var isExpandedState = false
     var onTerminate: ((AppIdentity) -> Void)?
+    var onSetPinned: ((AppIdentity, Bool) -> Void)?
     /// 潮涌触发透传（携图标 frame，面板内容坐标）
     var onSurge: ((AppEntry, NSRect) -> Void)?
 
@@ -250,6 +253,7 @@ final class TideBarView: NSView {
         tideline.add(breath, forKey: "breath")
         iconRow.onLaunch = { $0.primaryClick() }
         iconRow.onTerminate = { [weak self] identity in self?.onTerminate?(identity) }
+        iconRow.onSetPinned = { [weak self] identity, pinned in self?.onSetPinned?(identity, pinned) }
         iconRow.onSurge = { [weak self] entry, frame in self?.onSurge?(entry, frame) }
     }
 

@@ -2,11 +2,13 @@ import Testing
 @testable import TideBarCore
 
 private func revision(processIdentifier: Int32 = 10,
+                      isPinned: Bool = false,
                       canTerminate: Bool = true,
                       windows: WindowKnowledge<WindowContentRevision> = .known([])) -> AppContentRevision {
     AppContentRevision(identity: AppIdentity("com.example.app"),
                        name: "Example",
                        applicationPath: "/Applications/Example.app",
+                       isPinned: isPinned,
                        preferredProcessIdentifier: processIdentifier,
                        processIdentifiers: [processIdentifier],
                        canTerminate: canTerminate,
@@ -15,6 +17,10 @@ private func revision(processIdentifier: Int32 = 10,
 
 @Test func processReplacementChangesAppContentRevision() {
     #expect(revision(processIdentifier: 10) != revision(processIdentifier: 11))
+}
+
+@Test func pinStateChangeChangesAppContentRevision() {
+    #expect(revision(isPinned: true) != revision(isPinned: false))
 }
 
 @Test func capabilityChangeChangesAppContentRevision() {
@@ -48,6 +54,7 @@ private func revision(processIdentifier: Int32 = 10,
     let first = AppContentRevision(identity: AppIdentity("com.example.app"),
                                    name: "Example",
                                    applicationPath: nil,
+                                   isPinned: false,
                                    preferredProcessIdentifier: 10,
                                    processIdentifiers: [10, 11],
                                    canTerminate: true,
@@ -55,6 +62,7 @@ private func revision(processIdentifier: Int32 = 10,
     let second = AppContentRevision(identity: AppIdentity("com.example.app"),
                                     name: "Example",
                                     applicationPath: nil,
+                                    isPinned: false,
                                     preferredProcessIdentifier: 10,
                                     processIdentifiers: [11, 10],
                                     canTerminate: true,

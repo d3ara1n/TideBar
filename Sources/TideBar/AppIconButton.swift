@@ -7,6 +7,7 @@ final class AppIconButton: NSView {
     private(set) var entry: AppEntry
     var onClick: ((AppEntry) -> Void)?
     var onTerminate: ((AppIdentity) -> Void)?
+    var onSetPinned: ((AppIdentity, Bool) -> Void)?
     /// 潮涌触发，携图标 frame（位于 IconRowView 坐标系，即面板内容坐标）
     var onSurge: ((AppEntry, NSRect) -> Void)?
 
@@ -183,6 +184,17 @@ final class AppIconButton: NSView {
             }
             if addedWindow { menu.addItem(.separator()) }
         }
+        let pin = NSMenuItem(title: entry.isPinned ? "取消固定" : "固定到 TideBar",
+                             action: #selector(MenuAction.run),
+                             keyEquivalent: "")
+        let identity = entry.identity
+        let shouldPin = !entry.isPinned
+        let setPinned = onSetPinned
+        let pinAction = MenuAction { setPinned?(identity, shouldPin) }
+        menuActions.append(pinAction)
+        pin.target = pinAction
+        menu.addItem(pin)
+
         if entry.canTerminate, entry.runningApp != nil {
             let quit = NSMenuItem(title: "退出", action: #selector(MenuAction.run), keyEquivalent: "q")
             quit.keyEquivalentModifierMask = .command

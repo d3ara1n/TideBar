@@ -24,6 +24,7 @@ public struct AppContentRevision: Equatable, Sendable {
     public let identity: AppIdentity
     public let name: String
     public let applicationPath: String?
+    public let isPinned: Bool
     public let preferredProcessIdentifier: Int32?
     public let processIdentifiers: [Int32]
     public let canTerminate: Bool
@@ -32,6 +33,7 @@ public struct AppContentRevision: Equatable, Sendable {
     public init(identity: AppIdentity,
                 name: String,
                 applicationPath: String?,
+                isPinned: Bool,
                 preferredProcessIdentifier: Int32?,
                 processIdentifiers: [Int32],
                 canTerminate: Bool,
@@ -39,6 +41,7 @@ public struct AppContentRevision: Equatable, Sendable {
         self.identity = identity
         self.name = name
         self.applicationPath = applicationPath
+        self.isPinned = isPinned
         self.preferredProcessIdentifier = preferredProcessIdentifier
         self.processIdentifiers = processIdentifiers.sorted()
         self.canTerminate = canTerminate

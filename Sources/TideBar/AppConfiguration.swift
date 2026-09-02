@@ -1,4 +1,5 @@
 import AppKit
+import TideBarCore
 
 /// TideBar 的持久化配置。系统 Dock 的原始值由 DockController 单独快照。
 @MainActor
@@ -10,6 +11,9 @@ final class AppConfiguration {
 
     static let shared = AppConfiguration()
     static let didChange = Notification.Name("TideBar.configurationDidChange")
+    static let pinnedDidChange = Notification.Name("TideBar.pinnedAppsDidChange")
+    static let defaultPinnedBundleIDs = ["com.apple.Finder", "com.apple.Safari", "com.apple.mail",
+                                         "com.apple.Notes", "com.apple.Music", "com.apple.Terminal"]
 
     private let defaults = UserDefaults.standard
     private let modeKey = "tidebar.mode"
@@ -28,13 +32,33 @@ final class AppConfiguration {
         }
     }
 
-    /// 固定项 bundle id 列表；未设置时为 nil（AppRegistry 以默认固定项兜底）
+    /// 固定项 bundle id 列表；未设置时使用内建默认值。
     var pinnedBundleIDs: [String]? {
         get { defaults.stringArray(forKey: pinnedKey) }
         set {
             defaults.set(newValue, forKey: pinnedKey)
-            notifyChange()
+            NotificationCenter.default.post(name: Self.pinnedDidChange, object: self)
         }
+    }
+
+    var effectivePinnedBundleIDs: [String] {
+        pinnedBundleIDs ?? Self.defaultPinnedBundleIDs
+    }
+
+    /// 固定操作保留系统提供的原始 bundle identifier；身份比较仍忽略 ASCII 大小写。
+    func setPinned(_ pinned: Bool, bundleIdentifier: String) {
+        let identity = AppIdentity(bundleIdentifier)
+        var bundleIdentifiers = effectivePinnedBundleIDs
+        let contains = bundleIdentifiers.contains { AppIdentity($0) == identity }
+
+        if pinned {
+            guard !contains else { return }
+            bundleIdentifiers.append(bundleIdentifier)
+        } else {
+            guard contains else { return }
+            bundleIdentifiers.removeAll { AppIdentity($0) == identity }
+        }
+        pinnedBundleIDs = bundleIdentifiers
     }
 
     /// 贴底偏移：接管态贴底；悬浮测试态为可调值（缺省 140pt）
