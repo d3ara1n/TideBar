@@ -44,4 +44,6 @@ macOS Dock 替代品：平时缩成屏幕底部一条细线，鼠标靠近时如
 ## 约定
 
 - 文档、注释、提交信息用中文；运行时日志（NSLog）用正式英文，保证可 grep。
+- 提交信息用 Conventional Commits 格式（type 英文小写：feat/fix/docs/chore/refactor…，主题中文）。
+- AI 辅助的提交加 `Co-Authored-By: <模型名> <邮箱>` trailer；模型身份查 `PI_*` 环境变量，无对应邮箱用 `noreply@pi.dev`，不得伪造 provider 域名。
 - 代码与文档不留「原来是 A 改成 B」的历史痕迹，追溯看 git log。
