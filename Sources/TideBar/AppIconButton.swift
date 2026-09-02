@@ -66,7 +66,7 @@ private final class HoverHaloView: PassthroughView {
 final class AppIconButton: NSView {
     private(set) var entry: AppEntry
     var onClick: ((AppEntry) -> Void)?
-    var onHide: ((AppIdentity) -> Void)?
+    var onSetHidden: ((AppIdentity, Bool) -> Void)?
     var onTerminate: ((AppIdentity) -> Void)?
     var onSetPinned: ((AppIdentity, Bool) -> Void)?
     /// 潮涌触发，携图标 frame（位于 IconRowView 坐标系，即面板内容坐标）
@@ -258,41 +258,9 @@ final class AppIconButton: NSView {
         let menu = NSMenu()
         menuActions.removeAll()
 
-        if let windows = entry.windows, !windows.isEmpty {
-            var addedWindow = false
-            for (index, window) in windows.enumerated() {
-                guard let app = entry.runningApp(for: window) else { continue }
-                let item = NSMenuItem(title: window.title ?? "窗口 \(index + 1)",
-                                      action: #selector(MenuAction.run),
-                                      keyEquivalent: "")
-                let action = MenuAction { AXReader.raise(window, app: app) }
-                menuActions.append(action)
-                item.target = action
-                menu.addItem(item)
-                addedWindow = true
-            }
-            if addedWindow { menu.addItem(.separator()) }
-        }
-        if entry.isRunning {
-            let hide = NSMenuItem(title: "隐藏", action: #selector(MenuAction.run), keyEquivalent: "h")
-            hide.keyEquivalentModifierMask = .command
-            let identity = entry.identity
-            let requestHide = onHide
-            let action = MenuAction { requestHide?(identity) }
-            menuActions.append(action)
-            hide.target = action
-            menu.addItem(hide)
-        } else {
-            let open = NSMenuItem(title: "打开", action: #selector(MenuAction.run), keyEquivalent: "")
-            let entry = entry
-            let launch = onClick
-            let action = MenuAction { launch?(entry) }
-            menuActions.append(action)
-            open.target = action
-            menu.addItem(open)
-        }
-
-        let pin = NSMenuItem(title: entry.isPinned ? "取消固定" : "固定到 TideBar",
+        let pin = NSMenuItem(title: entry.isPinned
+                             ? "取消在 TideBar 中固定"
+                             : "固定到 TideBar",
                              action: #selector(MenuAction.run),
                              keyEquivalent: "")
         let identity = entry.identity
@@ -303,16 +271,6 @@ final class AppIconButton: NSView {
         pin.target = pinAction
         menu.addItem(pin)
 
-        if entry.canTerminate, entry.runningApp != nil {
-            let quit = NSMenuItem(title: "退出", action: #selector(MenuAction.run), keyEquivalent: "q")
-            quit.keyEquivalentModifierMask = .command
-            let identity = entry.identity
-            let terminate = onTerminate
-            let action = MenuAction { terminate?(identity) }
-            menuActions.append(action)
-            quit.target = action
-            menu.addItem(quit)
-        }
         if let url = entry.applicationURL {
             let reveal = NSMenuItem(title: "在 Finder 中显示",
                                     action: #selector(MenuAction.run),
@@ -321,6 +279,38 @@ final class AppIconButton: NSView {
             menuActions.append(action)
             reveal.target = action
             menu.addItem(reveal)
+        }
+        menu.addItem(.separator())
+
+        if entry.isRunning {
+            let shouldHide = !entry.isHidden
+            let visibility = NSMenuItem(title: shouldHide ? "隐藏" : "显示",
+                                        action: #selector(MenuAction.run),
+                                        keyEquivalent: shouldHide ? "h" : "")
+            if shouldHide { visibility.keyEquivalentModifierMask = .command }
+            let setHidden = onSetHidden
+            let action = MenuAction { setHidden?(identity, shouldHide) }
+            menuActions.append(action)
+            visibility.target = action
+            menu.addItem(visibility)
+        } else {
+            let open = NSMenuItem(title: "打开", action: #selector(MenuAction.run), keyEquivalent: "")
+            let entry = entry
+            let launch = onClick
+            let action = MenuAction { launch?(entry) }
+            menuActions.append(action)
+            open.target = action
+            menu.addItem(open)
+        }
+
+        if entry.canTerminate, entry.isRunning {
+            let quit = NSMenuItem(title: "退出", action: #selector(MenuAction.run), keyEquivalent: "q")
+            quit.keyEquivalentModifierMask = .command
+            let terminate = onTerminate
+            let action = MenuAction { terminate?(identity) }
+            menuActions.append(action)
+            quit.target = action
+            menu.addItem(quit)
         }
         return menu
     }

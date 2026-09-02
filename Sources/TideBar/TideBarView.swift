@@ -77,7 +77,7 @@ struct AppListUpdate {
 @MainActor
 final class IconRowView: NSView {
     var onLaunch: ((AppEntry) -> Void)?
-    var onHide: ((AppIdentity) -> Void)?
+    var onSetHidden: ((AppIdentity, Bool) -> Void)?
     var onTerminate: ((AppIdentity) -> Void)?
     var onSetPinned: ((AppIdentity, Bool) -> Void)?
     var onSurge: ((AppEntry, NSRect) -> Void)?
@@ -165,7 +165,7 @@ final class IconRowView: NSView {
     private func makeButton(_ app: AppEntry) -> AppIconButton {
         let button = AppIconButton(entry: app)
         button.onClick = { [weak self] entry in self?.onLaunch?(entry) }
-        button.onHide = { [weak self] identity in self?.onHide?(identity) }
+        button.onSetHidden = { [weak self] identity, hidden in self?.onSetHidden?(identity, hidden) }
         button.onTerminate = { [weak self] identity in self?.onTerminate?(identity) }
         button.onSetPinned = { [weak self] identity, pinned in self?.onSetPinned?(identity, pinned) }
         button.onSurge = { [weak self] entry, frame in self?.onSurge?(entry, frame) }
@@ -290,7 +290,7 @@ final class TideBarView: NSView {
     private let tideline = CALayer()
     private let iconRow = IconRowView()
     private(set) var isExpandedState = false
-    var onHide: ((AppIdentity) -> Void)?
+    var onSetHidden: ((AppIdentity, Bool) -> Void)?
     var onTerminate: ((AppIdentity) -> Void)?
     var onSetPinned: ((AppIdentity, Bool) -> Void)?
     /// 潮涌触发透传（携图标 frame，面板内容坐标）
@@ -349,7 +349,7 @@ final class TideBarView: NSView {
         breath.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         tideline.add(breath, forKey: "breath")
         iconRow.onLaunch = { $0.primaryClick() }
-        iconRow.onHide = { [weak self] identity in self?.onHide?(identity) }
+        iconRow.onSetHidden = { [weak self] identity, hidden in self?.onSetHidden?(identity, hidden) }
         iconRow.onTerminate = { [weak self] identity in self?.onTerminate?(identity) }
         iconRow.onSetPinned = { [weak self] identity, pinned in self?.onSetPinned?(identity, pinned) }
         iconRow.onSurge = { [weak self] entry, frame in self?.onSurge?(entry, frame) }

@@ -1,4 +1,4 @@
-/// 会影响窗口菜单、潮涌与点点的窗口内容修订。
+/// 会影响潮涌与状态标记的窗口内容修订。
 public struct WindowContentRevision: Equatable, Sendable {
     public let ownerProcessIdentifier: Int32
     public let elementIdentifier: Int
@@ -27,6 +27,7 @@ public struct AppContentRevision: Equatable, Sendable {
     public let isPinned: Bool
     public let preferredProcessIdentifier: Int32?
     public let processIdentifiers: [Int32]
+    public let isHidden: Bool
     public let canTerminate: Bool
     public let windows: WindowKnowledge<WindowContentRevision>
 
@@ -36,6 +37,7 @@ public struct AppContentRevision: Equatable, Sendable {
                 isPinned: Bool,
                 preferredProcessIdentifier: Int32?,
                 processIdentifiers: [Int32],
+                isHidden: Bool,
                 canTerminate: Bool,
                 windows: WindowKnowledge<WindowContentRevision>) {
         self.identity = identity
@@ -44,6 +46,7 @@ public struct AppContentRevision: Equatable, Sendable {
         self.isPinned = isPinned
         self.preferredProcessIdentifier = preferredProcessIdentifier
         self.processIdentifiers = processIdentifiers.sorted()
+        self.isHidden = isHidden
         self.canTerminate = canTerminate
         self.windows = windows
     }

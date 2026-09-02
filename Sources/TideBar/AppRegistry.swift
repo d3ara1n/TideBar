@@ -16,6 +16,7 @@ struct AppEntry: Identifiable {
     let preferredProcessIdentifier: pid_t?
     let runningAppsByPID: [pid_t: NSRunningApplication]
     let windowKnowledge: WindowKnowledge<WindowSnapshot>
+    let isHidden: Bool
     let canTerminate: Bool
 
     var id: AppIdentity { identity }
@@ -41,6 +42,7 @@ struct AppEntry: Identifiable {
                            isPinned: isPinned,
                            preferredProcessIdentifier: preferredProcessIdentifier,
                            processIdentifiers: Array(runningAppsByPID.keys),
+                           isHidden: isHidden,
                            canTerminate: canTerminate,
                            windows: windowRevision)
     }
@@ -119,7 +121,9 @@ final class AppRegistry {
         let center = NSWorkspace.shared.notificationCenter
         let bridge = MainThreadBridge { [weak self] in self?.refreshSoon() }
         for name: Notification.Name in [NSWorkspace.didLaunchApplicationNotification,
-                                         NSWorkspace.didTerminateApplicationNotification] {
+                                         NSWorkspace.didTerminateApplicationNotification,
+                                         NSWorkspace.didHideApplicationNotification,
+                                         NSWorkspace.didUnhideApplicationNotification] {
             observers.append(center.addObserver(forName: name, object: nil, queue: .main) { _ in
                 bridge()
             })
@@ -144,13 +148,13 @@ final class AppRegistry {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
     }
 
-    func requestHide(of identity: AppIdentity) {
+    func requestSetHidden(_ hidden: Bool, of identity: AppIdentity) {
         refresh()
         guard let entry = entries.first(where: { $0.identity == identity }) else {
-            NSLog("TideBar hide ignored for unavailable app: %@", identity.bundleIdentifier)
+            NSLog("TideBar visibility change ignored for unavailable app: %@", identity.bundleIdentifier)
             return
         }
-        AppActionDispatcher.hide(entry)
+        AppActionDispatcher.setHidden(hidden, for: entry)
     }
 
     func requestTermination(of identity: AppIdentity) {
@@ -234,6 +238,7 @@ final class AppRegistry {
                                  preferredProcessIdentifier: app?.processIdentifier,
                                  runningAppsByPID: appsByPID,
                                  windowKnowledge: windowKnowledge,
+                                 isHidden: !apps.isEmpty && apps.allSatisfy(\.isHidden),
                                  canTerminate: description.behavior.canTerminate)
             if description.isPinned {
                 pinnedEntries.append(entry)

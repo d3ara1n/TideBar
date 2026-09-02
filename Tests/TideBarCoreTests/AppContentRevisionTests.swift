@@ -3,6 +3,7 @@ import Testing
 
 private func revision(processIdentifier: Int32 = 10,
                       isPinned: Bool = false,
+                      isHidden: Bool = false,
                       canTerminate: Bool = true,
                       windows: WindowKnowledge<WindowContentRevision> = .known([])) -> AppContentRevision {
     AppContentRevision(identity: AppIdentity("com.example.app"),
@@ -11,6 +12,7 @@ private func revision(processIdentifier: Int32 = 10,
                        isPinned: isPinned,
                        preferredProcessIdentifier: processIdentifier,
                        processIdentifiers: [processIdentifier],
+                       isHidden: isHidden,
                        canTerminate: canTerminate,
                        windows: windows)
 }
@@ -21,6 +23,10 @@ private func revision(processIdentifier: Int32 = 10,
 
 @Test func pinStateChangeChangesAppContentRevision() {
     #expect(revision(isPinned: true) != revision(isPinned: false))
+}
+
+@Test func hiddenStateChangeChangesAppContentRevision() {
+    #expect(revision(isHidden: true) != revision(isHidden: false))
 }
 
 @Test func capabilityChangeChangesAppContentRevision() {
@@ -57,6 +63,7 @@ private func revision(processIdentifier: Int32 = 10,
                                    isPinned: false,
                                    preferredProcessIdentifier: 10,
                                    processIdentifiers: [10, 11],
+                                   isHidden: false,
                                    canTerminate: true,
                                    windows: .known([]))
     let second = AppContentRevision(identity: AppIdentity("com.example.app"),
@@ -65,6 +72,7 @@ private func revision(processIdentifier: Int32 = 10,
                                     isPinned: false,
                                     preferredProcessIdentifier: 10,
                                     processIdentifiers: [11, 10],
+                                    isHidden: false,
                                     canTerminate: true,
                                     windows: .known([]))
 
