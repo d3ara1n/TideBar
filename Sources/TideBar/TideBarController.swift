@@ -149,7 +149,6 @@ final class TideBarController {
         state.isExpanded = true
         cancelCollapse(state)
         state.panel.ignoresMouseEvents = false
-        state.panel.hasShadow = true
         state.view.setExpanded(true, apps: registry.entries)
         NSLog("TideBar expanded on screen %u", displayID(of: state.screen) ?? 0)
     }
@@ -158,7 +157,6 @@ final class TideBarController {
         state.isExpanded = false
         cancelCollapse(state)
         state.panel.ignoresMouseEvents = true
-        state.panel.hasShadow = false
         state.view.setExpanded(false, immediate: !animated)
     }
 

@@ -10,15 +10,25 @@ import QuartzCore
 ///
 /// 位移一律走 layer transform，不改 frame——不与布局打架，随时可被反向打断。
 enum Motion {
+    // MARK: 潮体不透明度编排
+    /// 涌潮峰值（玻璃路径下，水体在玻璃凝成前承担视觉主体）
+    static let swellPeakOpacity: Float = 0.85
+    /// 退潮时水体归来亮度（玻璃退场后接管退潮动画）
+    static let retreatOpacity: Float = 0.8
+
+    /// 水体调色：涌起时向玻璃色调过渡（亮色模式变白，「黑矩形消失」因此隐形）
+    static let waterTintDelay = 0.06
+    static let waterTintDuration = 0.32
+
     // MARK: 涌潮（展开，总长约 0.4s）
 
     /// 汐线感应：轻微增厚（预告，让展开不突兀）
     static let senseDuration = 0.14
-    /// 潮体（剪影层）胶囊 → bar 的弹性形变
+    /// 潮体胶囊 → bar 的弹性形变
     static let swellDuration = 0.38
     static let swellStiffness: CGFloat = 320
     static let swellDamping: CGFloat = 24
-    /// 玻璃显影：剪影胀开到位前开始接管，稳定后剪影淡出
+    /// 玻璃显影：潮体胀开的同时玻璃凝成，随后潮体淡出
     static let glassFadeDelay = 0.08
     static let glassFadeDuration = 0.22
     /// 图标波
