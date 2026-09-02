@@ -189,7 +189,7 @@ final class SurgePanel: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
-        level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
+        level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         isMovable = false
         hidesOnDeactivate = false

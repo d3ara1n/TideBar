@@ -2,13 +2,6 @@ import AppKit
 
 /// 实现层参数（决策边界内 agent 自主，调手感时改这里）
 enum Layout {
-    /// 测试期悬浮高度：暂不隐藏系统 Dock，TideBar 浮于屏幕底边上方避免重叠。
-    /// UserDefaults 键 `tidebar.offsetY`（pt），缺省 140；M3 接管向导后归零。
-    static var offsetY: CGFloat {
-        let raw = UserDefaults.standard.double(forKey: "tidebar.offsetY")
-        return raw > 0 ? raw : 140
-    }
-
     // 汐线（收起态白色胶囊）
     static let capsuleWidth: CGFloat = 160
     static let capsuleHeight: CGFloat = 3

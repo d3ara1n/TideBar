@@ -70,6 +70,11 @@ final class TideBarController {
 
     // MARK: - 面板生命周期
 
+    /// 配置模式切换后重新计算贴底位置和面板层级。
+    func configurationDidChange() {
+        rebuildPanels()
+    }
+
     private func rebuildPanels() {
         dismissSurge(animated: false)
         for state in screens.values {

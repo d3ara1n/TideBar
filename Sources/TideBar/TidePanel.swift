@@ -11,7 +11,8 @@ final class TidePanel: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
-        level = .floating
+        // 先尝试系统状态栏层级，使展开栏覆盖最大化窗口；若实测干扰系统面板再回退为 .floating。
+        level = .statusBar
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         isMovable = false
         hidesOnDeactivate = false

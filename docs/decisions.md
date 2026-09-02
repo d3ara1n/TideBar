@@ -59,7 +59,7 @@ defaults delete com.apple.dock autohide-delay && killall Dock
 ## 权限策略
 
 - 当前零权限：hover 检测用不可见热区窗口 + NSTrackingArea，鼠标事件不需授权（键盘全局监听才要辅助功能）
-- 后期加窗口预览 → 屏幕录制权限；最小化窗口管理 → 辅助功能权限。均告别 App Store，走 Developer ID + 公证直发（$99/年，开发期不需要）
+- 后期加窗口预览 → 屏幕录制权限；最小化窗口管理 → 辅助功能权限。项目走开源、非 App Store 分发路线，不以商店审核为技术约束
 
 ## 交互与技术约定
 
@@ -81,9 +81,20 @@ defaults delete com.apple.dock autohide-delay && killall Dock
 1. **使命收窄（取代「核心差异化 = 零存在感 + 完整 Dock 功能」）**：不做 dock 杂务——废纸篓、角标、拖拽管理不做，窗口预览延后。被隐藏 Dock 带走的能力用自有方案还原：窗口瓦片一体收录全部窗口（含最小化），不区分是否最小化，点击即开。
 2. **分期推进**：M1 潮汐交互验证（细线 + 展开 + 固定/运行图标，零权限，手感不成立则项目复盘）→ M2 窗口瓦片（AX 窗口枚举/聚焦/还原，需辅助功能权限）→ M3 系统接管向导（App 内开关执行隐藏，快照/恢复/自愈）。
 3. **接近检测改道（取代「权限策略」的 NSTrackingArea 热区方案）**：全局 `NSEvent.addGlobalMonitorForEvents(.mouseMoved)`。鼠标类事件零权限（仅键盘类需辅助功能）；汐线窗口保持点击穿透，无需热区吃事件。兜底：local monitor + 低频轮询 `NSEvent.mouseLocation`。NSTrackingArea 降级为展开面板内部 hover 方案。
-4. **隐藏参数补全（细化「架构」节命令集）**：M3 完整参数 = autohide + autohide-delay 1000 + autohide-time-modifier 0 + no-bouncing + tilesize 16 + magnification false + largesize 16 + mineffect scale。tilesize 组针对 Mission Control/Exposé 无视 autohide 强显；mineffect 针对 genie 动画指向隐藏 Dock 穿帮。向导标配快照/恢复/自愈（隐藏指纹检测 + atexit/signal 兜底）。
+4. **隐藏参数补全（细化「架构」节命令集）**：M3 完整参数 = autohide + autohide-delay 1000 + autohide-time-modifier 0 + no-bouncing + tilesize 16 + magnification false + largesize 16 + mineffect scale。tilesize 组针对 Mission Control/Exposé 无视 autohide 强显；mineffect 针对 genie 动画指向隐藏 Dock 穿帮。向导标配快照/恢复；配置漂移仅在设置页打开或用户主动检查时发现，不做常驻自愈。
 5. **废纸篓不做（取代可行性表 FSEvents 行的方案预期）**：将来若重启，已验证路线是 kqueue（`DispatchSourceFileSystemObject` + `O_EVTONLY`），无项目用 FSEvents。
 6. **可行性表勘误**：窗口预览的现实 = 枚举用 ScreenCaptureKit、逐窗抓图仍以私有 `CGSHWCaptureWindowList` 为主流（能截最小化窗口；纯 SCK 在 14/15 有崩溃/bug，AltTab 至 macOS 26 才全量 SCK），「AltTab 2026 已全量转 SkyLight」表述过时。录屏授权须重启 app 后生效，向导流程需按此设计。
+
+## 2026-09 M3 接管层级决策
+
+1. **优先高层级顶置，失败则接受展开态遮盖**：TideBar 面板优先使用 `NSWindow.Level.statusBar`，潮涌面板高一级，用于验证展开态覆盖最大化窗口的体验；不使用 `.screenSaver`，避免压住系统级安全界面。若状态栏层级干扰菜单、弹窗或全屏 Space，则回退为普通悬浮层，暂不做 AX 窗口避让。
+2. **接管态与测试态分离**：测试态继续使用悬浮高度（默认 140pt）；接管态由配置模式驱动，贴底运行（offsetY = 0）。
+3. **不采用私有 CoreDock API 的理由**：即使项目走开源、非 App Store 分发，也不把私有 API 作为长期基础设施；唯一原因是系统版本兼容性、行为稳定性和后续维护成本不可控。短期实验可以单独验证，但不能成为 M3 的默认实现。
+
+## 2026-09 M3 状态检查决策
+
+1. **不做常驻自动自愈**：不运行 Dock 配置轮询计时器，不引入后台 helper 或 LaunchAgent。只在 TideBar 启动、接管/恢复操作后、设置界面打开或用户主动点击检查时读取 Dock 配置。
+2. **漂移只告警，修复需显式操作**：发现 Dock 配置与接管指纹不一致时，设置界面显示警告信息条；用户点击“立即检查并修复”后才重新应用接管参数。
 
 ## 潮涌：窗口交互模型（2026-09 定稿）
 

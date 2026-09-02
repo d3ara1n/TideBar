@@ -5,8 +5,6 @@ import AppKit
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)   // 无 Dock 图标、不进 Cmd-Tab
-
-let controller = TideBarController()
-controller.start()
-
+let delegate = AppDelegate()
+app.delegate = delegate
 app.run()

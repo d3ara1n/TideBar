@@ -12,4 +12,4 @@ swift run      # 本地运行（期间终端会话被占用）
 - 定位与灵魂交互：[docs/product.md](docs/product.md)
 - 架构决策与技术约定：[docs/decisions.md](docs/decisions.md)
 - 进行中的工作：[plans/](plans/)
-- bundle id 占位 `dev.tidebar.TideBar`，发布前更换；打包 `.app` 与签名公证流程届时补充
+- bundle id `dev.dearain.TideBar`；打包 `.app` 与签名公证流程届时补充
