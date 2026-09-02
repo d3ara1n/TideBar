@@ -84,6 +84,7 @@ final class AppIconButton: NSView {
     private let visualContainer = PassthroughView(frame: .zero)
     private let haloView = HoverHaloView(frame: .zero)
     private let artworkView: IconArtworkView
+    private let statusIndicatorView: AppStatusIndicatorView
     private var hovering = false
     private var pressed = false
     private var pressTimer: Timer?
@@ -94,6 +95,7 @@ final class AppIconButton: NSView {
     init(entry: AppEntry) {
         self.entry = entry
         self.artworkView = IconArtworkView(icon: entry.icon)
+        self.statusIndicatorView = AppStatusIndicatorView(entry: entry)
         super.init(frame: NSRect(x: 0, y: 0, width: Layout.iconSlot, height: Layout.expandedHeight))
         wantsLayer = true   // 根层只承担整栏错峰升降，hover 使用独立视觉层避免 transform 争用
         motionPivot.wantsLayer = true
@@ -103,6 +105,7 @@ final class AppIconButton: NSView {
         visualContainer.addSubview(haloView)
         visualContainer.addSubview(artworkView)
         motionPivot.addSubview(visualContainer)
+        addSubview(statusIndicatorView)
         addSubview(motionPivot)
         haloView.layer?.opacity = 0
     }
@@ -114,17 +117,18 @@ final class AppIconButton: NSView {
     func update(entry newEntry: AppEntry) {
         guard newEntry.id == entry.id else { return }
         let iconChanged = !newEntry.icon.isEqual(entry.icon)
-        let redraw = newEntry.isRunning != entry.isRunning
+        let statusChanged = newEntry.isRunning != entry.isRunning
             || newEntry.dotSignature != entry.dotSignature
         entry = newEntry
         if iconChanged { artworkView.icon = newEntry.icon }
-        if redraw { needsDisplay = true }
+        statusIndicatorView.update(entry: newEntry, animated: statusChanged)
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func layout() {
         super.layout()
+        statusIndicatorView.frame = bounds
         let side = Self.visualSide
         motionPivot.frame = NSRect(x: bounds.midX,
                                    y: (bounds.height - side) / 2,
@@ -136,68 +140,6 @@ final class AppIconButton: NSView {
                                        height: side)
         haloView.frame = visualContainer.bounds
         artworkView.frame = visualContainer.bounds
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        // 运行短线和窗口点不跟随 hover 缩放，保证状态信息稳定。
-        drawWindowDots()
-        drawRunningWithoutWindowsIndicator()
-    }
-
-    /// 点点：实心=活跃窗口、空心=最小化，>5 收敛为数字。
-    private func drawWindowDots() {
-        guard entry.isRunning, let windows = entry.windows, !windows.isEmpty else { return }
-        let active = windows.filter { !$0.isMinimized }.count
-
-        if windows.count > 5 {
-            let text = "\(windows.count)" as NSString
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: 9.5, weight: .medium),
-                .foregroundColor: NSColor.labelColor,
-            ]
-            let size = text.size(withAttributes: attributes)
-            text.draw(at: NSPoint(x: bounds.midX - size.width / 2, y: 2.5), withAttributes: attributes)
-            return
-        }
-
-        let mini = windows.count - active
-        let total = CGFloat(active + mini - 1) * Layout.dotPitch + Layout.dotSize
-        var x = bounds.midX - total / 2
-        for index in 0..<(active + mini) {
-            let rect = NSRect(x: x, y: Layout.dotBaseline,
-                              width: Layout.dotSize, height: Layout.dotSize)
-            // 单一强调色：实心=活跃窗口，空心=最小化窗口；不叠加黑白轮廓，避免视觉刺眼。
-            drawIndicator(in: rect, filled: index < active)
-            x += Layout.dotPitch
-        }
-    }
-
-    /// AX 未知与已知零窗口均没有可绘制窗口点，以短线明确表达进程仍在运行。
-    private func drawRunningWithoutWindowsIndicator() {
-        guard entry.isRunning else { return }
-        if let windows = entry.windows, !windows.isEmpty { return }
-
-        let rect = NSRect(x: bounds.midX - Layout.runningDashWidth / 2,
-                          y: Layout.dotBaseline + (Layout.dotSize - Layout.runningDashHeight) / 2,
-                          width: Layout.runningDashWidth,
-                          height: Layout.runningDashHeight)
-        let path = NSBezierPath(roundedRect: rect,
-                                xRadius: Layout.runningDashHeight / 2,
-                                yRadius: Layout.runningDashHeight / 2)
-        NSColor.labelColor.withAlphaComponent(0.78).setFill()
-        path.fill()
-    }
-
-    private func drawIndicator(in rect: NSRect, filled: Bool) {
-        let tone = NSColor.labelColor
-        let path = NSBezierPath(ovalIn: rect)
-        path.lineWidth = 1.1
-        if filled {
-            tone.setFill()
-            path.fill()
-        }
-        tone.setStroke()
-        path.stroke()
     }
 
     /// 悬停态由控制器鼠标采样轮询驱动：非激活悬浮窗上 tracking area 的
@@ -262,10 +204,6 @@ final class AppIconButton: NSView {
             Motion.basic(haloLayer, keyPath: "opacity", to: haloOpacity,
                          duration: Motion.pressDuration)
         }
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        needsDisplay = true
     }
 
     override func mouseDown(with event: NSEvent) {

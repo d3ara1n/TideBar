@@ -66,6 +66,14 @@ enum BarBackgroundFactory {
 
 // MARK: - 图标横排
 
+struct AppListUpdate {
+    let hasInsertions: Bool
+    let hasRemovals: Bool
+    let removalDuration: TimeInterval
+
+    static let none = AppListUpdate(hasInsertions: false, hasRemovals: false, removalDuration: 0)
+}
+
 @MainActor
 final class IconRowView: NSView {
     var onLaunch: ((AppEntry) -> Void)?
@@ -74,28 +82,44 @@ final class IconRowView: NSView {
     var onSetPinned: ((AppIdentity, Bool) -> Void)?
     var onSurge: ((AppEntry, NSRect) -> Void)?
     private var buttons: [AppIconButton] = []
+    /// 离场项保留到动画结束，避免列表真值先删除导致视图瞬间消失。
+    private var departingButtons: [AppIdentity: AppIconButton] = [:]
+    private var departureTokens: [AppIdentity: Int] = [:]
 
     /// rebuildAll = true：整体重建（展开动画完整重播）
-    /// rebuildAll = false：按 id 差分，仅新项上涌、消失项淡出，其余原地保留
-    func update(apps: [AppEntry], rebuildAll: Bool) {
+    /// rebuildAll = false：按 identity 差分，统一处理新增、删除与保留项重排。
+    @discardableResult
+    func update(apps: [AppEntry], rebuildAll: Bool) -> AppListUpdate {
         if rebuildAll {
-            buttons.forEach { $0.removeFromSuperview() }
+            for button in buttons + Array(departingButtons.values) {
+                button.removeFromSuperview()
+            }
+            departingButtons.removeAll()
+            departureTokens.removeAll()
             buttons = apps.map { app in
                 let button = makeButton(app)
                 addSubview(button)
                 return button
             }
             needsLayout = true
-            return
+            return .none
         }
 
+        var oldFrames = Dictionary(uniqueKeysWithValues: buttons.map { ($0.entry.id, $0.frame) })
         var kept = Dictionary(uniqueKeysWithValues: buttons.map { ($0.entry.id, $0) })
         var next: [AppIconButton] = []
         var newcomers: [AppIconButton] = []
+
         for app in apps {
             if let existing = kept.removeValue(forKey: app.id) {
                 existing.update(entry: app)
                 next.append(existing)
+            } else if let returning = departingButtons.removeValue(forKey: app.id) {
+                departureTokens[app.id, default: 0] += 1
+                oldFrames[app.id] = returning.frame
+                restoreForReuse(returning)
+                returning.update(entry: app)
+                next.append(returning)
             } else {
                 let button = makeButton(app)
                 addSubview(button)
@@ -103,21 +127,39 @@ final class IconRowView: NSView {
                 newcomers.append(button)
             }
         }
-        for gone in kept.values {
-            NSAnimationContext.runAnimationGroup({ context in
-                context.duration = 0.15
-                gone.animator().alphaValue = 0
-            }, completionHandler: {
-                MainActor.assumeIsolated {
-                    gone.removeFromSuperview()
-                }
-            })
+
+        let removed = Array(kept.values)
+        for button in removed {
+            beginDeparture(button)
         }
+
         buttons = next
         needsLayout = true
-        for button in newcomers {
-            rise(button, delay: 0)
+        layoutSubtreeIfNeeded()
+
+        let newcomerIDs = Set(newcomers.map { $0.entry.id })
+        if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            for button in buttons where !newcomerIDs.contains(button.entry.id) {
+                guard let oldFrame = oldFrames[button.entry.id], let layer = button.layer else { continue }
+                let delta = oldFrame.midX - button.frame.midX
+                guard abs(delta) > 0.5 else { continue }
+                Motion.spring(layer, keyPath: "transform.translation.x", from: delta, to: CGFloat(0),
+                              stiffness: Motion.iconRepositionStiffness,
+                              damping: Motion.iconRepositionDamping,
+                              minDuration: Motion.iconRepositionDuration)
+            }
         }
+        for button in newcomers {
+            rise(button, delay: Motion.iconInsertionDelay)
+        }
+
+        let removalDuration = removed.isEmpty
+            ? 0
+            : (NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+               ? Motion.reducedMotionFadeDuration : Motion.dropDuration)
+        return AppListUpdate(hasInsertions: !newcomers.isEmpty,
+                             hasRemovals: !removed.isEmpty,
+                             removalDuration: removalDuration)
     }
 
     private func makeButton(_ app: AppEntry) -> AppIconButton {
@@ -175,11 +217,63 @@ final class IconRowView: NSView {
 
     private func rise(_ button: AppIconButton, delay: TimeInterval) {
         guard let layer = button.layer else { return }
-        Motion.spring(layer, keyPath: "transform.translation.y", from: Motion.iconRiseOffset, to: 0,
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            Motion.basic(layer, keyPath: "opacity", from: Float(0), to: Float(1),
+                         duration: Motion.reducedMotionFadeDuration, delay: delay)
+            return
+        }
+        Motion.spring(layer, keyPath: "transform.translation.y", from: Motion.iconRiseOffset, to: CGFloat(0),
                       stiffness: Motion.iconRiseStiffness, damping: Motion.iconRiseDamping,
                       minDuration: Motion.iconRiseDuration, delay: delay)
-        Motion.basic(layer, keyPath: "opacity", from: 0.0, to: 1.0,
+        Motion.basic(layer, keyPath: "opacity", from: Float(0), to: Float(1),
                      duration: Motion.iconRiseDuration, delay: delay)
+    }
+
+    private func beginDeparture(_ button: AppIconButton) {
+        let identity = button.entry.id
+        button.setHovered(false)
+        departingButtons[identity] = button
+        departureTokens[identity, default: 0] += 1
+        let token = departureTokens[identity]
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let duration = reduceMotion ? Motion.reducedMotionFadeDuration : Motion.dropDuration
+
+        if let layer = button.layer {
+            if !reduceMotion {
+                Motion.basic(layer, keyPath: "transform.translation.y", to: Motion.iconDropOffset,
+                             duration: duration, curve: .easeIn)
+                Motion.basic(layer, keyPath: "transform.scale", to: Motion.iconExitScale,
+                             duration: duration, curve: .easeIn)
+            }
+            Motion.basic(layer, keyPath: "opacity", to: Float(0),
+                         duration: duration, curve: .easeIn)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self, weak button] in
+            MainActor.assumeIsolated {
+                guard let self, let button,
+                      self.departureTokens[identity] == token,
+                      self.departingButtons[identity] === button else { return }
+                self.departingButtons.removeValue(forKey: identity)
+                self.departureTokens.removeValue(forKey: identity)
+                button.removeFromSuperview()
+            }
+        }
+    }
+
+    private func restoreForReuse(_ button: AppIconButton) {
+        guard let layer = button.layer else { return }
+        layer.removeAnimation(forKey: "motion.transform.translation.x")
+        layer.removeAnimation(forKey: "motion.transform.translation.y")
+        layer.removeAnimation(forKey: "motion.transform.scale")
+        layer.removeAnimation(forKey: "motion.opacity")
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.setValue(CGFloat(0), forKeyPath: "transform.translation.x")
+        layer.setValue(CGFloat(0), forKeyPath: "transform.translation.y")
+        layer.setValue(CGFloat(1), forKeyPath: "transform.scale")
+        layer.opacity = 1
+        CATransaction.commit()
     }
 }
 
@@ -377,8 +471,9 @@ final class TideBarView: NSView {
         }
     }
 
-    /// 展开态下列表变更：差分刷新，不重播整体动画
-    func refreshApps(_ apps: [AppEntry]) {
+    /// 展开态下列表变更：差分刷新，不重播整体动画。
+    @discardableResult
+    func refreshApps(_ apps: [AppEntry]) -> AppListUpdate {
         iconRow.update(apps: apps, rebuildAll: false)
     }
 

@@ -14,6 +14,8 @@ final class TideBarController {
         var isExpanded = false
         var collapseDebounce: DispatchWorkItem?
         var collapseHeldUntilMouseMoves = false
+        /// 使延迟的面板缩宽在后续应用变化后自动失效。
+        var appTransitionGeneration = 0
 
         init(screen: NSScreen, panel: TidePanel, view: TideBarView) {
             self.screen = screen
@@ -287,18 +289,42 @@ final class TideBarController {
             }
         }
         for state in screens.values {
+            state.appTransitionGeneration += 1
+            let generation = state.appTransitionGeneration
             let target = barFrame(for: state.screen)
             if state.isExpanded {
-                state.view.refreshApps(registry.entries)
-                NSAnimationContext.runAnimationGroup { context in
-                    context.duration = 0.25
-                    context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                    state.panel.animator().setFrame(target, display: true)
+                let transition = state.view.refreshApps(registry.entries)
+                if transition.hasRemovals, target.width < state.panel.frame.width {
+                    // 离场项仍位于旧面板边缘；动画结束后再缩宽，避免被窗口边界裁掉。
+                    DispatchQueue.main.asyncAfter(deadline: .now() + transition.removalDuration) {
+                        [weak self, weak state] in
+                        MainActor.assumeIsolated {
+                            guard let self, let state,
+                                  state.appTransitionGeneration == generation else { return }
+                            if state.isExpanded {
+                                self.animatePanel(state.panel, to: target)
+                            } else {
+                                state.panel.setFrame(target, display: true)
+                            }
+                        }
+                    }
+                } else {
+                    // 扩宽与新增项上涌并行；新增项自身稍后显影，避免面板边缘裁剪。
+                    animatePanel(state.panel, to: target)
                 }
             } else {
                 // 收起态窗口透明，宽度变化无声跟随
                 state.panel.setFrame(target, display: true)
             }
+        }
+    }
+
+    private func animatePanel(_ panel: NSPanel, to frame: NSRect) {
+        guard panel.frame != frame else { return }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Motion.listResizeDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            panel.animator().setFrame(frame, display: true)
         }
     }
 

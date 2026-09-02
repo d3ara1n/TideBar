@@ -38,6 +38,20 @@ enum Motion {
     static let iconRiseOffset: CGFloat = -14
     static let iconRiseStiffness: CGFloat = 340
     static let iconRiseDamping: CGFloat = 26
+    static let iconInsertionDelay = 0.06
+    static let iconRepositionDuration = 0.24
+    static let iconRepositionStiffness: CGFloat = 380
+    static let iconRepositionDamping: CGFloat = 30
+    static let iconExitScale: CGFloat = 0.92
+    static let listResizeDuration = 0.22
+
+    // MARK: 应用与窗口状态变化
+
+    static let statusDuration = 0.18
+    static let statusStagger = 0.025
+    static let statusStiffness: CGFloat = 420
+    static let statusDamping: CGFloat = 30
+    static let reducedMotionFadeDuration = 0.10
 
     // MARK: 图标轻浮潮（悬停与按压）
 
@@ -62,7 +76,7 @@ enum Motion {
     static let collapseDuration = 0.22
     static let dropDuration = 0.16
     static let dropWindow = 0.10
-    static let iconDropOffset: CGFloat = 10
+    static let iconDropOffset: CGFloat = -10
     static let glassFadeOut = 0.12
     /// 汐线回归轻弹（潮合上的一下）
     static let capsulePopScale: CGFloat = 1.18
