@@ -68,6 +68,12 @@ defaults delete com.apple.dock autohide-delay && killall Dock
 - **hover 收起防抖**：mouse exited 后 ~300ms 延迟收起，期间 re-enter 取消，防边缘抖动闪烁
 - **多显示器**：每屏一个 panel，监听 `NSScreen.didChangeScreenParametersNotification`
 
+## 2026-09 M2 实现约定
+
+1. **鼠标态统一采样器驱动（取代 tracking area 事件）**：非激活悬浮窗上 NSTrackingArea 的 entered/exited 合成不可靠（实测有稳定复现的状态机失步：悬停无反应/有反应交替）。图标悬停、潮涌行悬停、潮涌离场判定全部由接近检测采样器（mouseMoved 事件 + 40ms 节流 + 0.25s 兜底轮询）做命中测试驱动；点击/长按仍走 mouseDown/Up 事件流（该路径可靠）。
+2. **玻璃采样需要 key**：NSGlassEffectView 在非 key 窗口被 WindowServer 降级采样（发黑）。汐线展开时与潮涌显示时均 `makeKey()`，潮涌收起时 key 还给原屏汐线面板。
+3. **AX 窗口收录规则**：`subrole == AXStandardWindow` 或 `minimized == true`。最小化窗口的 subrole 不可靠（实测：访达最小化丢 std 标记、Zen 最小化报 AXDialog），必须 min 兜底；对话框/访达桌面元素两者皆不满足，天然排除，无需特例。依据见 plans/archived/todo-2026-09-window-surge.md 探针结论。
+
 ## 2026-09 调研修订
 
 来源：[research-dock-alternatives.md](research-dock-alternatives.md) §六，逐条注明取代关系。
