@@ -78,3 +78,15 @@ defaults delete com.apple.dock autohide-delay && killall Dock
 4. **隐藏参数补全（细化「架构」节命令集）**：M3 完整参数 = autohide + autohide-delay 1000 + autohide-time-modifier 0 + no-bouncing + tilesize 16 + magnification false + largesize 16 + mineffect scale。tilesize 组针对 Mission Control/Exposé 无视 autohide 强显；mineffect 针对 genie 动画指向隐藏 Dock 穿帮。向导标配快照/恢复/自愈（隐藏指纹检测 + atexit/signal 兜底）。
 5. **废纸篓不做（取代可行性表 FSEvents 行的方案预期）**：将来若重启，已验证路线是 kqueue（`DispatchSourceFileSystemObject` + `O_EVTONLY`），无项目用 FSEvents。
 6. **可行性表勘误**：窗口预览的现实 = 枚举用 ScreenCaptureKit、逐窗抓图仍以私有 `CGSHWCaptureWindowList` 为主流（能截最小化窗口；纯 SCK 在 14/15 有崩溃/bug，AltTab 至 macOS 26 才全量 SCK），「AltTab 2026 已全量转 SkyLight」表述过时。录屏授权须重启 app 后生效，向导流程需按此设计。
+
+## 潮涌：窗口交互模型（2026-09 定稿）
+
+取代「2026-09 调研修订」条目 1 中「窗口瓦片一体收录全部窗口」的形态设想；能力路线（AX 枚举/还原）不变，粒度与交互重设计。AX 能力依据见 [research-dock-alternatives.md](research-dock-alternatives.md) §三坑 3（Focus Dock 源码验证）。
+
+1. **app 为中心，二级展开**：展开态以 app 图标为粒度（不平铺窗口）；图标下方点点 = 窗口状态（实心=活跃数、空心=最小化数，>5 收敛为数字；读不到窗口信息不画）。
+2. **三条到达路径**：点击 = 切换最近非最小化窗口（仅剩最小化则还原最近一个；AX 不可用时退化为 activate）；长按或 ⌥+点击 = 「潮涌」展开该 app 的窗口列表；右键菜单同样列出窗口（原生 Dock 惯例，可发现性保底）。
+3. **潮涌内容**：窗口标题（`kAXTitle`）为主 + 文档图标（`kAXDocument` → `NSWorkspace.icon(forFile:)`，失败退回 app 图标）；最小化窗口暗显。实时缩略图继续延后（可行性表照旧）。
+4. **还原/聚焦**：`kAXMinimized` 置 false + `kAXRaiseAction` + `activateIgnoringOtherApps`；AX 读不到窗口的 app 降级为纯图标 + activate（即 M1 行为）。
+5. **命名**：二级展开名「潮涌」，代码标识 Surge（SurgePanel/SurgeView）；与「汐线」成对——汐为收敛态，涌为突发态。
+6. **动画语言「错峰升降」**：列表项从图标栏背后逐项错峰升起（每项延迟 20~30ms，弹簧曲线），收起反向退落；汐线展开共用此语言。
+7. **M2 前置探针**：开工前半日实测 `kAXWindows` / `kAXMinimized` / `kAXTitle` / `kAXDocument` 在真实 app 集的覆盖表，覆盖不可接受则复盘。
