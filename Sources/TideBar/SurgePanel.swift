@@ -78,7 +78,7 @@ final class SurgeRowView: NSView {
     }
 }
 
-// MARK: - 列表（decisions 命名 SurgeView）
+// MARK: - 列表
 
 /// 潮涌窗口列表：本屏正常 → 他屏暗显 → 最小化暗显；行自图标侧（下）错峰升起。
 /// macOS 26 用液态玻璃底（与图标栏同材质），旧系统回退深色胶囊卡。
@@ -178,7 +178,7 @@ final class SurgeView: NSView {
 // MARK: - 面板
 
 /// 潮涌宿主窗口：非激活、悬浮于图标栏之上（TidePanel 同款约束 + 高一级）。
-/// 可成为 key：玻璃背景采样需要（非 key 窗口采样层被 WindowServer 降级，见 M1 调查）。
+/// 可成为 key：玻璃背景采样需要（非 key 窗口的采样层被 WindowServer 降级）。
 @MainActor
 final class SurgePanel: NSPanel {
     init(contentRect: NSRect) {

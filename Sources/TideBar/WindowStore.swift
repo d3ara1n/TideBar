@@ -11,7 +11,7 @@ struct WindowSnapshot {
     let frame: CGRect?
 }
 
-// MARK: - AX 读取（元素级超时防挂起；复用探针验证过的读取模式）
+// MARK: - AX 读取（元素级超时防挂起）
 
 enum AXReader {
     static func setWindowElementTimeout(_ element: AXUIElement) {
@@ -79,8 +79,8 @@ enum AXReader {
 // MARK: - 窗口数据层
 
 /// 按 pid 观测各 app 的窗口集合：kAXWindows 惰性枚举 + AXObserver 订阅变更，
-/// 收录规则 = subrole 标准或 minimized（最小化窗口 subrole 不可靠，探针实测）。
-/// 读不到 kAXWindows 的 app 标记 degraded，快照返回 nil（M1 行为）。
+/// 收录规则 = subrole 标准或 minimized（最小化窗口 subrole 不可靠，实测）。
+/// 读不到 kAXWindows 的 app 标记 degraded，快照返回 nil（交互退化为纯图标 + 激活）。
 @MainActor
 final class WindowStore {
     private struct Watch {
@@ -100,7 +100,7 @@ final class WindowStore {
     func start() {
         let trusted = AXIsProcessTrusted()
         guard trusted else {
-            // 零权限安全态：全部走 M1 行为，不注册任何观测（授权引导属 M3 向导）
+            // 零权限安全态：不注册任何观测，交互退化为纯图标 + 激活（授权入口在设置界面）
             if !loggedNoPermission {
                 NSLog("TideBar WindowStore inactive: accessibility not granted")
                 loggedNoPermission = true

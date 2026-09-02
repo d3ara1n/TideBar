@@ -41,7 +41,7 @@ final class TideBarController {
         registry.start()
         rebuildPanels()
 
-        // 接近检测：全局 monitor 为主，local monitor 兜自家激活，轮询兜静止光标（decisions 修订条目 3）
+        // 接近检测：全局 monitor 为主，local monitor 兜自家激活，轮询兜静止光标
         let sample = MainThreadBridge { [weak self] in self?.sampleMouse() }
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { _ in
             sample()
@@ -65,7 +65,7 @@ final class TideBarController {
             spaceBridge()
         })
 
-        NSLog("TideBar started: offsetY=%.0f, screens=%d", Layout.offsetY, screens.count)
+        NSLog("TideBar started: offsetY=%.0f, screens=%d", AppConfiguration.shared.verticalOffset, screens.count)
     }
 
     // MARK: - 面板生命周期
@@ -110,7 +110,7 @@ final class TideBarController {
     }
 
     private func barBottom(for screen: NSScreen) -> CGFloat {
-        screen.frame.minY + Layout.offsetY
+        screen.frame.minY + AppConfiguration.shared.verticalOffset
     }
 
     private func barFrame(for screen: NSScreen) -> NSRect {
@@ -204,7 +204,7 @@ final class TideBarController {
         state.view.setExpanded(false, immediate: !animated)
     }
 
-    /// 收起防抖：mouse exited 后延迟收起，期间 re-enter 取消（decisions「交互与技术约定」）
+    /// 收起防抖：mouse exited 后延迟收起，期间 re-enter 取消
     private func scheduleCollapse(_ state: ScreenState) {
         guard state.collapseDebounce == nil else { return }
         let bridge = MainThreadBridge { [weak self, weak state] in

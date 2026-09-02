@@ -19,7 +19,7 @@ struct AppEntry: Identifiable {
     }
 
     /// 主点击：仅剩最小化窗口 → 还原最近一个；否则 activate
-    /// （activate 隐含 raise 最近窗口，与 Dock 一致；无 AX 信息时同为 M1 行为）
+    /// （activate 隐含 raise 最近窗口，与 Dock 一致；无 AX 信息时退化为纯激活）
     func primaryClick() {
         if let app = runningApp {
             if let windows, !windows.isEmpty, windows.allSatisfy(\.isMinimized) {
@@ -103,7 +103,7 @@ final class AppRegistry {
     }
 
     func refresh() {
-        let pinned: [String] = UserDefaults.standard.stringArray(forKey: "tidebar.pinned") ?? Self.defaultPinned
+        let pinned = AppConfiguration.shared.pinnedBundleIDs ?? Self.defaultPinned
         let running = NSWorkspace.shared.runningApplications.filter {
             $0.activationPolicy == .regular && $0.bundleIdentifier != nil
                 && !Self.hiddenBundles.contains($0.bundleIdentifier!)

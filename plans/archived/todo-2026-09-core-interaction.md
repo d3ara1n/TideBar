@@ -1,6 +1,6 @@
 # M1：潮汐交互验证（细线 ↔ 图标栏）
 
-> 立案 2026-09-02。全项目最大的、唯一无法纸面验证的风险的验证尖刀：若「汐线 + 热区展开」的手感在日常使用中不成立，项目到此复盘。前置调研见 [research-dock-alternatives.md](../docs/research-dock-alternatives.md)。
+> 立案 2026-09-02。全项目最大的、唯一无法纸面验证的风险的验证尖刀：若「汐线 + 热区展开」的手感在日常使用中不成立，项目到此复盘。前置调研见 [research-dock-alternatives.md](../../docs/research-dock-alternatives.md)。
 
 ## 目标
 

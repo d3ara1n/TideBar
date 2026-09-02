@@ -1,6 +1,6 @@
 import AppKit
 
-/// 悬浮于所有 Space 的非激活面板（decisions.md「交互与技术约定」）
+/// 悬浮于所有 Space 的非激活面板
 @MainActor
 final class TidePanel: NSPanel {
     init(contentRect: NSRect) {
@@ -11,7 +11,7 @@ final class TidePanel: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
-        // 先尝试系统状态栏层级，使展开栏覆盖最大化窗口；若实测干扰系统面板再回退为 .floating。
+        // 状态栏层级：展开栏覆盖最大化窗口；潮涌面板在此基础上再加一级
         level = .statusBar
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         isMovable = false
