@@ -1,44 +1,8 @@
 import AppKit
 import QuartzCore
 
-/// 汐线：胶囊随亮暗模式自适应（labelColor 自动解析），辉光呼吸
-@MainActor
-final class TidelineCapsuleView: NSView {
-    override func draw(_ dirtyRect: NSRect) {
-        let color = NSColor.labelColor.withAlphaComponent(0.92)
-        let pill = NSBezierPath(roundedRect: bounds,
-                                xRadius: bounds.height / 2,
-                                yRadius: bounds.height / 2)
-        color.setFill()
-        pill.fill()
-        // 辉光颜色随外观同步，呼吸动画只驱动 shadowOpacity，互不干扰
-        layer?.shadowColor = NSColor.labelColor.cgColor
-    }
+// MARK: - 玻璃背景（macOS 26+）
 
-    override func viewDidChangeEffectiveAppearance() {
-        needsDisplay = true
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        guard window != nil, layer != nil else { return }
-        layer?.shadowColor = NSColor.white.cgColor
-        layer?.shadowRadius = 5
-        layer?.shadowOffset = .zero
-        layer?.shadowOpacity = 0.28
-        // 呼吸只动 shadowOpacity，不动 opacity——避免与展开/收起的视图淡入淡出互相覆盖
-        let breath = CABasicAnimation(keyPath: "shadowOpacity")
-        breath.fromValue = 0.1
-        breath.toValue = 0.5
-        breath.duration = 3.2
-        breath.autoreverses = true
-        breath.repeatCount = .infinity
-        breath.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        layer?.add(breath, forKey: "breath")
-    }
-}
-
-/// 展开态背景：macOS 26+ 液态玻璃（NSGlassEffectView）
 @available(macOS 26.0, *)
 @MainActor
 final class GlassBarBackgroundView: NSView {
@@ -60,21 +24,6 @@ final class GlassBarBackgroundView: NSView {
     }
 }
 
-/// 展开态背景：旧系统回退自绘深色胶囊
-@MainActor
-final class PillBarBackgroundView: NSView {
-    override func draw(_ dirtyRect: NSRect) {
-        let pill = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
-                                xRadius: bounds.height / 2,
-                                yRadius: bounds.height / 2)
-        NSColor.black.withAlphaComponent(0.42).setFill()
-        pill.fill()
-        NSColor.white.withAlphaComponent(0.16).setStroke()
-        pill.lineWidth = 1
-        pill.stroke()
-    }
-}
-
 @MainActor
 enum BarBackgroundFactory {
     static var usesGlass: Bool {
@@ -82,16 +31,67 @@ enum BarBackgroundFactory {
         return false
     }
 
-    static func make() -> NSView {
-        if #available(macOS 26.0, *) {
-            return GlassBarBackgroundView(frame: .zero)
-        }
-        return PillBarBackgroundView(frame: .zero)
+    static func makeGlassIfAvailable() -> NSView? {
+        if #available(macOS 26.0, *) { return GlassBarBackgroundView(frame: .zero) }
+        return nil
     }
 }
 
-/// 图标横排：布局按钮 + 展开时的「错峰升降」上涌动画；
-/// 列表变更走差分（新项错峰上涌、旧项淡出），只有展开动画才全量重播
+// MARK: - 汐线胶囊
+
+@MainActor
+final class TidelineCapsuleView: NSView {
+    override func draw(_ dirtyRect: NSRect) {
+        let pill = NSBezierPath(roundedRect: bounds,
+                                xRadius: bounds.height / 2,
+                                yRadius: bounds.height / 2)
+        NSColor.labelColor.withAlphaComponent(0.92).setFill()
+        pill.fill()
+        layer?.shadowColor = NSColor.labelColor.cgColor
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        needsDisplay = true
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil, let layer else { return }
+        layer.shadowColor = NSColor.labelColor.cgColor
+        layer.shadowRadius = 5
+        layer.shadowOffset = .zero
+        layer.shadowOpacity = 0.28
+        // 呼吸只驱动 shadowOpacity，不与展开/收起的 transform/alpha 冲突
+        let breath = CABasicAnimation(keyPath: "shadowOpacity")
+        breath.fromValue = 0.1
+        breath.toValue = 0.5
+        breath.duration = 3.2
+        breath.autoreverses = true
+        breath.repeatCount = .infinity
+        breath.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        layer.add(breath, forKey: "breath")
+    }
+
+    /// 涌潮预告：底边为锚向上增厚、自中心加宽
+    func swell() {
+        guard let layer else { return }
+        Motion.basic(layer, keyPath: "transform.scale.x", from: 1.0, to: 1.12,
+                     duration: Motion.senseDuration)
+        Motion.basic(layer, keyPath: "transform.scale.y", from: 1.0, to: 1.5,
+                     duration: Motion.senseDuration)
+    }
+
+    /// 退潮归位：过冲轻弹（潮合上的一下）
+    func pop() {
+        guard let layer else { return }
+        Motion.spring(layer, keyPath: "transform.scale", from: Motion.capsulePopScale, to: 1.0,
+                      stiffness: Motion.capsulePopStiffness, damping: Motion.capsulePopDamping,
+                      minDuration: Motion.capsulePopDuration)
+    }
+}
+
+// MARK: - 图标横排
+
 @MainActor
 final class IconRowView: NSView {
     var onLaunch: ((AppEntry) -> Void)?
@@ -131,7 +131,6 @@ final class IconRowView: NSView {
                 newcomers.append((button, index))
             }
         }
-        // 消失项：淡出后移除（completionHandler 在主线程回调）
         for gone in kept.values {
             NSAnimationContext.runAnimationGroup({ context in
                 context.duration = 0.15
@@ -144,7 +143,9 @@ final class IconRowView: NSView {
         }
         buttons = next
         needsLayout = true
-        staggerIn(newcomers)
+        for (button, _) in newcomers {
+            rise(button, delay: 0)
+        }
     }
 
     override func layout() {
@@ -159,88 +160,162 @@ final class IconRowView: NSView {
         }
     }
 
-    /// 展开全量上涌：图标自窗口底边下涌出（decisions「错峰升降」）；
-    /// beginTime + fillMode(.backwards) 实现逐项延迟，不改 frame、不与布局打架
-    func appearStaggered() {
+    /// 涌潮波：自中心向两侧发散上涌，波窗封顶（Motion.waveStep）
+    func waveIn() {
         alphaValue = 1
-        staggerIn(buttons.enumerated().map { ($0.element, $0.offset) })
+        let step = Motion.waveStep(count: buttons.count)
+        let center = Double(buttons.count - 1) / 2
+        for (index, button) in buttons.enumerated() {
+            rise(button, delay: Motion.waveDelay + abs(Double(index) - center) * step)
+        }
     }
 
-    private func staggerIn(_ items: [(button: AppIconButton, index: Int)]) {
-        alphaValue = 1
-        let now = CACurrentMediaTime()
-        for (button, index) in items {
+    /// 退潮波：向中心汇聚下坠，外圈先离场（easeIn 加速离场）
+    func waveOut() {
+        let step = Motion.convergeStep(count: buttons.count)
+        let center = Double(buttons.count - 1) / 2
+        for (index, button) in buttons.enumerated() {
+            let delay = abs(Double(index) - center) * step
             guard let layer = button.layer else { continue }
-            let delay = CFTimeInterval(index) * Layout.staggerStep
-            let rise = CABasicAnimation(keyPath: "transform.translation.y")
-            rise.fromValue = -14
-            rise.toValue = 0
-            rise.duration = Layout.staggerDuration
-            rise.beginTime = now + delay
-            rise.fillMode = .backwards
-            rise.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            layer.add(rise, forKey: "rise")
-            let fade = CABasicAnimation(keyPath: "opacity")
-            fade.fromValue = 0
-            fade.toValue = 1
-            fade.duration = Layout.staggerDuration
-            fade.beginTime = now + delay
-            fade.fillMode = .backwards
-            fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            layer.add(fade, forKey: "fade")
+            Motion.basic(layer, keyPath: "transform.translation.y", to: Motion.iconDropOffset,
+                         duration: Motion.dropDuration, curve: .easeIn, delay: delay)
+            Motion.basic(layer, keyPath: "opacity", to: 0.0,
+                         duration: Motion.dropDuration, curve: .easeIn, delay: delay)
         }
+    }
+
+    private func rise(_ button: AppIconButton, delay: TimeInterval) {
+        guard let layer = button.layer else { return }
+        Motion.spring(layer, keyPath: "transform.translation.y", from: Motion.iconRiseOffset, to: 0,
+                      stiffness: Motion.iconRiseStiffness, damping: Motion.iconRiseDamping,
+                      minDuration: Motion.iconRiseDuration, delay: delay)
+        Motion.basic(layer, keyPath: "opacity", from: 0.0, to: 1.0,
+                     duration: Motion.iconRiseDuration, delay: delay)
     }
 }
 
-/// 面板内容：收起态汐线胶囊 ↔ 展开态图标栏（含过渡动画）
+// MARK: - 面板内容（编舞主体）
+// 窗口恒为展开尺寸，所有形变发生在 layer 空间——与窗口 frame 解耦，
+// 杜绝 frame 动画与内容动画两套时间轴失同步的「散架感」。
+// 元素：剪影层（潮体，胶囊↔bar 弹性形变）、玻璃（26+ 稳态背景）、汐线、图标波。
+
 @MainActor
 final class TideBarView: NSView {
+    private let glass: NSView?
+    private let silhouette = CALayer()
     private let capsule = TidelineCapsuleView()
-    private let barBackground = BarBackgroundFactory.make()
     private let iconRow = IconRowView()
+    private(set) var isExpandedState = false
 
     override init(frame frameRect: NSRect) {
+        glass = BarBackgroundFactory.makeGlassIfAvailable()
         super.init(frame: frameRect)
         wantsLayer = true
-        iconRow.onLaunch = { entry in entry.activate() }
-        addSubview(barBackground)
+        // 层序自底向上：剪影（潮体）→ 玻璃 → 图标波 → 汐线
+        silhouette.backgroundColor = NSColor.labelColor.withAlphaComponent(0.42).cgColor
+        silhouette.borderWidth = 1
+        silhouette.borderColor = NSColor.white.withAlphaComponent(0.16).cgColor
+        silhouette.opacity = 0
+        layer?.addSublayer(silhouette)
+        if let glass {
+            glass.alphaValue = 0
+            addSubview(glass)
+        }
         addSubview(iconRow)
+        capsule.wantsLayer = true
         addSubview(capsule)
-        barBackground.alphaValue = 0
-        iconRow.alphaValue = 0
+        iconRow.onLaunch = { $0.activate() }
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not supported") }
 
-    override func layout() {
-        super.layout()
-        barBackground.frame = bounds
-        iconRow.frame = bounds
-        capsule.frame = NSRect(x: bounds.midX - Layout.capsuleWidth / 2,
-                               y: 2,
-                               width: Layout.capsuleWidth,
-                               height: Layout.capsuleHeight)
+    private var capsuleShape: NSRect {
+        NSRect(x: bounds.midX - Layout.capsuleWidth / 2,
+               y: 2,
+               width: Layout.capsuleWidth,
+               height: Layout.capsuleHeight)
     }
 
-    /// 切换展开/收起；展开时用给定 app 列表重建图标并错峰上涌
-    func setExpanded(_ expanded: Bool, apps: [AppEntry]) {
+    override func layout() {
+        super.layout()
+        glass?.frame = bounds
+        iconRow.frame = bounds
+        capsule.frame = capsuleShape
+        // 剪影只在稳态跟随布局（避免打断形变动画）：
+        // 展开稳态 = 全幅（26 下被玻璃盖住；旧系统即最终背景）；收起稳态 = 胶囊形状
+        if isExpandedState {
+            silhouette.frame = bounds
+            silhouette.cornerRadius = bounds.height / 2
+        } else if silhouette.opacity == 0 {
+            silhouette.frame = capsuleShape
+            silhouette.cornerRadius = capsuleShape.height / 2
+        }
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        silhouette.backgroundColor = NSColor.labelColor.withAlphaComponent(0.42).cgColor
+        needsDisplay = true
+    }
+
+    // MARK: 状态切换
+
+    func setExpanded(_ expanded: Bool, apps: [AppEntry] = [], immediate: Bool = false) {
         if expanded {
+            guard !isExpandedState else { return }
+            isExpandedState = true
             iconRow.update(apps: apps, rebuildAll: true)
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.3
-                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                barBackground.animator().alphaValue = 1
-                capsule.animator().alphaValue = 0
+            // 1) 汐线感应：增厚预告
+            capsule.swell()
+            fade(capsule, to: 0, delay: 0.08, duration: 0.12)
+            // 2) 潮体显形并弹性胀开：胶囊 → bar
+            Motion.basic(silhouette, keyPath: "opacity", from: 0.0, to: 1.0, duration: 0.08)
+            Motion.spring(silhouette, keyPath: "bounds", to: NSValue(rect: bounds),
+                          stiffness: Motion.swellStiffness, damping: Motion.swellDamping,
+                          minDuration: Motion.swellDuration)
+            Motion.spring(silhouette, keyPath: "position",
+                          to: NSValue(point: CGPoint(x: bounds.midX, y: bounds.midY)),
+                          stiffness: Motion.swellStiffness, damping: Motion.swellDamping,
+                          minDuration: Motion.swellDuration)
+            Motion.spring(silhouette, keyPath: "cornerRadius", to: bounds.height / 2,
+                          stiffness: Motion.swellStiffness, damping: Motion.swellDamping,
+                          minDuration: Motion.swellDuration)
+            // 3) 玻璃显影接管，剪影功成身退（仅 26+；旧系统剪影即最终背景）
+            if let glass {
+                fade(glass, to: 1, delay: Motion.glassFadeDelay, duration: Motion.glassFadeDuration)
+                let settle = Motion.glassFadeDelay + Motion.glassFadeDuration + 0.05
+                DispatchQueue.main.asyncAfter(deadline: .now() + settle) { [weak self] in
+                    guard let self, self.isExpandedState else { return }
+                    Motion.basic(self.silhouette, keyPath: "opacity", to: 0.0, duration: 0.15)
+                }
             }
-            iconRow.appearStaggered()
+            // 4) 图标波自中心扫出
+            iconRow.waveIn()
         } else {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.2
-                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                barBackground.animator().alphaValue = 0
-                iconRow.animator().alphaValue = 0
-                capsule.animator().alphaValue = 1
+            guard isExpandedState else { return }
+            isExpandedState = false
+            if immediate {
+                hardReset()
+                return
+            }
+            // 退潮：图标汇聚下坠、潮体加速缩回、汐线轻弹回归
+            iconRow.waveOut()
+            if let glass {
+                fade(glass, to: 0, delay: 0, duration: Motion.glassFadeOut)
+            }
+            let retreatStart = max(0, Motion.collapseDuration - 0.12)
+            Motion.basic(silhouette, keyPath: "bounds", to: NSValue(rect: capsuleShape),
+                         duration: Motion.collapseDuration, curve: .easeIn)
+            Motion.basic(silhouette, keyPath: "position",
+                          to: NSValue(point: CGPoint(x: capsuleShape.midX, y: capsuleShape.midY)),
+                         duration: Motion.collapseDuration, curve: .easeIn)
+            Motion.basic(silhouette, keyPath: "cornerRadius", to: capsuleShape.height / 2,
+                         duration: Motion.collapseDuration, curve: .easeIn)
+            Motion.basic(silhouette, keyPath: "opacity", to: 0.0,
+                         duration: 0.12, delay: retreatStart)
+            fade(capsule, to: 1, delay: retreatStart, duration: 0.1)
+            DispatchQueue.main.asyncAfter(deadline: .now() + retreatStart) { [weak self] in
+                self?.capsule.pop()
             }
         }
     }
@@ -248,5 +323,35 @@ final class TideBarView: NSView {
     /// 展开态下列表变更：差分刷新，不重播整体动画
     func refreshApps(_ apps: [AppEntry]) {
         iconRow.update(apps: apps, rebuildAll: false)
+    }
+
+    /// 立即回到收起终态（全屏抑制用）
+    private func hardReset() {
+        silhouette.removeAllAnimations()
+        silhouette.opacity = 0
+        silhouette.frame = capsuleShape
+        silhouette.cornerRadius = capsuleShape.height / 2
+        glass?.alphaValue = 0
+        iconRow.alphaValue = 0
+        capsule.alphaValue = 1
+        capsule.layer?.removeAllAnimations()
+        capsule.layer?.setAffineTransform(.identity)
+    }
+
+    private func fade(_ view: NSView, to: CGFloat, delay: TimeInterval, duration: TimeInterval) {
+        let bridge = MainThreadBridge { [weak view] in
+            guard let view else { return }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = duration
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                view.animator().alphaValue = to
+            }
+        }
+        let work = DispatchWorkItem { bridge() }
+        if delay > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+        } else {
+            work.perform()
+        }
     }
 }

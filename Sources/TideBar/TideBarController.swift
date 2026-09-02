@@ -73,7 +73,7 @@ final class TideBarController {
 
         for screen in NSScreen.screens {
             guard let displayID = displayID(of: screen) else { continue }
-            let frame = collapsedFrame(for: screen)
+            let frame = barFrame(for: screen)
             let panel = TidePanel(contentRect: frame)
             let view = TideBarView(frame: NSRect(origin: .zero, size: frame.size))
             panel.contentView = view
@@ -95,14 +95,7 @@ final class TideBarController {
         screen.frame.minY + Layout.offsetY
     }
 
-    private func collapsedFrame(for screen: NSScreen) -> NSRect {
-        NSRect(x: screen.frame.midX - Layout.collapsedPanelWidth / 2,
-               y: barBottom(for: screen),
-               width: Layout.collapsedPanelWidth,
-               height: Layout.collapsedPanelHeight)
-    }
-
-    private func expandedFrame(for screen: NSScreen) -> NSRect {
+    private func barFrame(for screen: NSScreen) -> NSRect {
         let count = max(registry.entries.count, 1)
         let width = min(Layout.barHPadding * 2 + CGFloat(count) * Layout.iconSlot,
                         screen.frame.width * 0.9)
@@ -158,11 +151,6 @@ final class TideBarController {
         state.panel.ignoresMouseEvents = false
         state.panel.hasShadow = true
         state.view.setExpanded(true, apps: registry.entries)
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = Layout.expandDuration
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            state.panel.animator().setFrame(expandedFrame(for: state.screen), display: true)
-        }
         NSLog("TideBar expanded on screen %u", displayID(of: state.screen) ?? 0)
     }
 
@@ -171,17 +159,7 @@ final class TideBarController {
         cancelCollapse(state)
         state.panel.ignoresMouseEvents = true
         state.panel.hasShadow = false
-        state.view.setExpanded(false, apps: [])
-        let target = collapsedFrame(for: state.screen)
-        if animated {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = Layout.collapseDuration
-                context.timingFunction = CAMediaTimingFunction(name: .easeIn)
-                state.panel.animator().setFrame(target, display: true)
-            }
-        } else {
-            state.panel.setFrame(target, display: true)
-        }
+        state.view.setExpanded(false, immediate: !animated)
     }
 
     /// 收起防抖：mouse exited 后延迟收起，期间 re-enter 取消（decisions「交互与技术约定」）
@@ -230,12 +208,18 @@ final class TideBarController {
     // MARK: - 数据与屏幕变更
 
     private func appsDidChange() {
-        for state in screens.values where state.isExpanded {
-            state.view.refreshApps(registry.entries)
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.3
-                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                state.panel.animator().setFrame(expandedFrame(for: state.screen), display: true)
+        for state in screens.values {
+            let target = barFrame(for: state.screen)
+            if state.isExpanded {
+                state.view.refreshApps(registry.entries)
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.25
+                    context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                    state.panel.animator().setFrame(target, display: true)
+                }
+            } else {
+                // 收起态窗口透明，宽度变化无声跟随
+                state.panel.setFrame(target, display: true)
             }
         }
     }

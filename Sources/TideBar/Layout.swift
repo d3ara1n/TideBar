@@ -12,10 +12,8 @@ enum Layout {
     // 汐线（收起态白色胶囊）
     static let capsuleWidth: CGFloat = 160
     static let capsuleHeight: CGFloat = 3
-    static let collapsedPanelWidth: CGFloat = 200
-    static let collapsedPanelHeight: CGFloat = 14
 
-    // 展开态图标栏
+    // 图标栏（窗口恒为展开尺寸，收起态透明且点击穿透）
     static let expandedHeight: CGFloat = 64
     static let iconSize: CGFloat = 40
     static let iconSlot: CGFloat = 52
@@ -29,11 +27,7 @@ enum Layout {
     // 滞留热区（展开态维持）：panel frame 外扩
     static let keepMargin: CGFloat = 14
 
-    // 动画与防抖
-    static let expandDuration: TimeInterval = 0.42
-    static let collapseDuration: TimeInterval = 0.3
-    static let staggerStep: TimeInterval = 0.025
-    static let staggerDuration: TimeInterval = 0.28
+    // 防抖与采样（动画参数见 Motion.swift）
     static let collapseDebounce: TimeInterval = 0.3
 
     // 采样与兜底
