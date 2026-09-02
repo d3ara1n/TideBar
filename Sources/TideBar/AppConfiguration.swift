@@ -64,8 +64,16 @@ final class AppConfiguration {
     /// 贴底偏移：接管态贴底；悬浮测试态为可调值（缺省 140pt）
     var verticalOffset: CGFloat {
         if mode == .takeover { return 0 }
-        let raw = defaults.double(forKey: offsetYKey)
-        return raw > 0 ? raw : 140
+        guard defaults.object(forKey: offsetYKey) != nil else { return 140 }
+        return defaults.double(forKey: offsetYKey)
+    }
+
+    /// 设置悬浮模式贴底偏移（0–300pt）
+    func setFloatingOffset(_ value: CGFloat) {
+        let clamped = min(max(value, 0), 300)
+        guard clamped != verticalOffset else { return }
+        defaults.set(clamped, forKey: offsetYKey)
+        notifyChange()
     }
 
     var onboardingCompleted: Bool {
