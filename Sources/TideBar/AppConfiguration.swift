@@ -8,8 +8,8 @@ final class AppConfiguration {
     static let didChange = Notification.Name("TideBar.configurationDidChange")
     static let pinnedDidChange = Notification.Name("TideBar.pinnedAppsDidChange")
 
+    /// 默认固定常用应用；Finder 不在此列，由窗口模型在存在可用窗口时自然出现。
     static let defaultPinnedBundleIDs = [
-        "com.apple.Finder",
         "com.apple.Safari",
         "com.apple.mail",
         "com.apple.Notes",
@@ -21,7 +21,6 @@ final class AppConfiguration {
     private let enabledKey = "tidebar.enabled"
     private let pinnedKey = "tidebar.pinned"
     private let onboardingKey = "tidebar.onboardingCompleted"
-
     private init() {}
 
     /// TideBar 是否负责系统 Dock 的可见入口。正式产品只有启用与停用两种运行状态。

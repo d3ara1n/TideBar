@@ -20,7 +20,13 @@ struct AppEntry: Identifiable {
     let canTerminate: Bool
 
     var id: AppIdentity { identity }
-    var isRunning: Bool { !runningAppsByPID.isEmpty }
+    /// Finder 的常驻桌面进程不计运行；只有收录到资源管理窗口才算逻辑运行。
+    var isRunning: Bool {
+        AppBehavior.resolve(for: identity).logicalIsRunning(
+            processIsRunning: !runningAppsByPID.isEmpty,
+            knownWindowCount: windowKnowledge.elements?.count
+        )
+    }
     var runningApp: NSRunningApplication? {
         preferredProcessIdentifier.flatMap { runningAppsByPID[$0] }
     }
@@ -218,10 +224,11 @@ final class AppRegistry {
             let windowKnowledge = WindowKnowledge.aggregate(apps.map {
                 windowStore.knowledge(for: $0.processIdentifier)
             })
-            guard description.behavior.isVisible(isPinned: description.isPinned,
-                                                  isRunning: !apps.isEmpty,
-                                                  knownWindowCount: windowKnowledge.elements?.count)
-            else { continue }
+            guard description.behavior.isVisible(
+                isPinned: description.isPinned,
+                processIsRunning: !apps.isEmpty,
+                knownWindowCount: windowKnowledge.elements?.count
+            ) else { continue }
 
             let app = apps.first
             guard let locator = app?.bundleIdentifier ?? description.pinnedBundleIdentifier else { continue }

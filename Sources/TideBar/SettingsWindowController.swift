@@ -190,6 +190,19 @@ private final class SettingsModel: ObservableObject {
         refreshPinnedApps()
     }
 
+    func removePinned(_ app: PinnedApplication) {
+        guard let index = pinnedApps.firstIndex(of: app) else { return }
+        removePinned(at: IndexSet(integer: index))
+    }
+
+    func movePinnedItem(_ app: PinnedApplication, by offset: Int) {
+        guard let index = pinnedApps.firstIndex(of: app) else { return }
+        let destination = min(max(index + offset, 0), pinnedApps.count - 1)
+        guard destination != index else { return }
+        movePinned(from: IndexSet(integer: index),
+                   to: offset > 0 ? destination + 1 : destination)
+    }
+
     func restoreDefaultPinned() {
         AppConfiguration.shared.restoreDefaultPinned()
         refreshPinnedApps()
@@ -440,6 +453,7 @@ private struct OverviewPage: View {
 private struct PinnedPage: View {
     @ObservedObject var model: SettingsModel
     @State private var showResetConfirmation = false
+    @State private var isEditing = false
 
     var body: some View {
         Form {
@@ -451,7 +465,7 @@ private struct PinnedPage: View {
                         .foregroundStyle(.secondary)
                 } else {
                     List {
-                        ForEach(model.pinnedApps) { app in
+                        ForEach(Array(model.pinnedApps.enumerated()), id: \.element.id) { index, app in
                             HStack(spacing: 10) {
                                 Image(nsImage: app.icon)
                                     .resizable()
@@ -465,23 +479,40 @@ private struct PinnedPage: View {
                                     }
                                 }
                                 Spacer()
+                                if isEditing {
+                                    Button { model.movePinnedItem(app, by: -1) } label: {
+                                        Image(systemName: "chevron.up")
+                                    }
+                                    .disabled(index == 0)
+                                    .buttonStyle(.borderless)
+                                    Button { model.movePinnedItem(app, by: 1) } label: {
+                                        Image(systemName: "chevron.down")
+                                    }
+                                    .disabled(index == model.pinnedApps.count - 1)
+                                    .buttonStyle(.borderless)
+                                    Button("移除", role: .destructive) {
+                                        model.removePinned(app)
+                                    }
+                                    .buttonStyle(.borderless)
+                                }
                             }
                         }
-                        .onDelete(perform: model.removePinned)
-                        .onMove(perform: model.movePinned)
                     }
                     .frame(minHeight: 180, maxHeight: 300)
                 }
 
                 HStack {
                     Button("添加应用…", action: model.addApplications)
+                    Button(isEditing ? "完成" : "编辑") {
+                        isEditing.toggle()
+                    }
                     Spacer()
                     Button("恢复默认", action: { showResetConfirmation = true })
                 }
             } header: {
                 Text("固定到 TideBar")
             } footer: {
-                Text("固定项目只决定应用在汐中的位置，不会阻止应用自动显示或隐藏。")
+                Text("点击“编辑”可以移除或重新排序固定项目。固定项目只决定应用在汐中的位置，不会阻止应用自动显示或隐藏。")
             }
         }
         .formStyle(.grouped)
