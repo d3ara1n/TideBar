@@ -2,29 +2,26 @@ import AppKit
 import QuartzCore
 import TideBarCore
 
-// MARK: - 玻璃背景（macOS 26+）
+// MARK: - 稳定磨砂背景
 
-@available(macOS 26.0, *)
 @MainActor
-final class GlassBarBackgroundView: NSView {
-    private let glass = NSGlassEffectView(frame: .zero)
+final class StableBlurBackgroundView: NSView {
+    private let effect = NSVisualEffectView(frame: .zero)
     /// nil = 胶囊（height/2）；数值 = 定圆角（潮涌圈角卡片）
     private let fixedCornerRadius: CGFloat?
 
     init(cornerRadius: CGFloat? = nil) {
         self.fixedCornerRadius = cornerRadius
         super.init(frame: .zero)
-        glass.style = .clear
-        let placeholder = NSView()
-        placeholder.autoresizingMask = [.width, .height]
-        glass.contentView = placeholder
-        // regular 材质的背景采样层覆盖全窗口矩形且不受 cornerRadius 约束，
-        // 必须用 layer 裁剪把它裁进胶囊形（alt-tab 同款）
-        glass.wantsLayer = true
-        glass.layer?.masksToBounds = true
-        glass.layer?.cornerCurve = .continuous
-        addSubview(glass)
-        updateGlassTint()
+        effect.material = .hudWindow
+        effect.blendingMode = .behindWindow
+        // NSGlassEffectView 会随宿主窗口 key 状态切换外观；固定 active 避免失焦变色。
+        effect.state = .active
+        effect.wantsLayer = true
+        effect.layer?.masksToBounds = true
+        effect.layer?.cornerCurve = .continuous
+        addSubview(effect)
+        updateAppearance()
     }
 
     @available(*, unavailable)
@@ -32,35 +29,28 @@ final class GlassBarBackgroundView: NSView {
 
     override func layout() {
         super.layout()
-        glass.frame = bounds
+        effect.frame = bounds
         let radius = fixedCornerRadius ?? bounds.height / 2
-        glass.cornerRadius = radius
-        glass.layer?.cornerRadius = radius
+        effect.layer?.cornerRadius = radius
     }
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
-        updateGlassTint()
+        updateAppearance()
     }
 
-    private func updateGlassTint() {
+    private func updateAppearance() {
         let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        glass.tintColor = dark
-            ? NSColor.black.withAlphaComponent(0.55)
-            : NSColor.white.withAlphaComponent(0.92)
+        effect.appearance = dark ? NSAppearance(named: .darkAqua) : NSAppearance(named: .aqua)
     }
 }
 
 @MainActor
 enum BarBackgroundFactory {
-    static var usesGlass: Bool {
-        if #available(macOS 26.0, *) { return true }
-        return false
-    }
+    static var usesGlass: Bool { true }
 
     static func makeGlassIfAvailable(cornerRadius: CGFloat? = nil) -> NSView? {
-        if #available(macOS 26.0, *) { return GlassBarBackgroundView(cornerRadius: cornerRadius) }
-        return nil
+        StableBlurBackgroundView(cornerRadius: cornerRadius)
     }
 }
 
