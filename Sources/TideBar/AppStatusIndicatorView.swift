@@ -74,8 +74,8 @@ final class AppStatusIndicatorView: NSView {
     private func apply(_ next: State, animated: Bool, previous: State) {
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         let shouldAnimate = animated && !reduceMotion
-        let tone = NSColor.labelColor.cgColor
-        let quietTone = NSColor.secondaryLabelColor.cgColor
+        let tone = AppearanceColors.cgColor(.labelColor, for: effectiveAppearance)
+        let quietTone = AppearanceColors.cgColor(.secondaryLabelColor, for: effectiveAppearance)
 
         switch next {
         case .none:

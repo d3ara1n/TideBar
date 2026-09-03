@@ -6,8 +6,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: SettingsWindowController?
     private var statusItem: NSStatusItem?
     private var configurationObserver: NSObjectProtocol?
+    private var appearanceObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        applyAppearance()
         configureStatusItem()
         DockController.shared.start()
         controller.start()
@@ -15,6 +17,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             forName: AppConfiguration.didChange, object: nil, queue: .main
         ) { [weak self] _ in
             MainThreadBridge { [weak self] in self?.controller.configurationDidChange() }.call()
+        }
+        appearanceObserver = NotificationCenter.default.addObserver(
+            forName: AppConfiguration.appearanceDidChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainThreadBridge { [weak self] in self?.applyAppearance() }.call()
         }
 
         if !AppConfiguration.shared.onboardingCompleted {
@@ -30,6 +37,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let configurationObserver {
             NotificationCenter.default.removeObserver(configurationObserver)
         }
+        if let appearanceObserver {
+            NotificationCenter.default.removeObserver(appearanceObserver)
+        }
+    }
+
+    private func applyAppearance() {
+        NSApp.appearance = AppConfiguration.shared.appearance.appearance
     }
 
     private func configureStatusItem() {

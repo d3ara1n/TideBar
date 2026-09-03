@@ -321,10 +321,8 @@ final class TideBarView: NSView {
             addSubview(glass)
         }
         addSubview(iconRow)
-        let line = NSColor.labelColor
-        tideline.backgroundColor = line.withAlphaComponent(0.92).cgColor
+        updateAppearance()
         tideline.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-        tideline.shadowColor = line.cgColor
         tideline.shadowRadius = 5
         tideline.shadowOffset = .zero
         tideline.shadowOpacity = 0.28
@@ -378,10 +376,15 @@ final class TideBarView: NSView {
     }
 
     override func viewDidChangeEffectiveAppearance() {
-        let line = NSColor.labelColor
-        tideline.backgroundColor = line.withAlphaComponent(0.92).cgColor
-        tideline.shadowColor = line.cgColor
-        needsDisplay = true
+        super.viewDidChangeEffectiveAppearance()
+        updateAppearance()
+    }
+
+    private func updateAppearance() {
+        tideline.backgroundColor = AppearanceColors.cgColor(
+            .labelColor, alpha: 0.92, for: effectiveAppearance
+        )
+        tideline.shadowColor = AppearanceColors.cgColor(.labelColor, for: effectiveAppearance)
     }
 
     // MARK: 状态切换

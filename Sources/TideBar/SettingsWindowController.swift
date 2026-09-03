@@ -43,6 +43,7 @@ private final class SettingsModel: ObservableObject {
     @Published private(set) var accessibilityTrusted = false
     @Published private(set) var pinnedApps: [PinnedApplication] = []
     @Published private(set) var operation: Operation = .idle
+    @Published private(set) var applicationTheme: ApplicationTheme = .system
 
     private var observers: [NSObjectProtocol] = []
     private var permissionTimer: Timer?
@@ -62,6 +63,9 @@ private final class SettingsModel: ObservableObject {
         observers.append(NotificationCenter.default.addObserver(
             forName: AppConfiguration.pinnedDidChange, object: nil, queue: .main
         ) { _ in configBridge() })
+        observers.append(NotificationCenter.default.addObserver(
+            forName: AppConfiguration.appearanceDidChange, object: nil, queue: .main
+        ) { _ in configBridge() })
 
         // AX 授权没有通知渠道，只在设置窗口存活期间低频刷新展示状态。
         permissionTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
@@ -73,6 +77,7 @@ private final class SettingsModel: ObservableObject {
         refreshDock()
         refreshPermission()
         refreshPinnedApps()
+        applicationTheme = AppConfiguration.shared.appearance
     }
 
     func refreshDock() {
@@ -81,6 +86,11 @@ private final class SettingsModel: ObservableObject {
 
     private func refreshPermission() {
         accessibilityTrusted = AXIsProcessTrusted()
+    }
+
+    func setApplicationTheme(_ theme: ApplicationTheme) {
+        applicationTheme = theme
+        AppConfiguration.shared.appearance = theme
     }
 
     func enableTakeover() {
@@ -291,7 +301,7 @@ private struct SettingsRootView: View {
                 case .overview: OverviewPage(model: model)
                 case .pinned: PinnedPage(model: model)
                 case .windows: WindowsPage(model: model)
-                case .appearance: AppearancePage()
+                case .appearance: AppearancePage(model: model)
                 case .dock: DockPage(model: model)
                 case .permissions: PermissionsPage(model: model)
                 case .about: AboutPage()
@@ -583,9 +593,27 @@ private struct CapabilityRow: View {
 // MARK: - 外观与交互
 
 private struct AppearancePage: View {
+    @ObservedObject var model: SettingsModel
+
     var body: some View {
         Form {
-            PageHeader(title: "外观与交互", description: "调整汐线、展开动画和应用栏的表现。")
+            PageHeader(title: "外观与交互", description: "调整主题、汐线、展开动画和应用栏的表现。")
+
+            Section {
+                Picker("主题", selection: Binding(
+                    get: { model.applicationTheme },
+                    set: { model.setApplicationTheme($0) }
+                )) {
+                    ForEach(ApplicationTheme.allCases) { theme in
+                        Text(theme.title).tag(theme)
+                    }
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("外观")
+            } footer: {
+                Text("所选主题会应用到设置窗口、汐线、潮涌和应用菜单。")
+            }
 
             Section {
                 ComingSoonRow(title: "汐线亮度", description: "让收起态在不同桌面背景上保持清晰。")

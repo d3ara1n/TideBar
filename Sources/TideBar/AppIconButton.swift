@@ -55,9 +55,12 @@ private final class HoverHaloView: PassthroughView {
     }
 
     private func updateAppearance() {
-        let tone = NSColor.labelColor
-        layer?.backgroundColor = tone.withAlphaComponent(0.12).cgColor
-        layer?.borderColor = tone.withAlphaComponent(0.52).cgColor
+        layer?.backgroundColor = AppearanceColors.cgColor(
+            .labelColor, alpha: 0.12, for: effectiveAppearance
+        )
+        layer?.borderColor = AppearanceColors.cgColor(
+            .labelColor, alpha: 0.52, for: effectiveAppearance
+        )
     }
 }
 
