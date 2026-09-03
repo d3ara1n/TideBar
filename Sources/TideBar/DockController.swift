@@ -4,9 +4,10 @@ import AppKit
 @MainActor
 final class DockController {
     enum State: Equatable {
-        case floating
+        case notEnabled
         case takeover
         case drifted
+        case manualRecoveryRequired
         case failed(String)
     }
 
@@ -78,7 +79,7 @@ final class DockController {
     ]
 
     private let defaults = UserDefaults.standard
-    private(set) var state: State = .floating {
+    private(set) var state: State = .notEnabled {
         didSet { NotificationCenter.default.post(name: Self.didChange, object: self) }
     }
     static let didChange = Notification.Name("TideBar.dockStateDidChange")
@@ -91,11 +92,11 @@ final class DockController {
     /// 仅在设置界面或用户主动操作时检查，不常驻轮询。
     func checkStatus() {
         guard AppConfiguration.shared.isTakeoverEnabled else {
-            state = .floating
+            state = .notEnabled
             return
         }
         guard snapshotData() != nil else {
-            state = .failed("未找到 Dock 配置快照，请先关闭接管或手动恢复")
+            state = .manualRecoveryRequired
             return
         }
         state = fingerprintMatches() ? .takeover : .drifted
@@ -103,14 +104,14 @@ final class DockController {
 
     func applyTakeover() {
         guard !AppConfiguration.shared.isTakeoverEnabled else {
-            state = fingerprintMatches() ? .takeover : .drifted
+            checkStatus()
             return
         }
         do {
             try saveSnapshot()
             try writeTargetValues()
             guard restartDock(), fingerprintMatches() else { throw DockError.verificationFailed }
-            AppConfiguration.shared.mode = .takeover
+            AppConfiguration.shared.isTakeoverEnabled = true
             state = .takeover
             NSLog("TideBar Dock takeover enabled")
         } catch {
@@ -123,14 +124,14 @@ final class DockController {
 
     func restore() {
         guard snapshotData() != nil else {
-            state = .failed("未找到 Dock 配置快照，无法安全恢复")
+            state = .manualRecoveryRequired
             return
         }
         do {
             try restoreSnapshot()
             guard restartDock() else { throw DockError.restartFailed }
-            AppConfiguration.shared.mode = .floating
-            state = .floating
+            AppConfiguration.shared.isTakeoverEnabled = false
+            state = .notEnabled
             defaults.removeObject(forKey: Self.snapshotKey)
             NSLog("TideBar Dock settings restored")
         } catch {
@@ -142,11 +143,11 @@ final class DockController {
     /// 用户在设置界面明确触发的修复操作。
     func repair() {
         guard AppConfiguration.shared.isTakeoverEnabled else {
-            state = .floating
+            state = .notEnabled
             return
         }
         guard snapshotData() != nil else {
-            state = .failed("未找到 Dock 配置快照，无法安全修复")
+            state = .manualRecoveryRequired
             return
         }
         guard !fingerprintMatches() else {

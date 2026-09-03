@@ -41,7 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "打开设置…", action: #selector(openSettings), keyEquivalent: ","))
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "检查 Dock 状态", action: #selector(checkDock), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "检查 TideBar 状态", action: #selector(checkDock), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "退出 TideBar", action: #selector(terminate), keyEquivalent: "q"))
         for item in menu.items { item.target = self }
         item.menu = menu
@@ -50,18 +50,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showOnboarding() {
         let alert = NSAlert()
-        alert.messageText = "欢迎使用 TideBar"
-        alert.informativeText = "TideBar 会以底部汐线和窗口管理栏替代系统 Dock 的可见入口。默认先使用悬浮测试模式，不会修改系统设置。"
-        alert.addButton(withTitle: "开始使用悬浮模式")
-        alert.addButton(withTitle: "接管系统 Dock")
+        alert.messageText = "欢迎使用汐 TideBar"
+        alert.informativeText = "汐会隐藏系统 Dock 的可见入口，并在屏幕底部提供应用与窗口访问。启用前会保存当前 Dock 设置，之后可以随时恢复。启用过程中系统 Dock 会重新启动一次，不会关闭已打开的应用。"
+        alert.addButton(withTitle: "启用 TideBar")
         alert.addButton(withTitle: "稍后设置")
         alert.alertStyle = .informational
         let response = alert.runModal()
-        switch response {
-        case .alertSecondButtonReturn:
+        if response == .alertFirstButtonReturn {
             DockController.shared.applyTakeover()
-        default:
-            break
         }
         AppConfiguration.shared.onboardingCompleted = true
     }

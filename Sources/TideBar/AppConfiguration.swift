@@ -4,36 +4,38 @@ import TideBarCore
 /// TideBar 的持久化配置。系统 Dock 的原始值由 DockController 单独快照。
 @MainActor
 final class AppConfiguration {
-    enum Mode: String {
-        case floating
-        case takeover
-    }
-
     static let shared = AppConfiguration()
     static let didChange = Notification.Name("TideBar.configurationDidChange")
     static let pinnedDidChange = Notification.Name("TideBar.pinnedAppsDidChange")
-    static let defaultPinnedBundleIDs = ["com.apple.Finder", "com.apple.Safari", "com.apple.mail",
-                                         "com.apple.Notes", "com.apple.Music", "com.apple.Terminal"]
+
+    static let defaultPinnedBundleIDs = [
+        "com.apple.Finder",
+        "com.apple.Safari",
+        "com.apple.mail",
+        "com.apple.Notes",
+        "com.apple.Music",
+        "com.apple.Terminal",
+    ]
 
     private let defaults = UserDefaults.standard
-    private let modeKey = "tidebar.mode"
+    private let enabledKey = "tidebar.enabled"
     private let pinnedKey = "tidebar.pinned"
-    private let offsetYKey = "tidebar.offsetY"
     private let onboardingKey = "tidebar.onboardingCompleted"
 
     private init() {}
 
-    var mode: Mode {
-        get { Mode(rawValue: defaults.string(forKey: modeKey) ?? "floating") ?? .floating }
+    /// TideBar 是否负责系统 Dock 的可见入口。正式产品只有启用与停用两种运行状态。
+    var isTakeoverEnabled: Bool {
+        get { defaults.bool(forKey: enabledKey) }
         set {
-            guard mode != newValue else { return }
-            defaults.set(newValue.rawValue, forKey: modeKey)
+            guard isTakeoverEnabled != newValue else { return }
+            defaults.set(newValue, forKey: enabledKey)
             notifyChange()
         }
     }
 
     /// 固定项 bundle id 列表；未设置时使用内建默认值。
-    var pinnedBundleIDs: [String]? {
+    private(set) var pinnedBundleIDs: [String]? {
         get { defaults.stringArray(forKey: pinnedKey) }
         set {
             defaults.set(newValue, forKey: pinnedKey)
@@ -61,27 +63,25 @@ final class AppConfiguration {
         pinnedBundleIDs = bundleIdentifiers
     }
 
-    /// 贴底偏移：接管态贴底；悬浮测试态为可调值（缺省 140pt）
-    var verticalOffset: CGFloat {
-        if mode == .takeover { return 0 }
-        guard defaults.object(forKey: offsetYKey) != nil else { return 140 }
-        return defaults.double(forKey: offsetYKey)
+    func movePinned(from offsets: IndexSet, to destination: Int) {
+        var values = effectivePinnedBundleIDs
+        let moving = offsets.sorted().map { values[$0] }
+        for index in offsets.sorted(by: >) {
+            values.remove(at: index)
+        }
+        let adjustedDestination = destination - offsets.filter { $0 < destination }.count
+        values.insert(contentsOf: moving, at: min(max(adjustedDestination, 0), values.count))
+        pinnedBundleIDs = values
     }
 
-    /// 设置悬浮模式贴底偏移（0–300pt）
-    func setFloatingOffset(_ value: CGFloat) {
-        let clamped = min(max(value, 0), 300)
-        guard clamped != verticalOffset else { return }
-        defaults.set(clamped, forKey: offsetYKey)
-        notifyChange()
+    func restoreDefaultPinned() {
+        pinnedBundleIDs = nil
     }
 
     var onboardingCompleted: Bool {
         get { defaults.bool(forKey: onboardingKey) }
         set { defaults.set(newValue, forKey: onboardingKey) }
     }
-
-    var isTakeoverEnabled: Bool { mode == .takeover }
 
     func notifyChange() {
         NotificationCenter.default.post(name: Self.didChange, object: self)

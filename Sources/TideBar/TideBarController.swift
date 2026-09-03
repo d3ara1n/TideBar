@@ -43,7 +43,9 @@ final class TideBarController {
     func start() {
         registry.onChange = { [weak self] in self?.appsDidChange() }
         registry.start()
-        rebuildPanels()
+        if AppConfiguration.shared.isTakeoverEnabled {
+            rebuildPanels()
+        }
 
         // 接近检测：全局 monitor 为主，local monitor 兜自家激活，轮询兜静止光标。
         // 真实移动与轮询分流，菜单动作可保持展开直到用户再次移动鼠标。
@@ -71,18 +73,29 @@ final class TideBarController {
             spaceBridge()
         })
 
-        NSLog("TideBar started: offsetY=%.0f, screens=%d", AppConfiguration.shared.verticalOffset, screens.count)
+        NSLog("TideBar started: screens=%d", screens.count)
     }
 
     // MARK: - 面板生命周期
 
-    /// 结构配置变化先刷新应用模型，再按最新配置重建面板；固定列表单独原地刷新。
+    /// 接管状态变化时启动或停止底部面板；固定列表变化则刷新现有模型。
     func configurationDidChange() {
+        guard AppConfiguration.shared.isTakeoverEnabled else {
+            dismissSurge(animated: false)
+            for state in screens.values {
+                state.collapseDebounce?.cancel()
+                state.panel.orderOut(nil)
+                state.panel.close()
+            }
+            screens.removeAll()
+            return
+        }
         registry.refresh()
         rebuildPanels()
     }
 
     private func rebuildPanels() {
+        guard AppConfiguration.shared.isTakeoverEnabled else { return }
         dismissSurge(animated: false)
         for state in screens.values {
             state.collapseDebounce?.cancel()
@@ -129,7 +142,7 @@ final class TideBarController {
     }
 
     private func barBottom(for screen: NSScreen) -> CGFloat {
-        screen.frame.minY + AppConfiguration.shared.verticalOffset
+        screen.frame.minY
     }
 
     private func barFrame(for screen: NSScreen) -> NSRect {
