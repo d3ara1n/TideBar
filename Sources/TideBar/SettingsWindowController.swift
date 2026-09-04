@@ -930,7 +930,7 @@ private struct AboutPage: View {
             }
 
             Section {
-                LabeledContent("系统要求", value: "macOS 14 或更高版本")
+                LabeledContent("系统要求", value: "macOS 26 或更高版本")
                 LabeledContent("产品定位", value: "窗口任务栏与 Dock 替代")
             }
         }
