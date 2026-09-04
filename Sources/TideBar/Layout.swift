@@ -1,15 +1,17 @@
 import AppKit
 
 /// 实现层参数（决策边界内 agent 自主，调手感时改这里）
+@MainActor
 enum Layout {
     // 汐线（收起态随亮暗模式自适应的胶囊）
     static let capsuleWidth: CGFloat = 160
     static let capsuleHeight: CGFloat = 3
 
     // 图标栏（窗口恒为展开尺寸，收起态透明且点击穿透）
-    static let expandedHeight: CGFloat = 64
-    static let iconSize: CGFloat = 40
-    static let iconSlot: CGFloat = 52
+    static var expandedHeight: CGFloat { CGFloat(AppConfiguration.shared.iconSize.expandedHeight) }
+    static var iconSize: CGFloat { CGFloat(AppConfiguration.shared.iconSize.iconSide) }
+    static var iconSlot: CGFloat { CGFloat(AppConfiguration.shared.iconSize.iconSlot) }
+    static var iconVisualSide: CGFloat { max(iconSize + 6, iconSlot - 6) }
     static let barHPadding: CGFloat = 10
 
     // 点点（窗口状态）：实心=活跃、空心=最小化，>5 收敛为数字
@@ -26,7 +28,9 @@ enum Layout {
     static let surgeRowHeight: CGFloat = 28
     static let surgeVPadding: CGFloat = 6
     static let surgeGap: CGFloat = 8
-    static let surgeStaggerStep: TimeInterval = 0.025
+    static var surgeStaggerStep: TimeInterval {
+        0.025 / AppConfiguration.shared.animation.speedFactor
+    }
     static let surgeDismissDebounce: TimeInterval = 0.3
 
     // 接近热区（收起态触发展开）：胶囊外扩范围

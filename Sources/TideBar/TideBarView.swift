@@ -128,7 +128,7 @@ final class IconRowView: NSView {
         layoutSubtreeIfNeeded()
 
         let newcomerIDs = Set(newcomers.map { $0.entry.id })
-        if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+        if !Motion.shouldReduceMotion {
             for button in buttons where !newcomerIDs.contains(button.entry.id) {
                 guard let oldFrame = oldFrames[button.entry.id], let layer = button.layer else { continue }
                 let delta = oldFrame.midX - button.frame.midX
@@ -145,7 +145,7 @@ final class IconRowView: NSView {
 
         let removalDuration = removed.isEmpty
             ? 0
-            : (NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            : (Motion.shouldReduceMotion
                ? Motion.reducedMotionFadeDuration : Motion.dropDuration)
         return AppListUpdate(hasInsertions: !newcomers.isEmpty,
                              hasRemovals: !removed.isEmpty,
@@ -166,6 +166,20 @@ final class IconRowView: NSView {
     func setHover(hit: AppIconButton?) {
         for button in buttons {
             button.setHovered(button === hit)
+        }
+    }
+
+    func refreshLayout() {
+        for button in buttons + Array(departingButtons.values) {
+            button.refreshLayout()
+        }
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+    }
+
+    func refreshAppearance() {
+        for button in buttons + Array(departingButtons.values) {
+            button.refreshAppearance()
         }
     }
 
@@ -198,16 +212,21 @@ final class IconRowView: NSView {
         for (index, button) in buttons.enumerated() {
             let delay = abs(Double(index) - center) * step
             guard let layer = button.layer else { continue }
-            Motion.basic(layer, keyPath: "transform.translation.y", to: Motion.iconDropOffset,
-                         duration: Motion.dropDuration, curve: .easeIn, delay: delay)
-            Motion.basic(layer, keyPath: "opacity", to: 0.0,
-                         duration: Motion.dropDuration, curve: .easeIn, delay: delay)
+            if Motion.shouldReduceMotion {
+                Motion.basic(layer, keyPath: "opacity", to: 0.0,
+                             duration: Motion.reducedMotionFadeDuration, delay: delay)
+            } else {
+                Motion.basic(layer, keyPath: "transform.translation.y", to: Motion.iconDropOffset,
+                             duration: Motion.dropDuration, curve: .easeIn, delay: delay)
+                Motion.basic(layer, keyPath: "opacity", to: 0.0,
+                             duration: Motion.dropDuration, curve: .easeIn, delay: delay)
+            }
         }
     }
 
     private func rise(_ button: AppIconButton, delay: TimeInterval) {
         guard let layer = button.layer else { return }
-        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+        if Motion.shouldReduceMotion {
             Motion.basic(layer, keyPath: "opacity", from: Float(0), to: Float(1),
                          duration: Motion.reducedMotionFadeDuration, delay: delay)
             return
@@ -225,7 +244,7 @@ final class IconRowView: NSView {
         departingButtons[identity] = button
         departureTokens[identity, default: 0] += 1
         let token = departureTokens[identity]
-        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let reduceMotion = Motion.shouldReduceMotion
         let duration = reduceMotion ? Motion.reducedMotionFadeDuration : Motion.dropDuration
 
         if let layer = button.layer {
@@ -381,8 +400,10 @@ final class TideBarView: NSView {
     }
 
     private func updateAppearance() {
+        let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        let opacity = AppConfiguration.shared.tidelineBrightness.opacity(isDark: dark)
         tideline.backgroundColor = AppearanceColors.cgColor(
-            .labelColor, alpha: 0.92, for: effectiveAppearance
+            .labelColor, alpha: CGFloat(opacity), for: effectiveAppearance
         )
         tideline.shadowColor = AppearanceColors.cgColor(.labelColor, for: effectiveAppearance)
     }
@@ -395,16 +416,28 @@ final class TideBarView: NSView {
             guard !isExpandedState else { return }
             isExpandedState = true
             iconRow.update(apps: apps, rebuildAll: true)
+            if Motion.shouldReduceMotion {
+                silhouette.removeAllAnimations()
+                silhouette.isHidden = glass != nil
+                silhouette.transform = CATransform3DIdentity
+                silhouette.opacity = glass == nil ? 1 : 0
+                glass?.alphaValue = 1
+                tideline.removeAllAnimations()
+                tideline.opacity = 0
+                iconRow.waveIn()
+                return
+            }
             // 1) 汐线感应：增厚预告（裸层中心锚点，对称膨胀）
             Motion.basic(tideline, keyPath: "transform.scale.x", from: 1.0, to: 1.12,
                          duration: Motion.senseDuration)
             Motion.basic(tideline, keyPath: "transform.scale.y", from: 1.0, to: 1.5,
                          duration: Motion.senseDuration)
             Motion.basic(tideline, keyPath: "opacity", from: 1.0, to: 0.0,
-                         duration: 0.12, delay: 0.08)
+                         duration: Motion.tidelineFadeDuration, delay: Motion.glassFadeDelay)
             // 2) 潮体显形并弹性胀开：胶囊 → bar（transform 缩放，中心对称）
             let peak: Float = glass != nil ? Motion.swellPeakOpacity : 1.0
-            Motion.basic(silhouette, keyPath: "opacity", from: 0.0, to: peak, duration: 0.10)
+            Motion.basic(silhouette, keyPath: "opacity", from: 0.0, to: peak,
+                         duration: Motion.silhouetteRevealDuration)
             let scale = collapsedScale
             Motion.spring(silhouette, keyPath: "transform.scale.x", from: scale.x, to: 1.0,
                           stiffness: Motion.swellStiffness, damping: Motion.swellDamping,
@@ -419,10 +452,11 @@ final class TideBarView: NSView {
                 Motion.basic(silhouette, keyPath: "backgroundColor", to: glassToneColor,
                              duration: Motion.waterTintDuration, delay: Motion.waterTintDelay)
                 Motion.basic(silhouette, keyPath: "opacity", from: peak, to: 0.0,
-                             duration: 0.30, delay: Motion.glassFadeDelay)
+                             duration: Motion.silhouetteFadeDuration, delay: Motion.glassFadeDelay)
                 // 编舞落幕后彻底隐藏潮体：任何残留（色调/边界/动画尾巴）都不可能渲染
                 let generation = expandGeneration
-                DispatchQueue.main.asyncAfter(deadline: .now() + Motion.glassFadeDelay + 0.35) { [weak self] in
+                DispatchQueue.main.asyncAfter(deadline: .now() + Motion.glassFadeDelay
+                                               + Motion.silhouetteFadeDuration + 0.05) { [weak self] in
                     guard let self, self.isExpandedState, generation == self.expandGeneration else { return }
                     self.silhouette.isHidden = true
                 }
@@ -434,6 +468,18 @@ final class TideBarView: NSView {
             isExpandedState = false
             if immediate {
                 hardReset()
+                return
+            }
+            if Motion.shouldReduceMotion {
+                iconRow.waveOut()
+                silhouette.removeAllAnimations()
+                silhouette.isHidden = false
+                silhouette.transform = collapsedTransform
+                silhouette.opacity = 0
+                glass?.alphaValue = 0
+                tideline.removeAllAnimations()
+                tideline.opacity = 1
+                tideline.transform = CATransform3DIdentity
                 return
             }
             // 退潮：玻璃退场、水体颜色沉回深色调并归来接管收缩
@@ -452,12 +498,12 @@ final class TideBarView: NSView {
                          duration: Motion.collapseDuration, curve: .easeIn)
             Motion.basic(silhouette, keyPath: "transform.scale.y", to: scale.y,
                          duration: Motion.collapseDuration, curve: .easeIn)
-            let tail = max(0, Motion.collapseDuration - 0.12)
+            let tail = max(0, Motion.collapseDuration - Motion.collapseTail)
             Motion.basic(silhouette, keyPath: "opacity", from: retreatOpacity, to: 0.0,
-                         duration: 0.15, delay: tail)
+                         duration: Motion.retreatFadeDuration, delay: tail)
             // 汐线回归 + 轻弹（潮合上的一下）
             Motion.basic(tideline, keyPath: "opacity", from: 0.0, to: 1.0,
-                         duration: 0.1, delay: tail)
+                         duration: Motion.tidelineReturnDuration, delay: tail)
             Motion.spring(tideline, keyPath: "transform.scale", from: Motion.capsulePopScale, to: 1.0,
                           stiffness: Motion.capsulePopStiffness, damping: Motion.capsulePopDamping,
                           minDuration: Motion.capsulePopDuration, delay: tail)
@@ -468,6 +514,17 @@ final class TideBarView: NSView {
     @discardableResult
     func refreshApps(_ apps: [AppEntry]) -> AppListUpdate {
         iconRow.update(apps: apps, rebuildAll: false)
+    }
+
+    func refreshLayout() {
+        iconRow.refreshLayout()
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+    }
+
+    func refreshAppearance() {
+        updateAppearance()
+        iconRow.refreshAppearance()
     }
 
     /// 立即回到收起终态（全屏抑制用）

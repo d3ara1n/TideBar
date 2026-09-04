@@ -16,6 +16,7 @@ final class TideBarController {
         var collapseHeldUntilMouseMoves = false
         /// 使延迟的面板缩宽在后续应用变化后自动失效。
         var appTransitionGeneration = 0
+        var hiddenForFullscreen = false
 
         init(screen: NSScreen, panel: TidePanel, view: TideBarView) {
             self.screen = screen
@@ -130,6 +131,7 @@ final class TideBarController {
             panel.orderFrontRegardless()
             screens[displayID] = state
         }
+        behaviorDidChange()
     }
 
     // MARK: - 几何
@@ -182,10 +184,8 @@ final class TideBarController {
 
         let location = NSEvent.mouseLocation
         for state in screens.values {
-            if isFullscreenNow(state.screen) {
-                if state.isExpanded {
-                    collapse(state, animated: false)
-                }
+            let fullscreen = isFullscreenNow(state.screen)
+            if applyFullscreenBehavior(state, fullscreen: fullscreen) {
                 continue
             }
             if state.isExpanded {
@@ -270,6 +270,50 @@ final class TideBarController {
 
     // MARK: - 全屏
 
+    func behaviorDidChange() {
+        fullscreenCache.removeAll()
+        for state in screens.values {
+            _ = applyFullscreenBehavior(state, fullscreen: isFullscreenNow(state.screen))
+        }
+    }
+
+    private func applyFullscreenBehavior(_ state: ScreenState, fullscreen: Bool) -> Bool {
+        if fullscreen {
+            switch AppConfiguration.shared.fullscreenBehavior {
+            case .normal:
+                if state.hiddenForFullscreen {
+                    state.hiddenForFullscreen = false
+                    state.panel.orderFrontRegardless()
+                    state.panel.ignoresMouseEvents = !state.isExpanded
+                }
+                return false
+            case .lineOnly:
+                if state.hiddenForFullscreen {
+                    state.hiddenForFullscreen = false
+                    state.panel.orderFrontRegardless()
+                    state.panel.ignoresMouseEvents = !state.isExpanded
+                }
+                if state.isExpanded { collapse(state, animated: false) }
+                return true
+            case .hidden:
+                if state.isExpanded { collapse(state, animated: false) }
+                state.panel.ignoresMouseEvents = true
+                if !state.hiddenForFullscreen {
+                    state.hiddenForFullscreen = true
+                    state.panel.orderOut(nil)
+                }
+                return true
+            }
+        }
+
+        if state.hiddenForFullscreen {
+            state.hiddenForFullscreen = false
+            state.panel.orderFrontRegardless()
+            state.panel.ignoresMouseEvents = !state.isExpanded
+        }
+        return false
+    }
+
     private func isFullscreenNow(_ screen: NSScreen) -> Bool {
         guard let key = displayID(of: screen) else { return false }
         let now = CACurrentMediaTime()
@@ -286,8 +330,22 @@ final class TideBarController {
 
     private func activeSpaceChanged() {
         fullscreenCache.removeAll()
-        for state in screens.values where state.isExpanded && isFullscreenNow(state.screen) {
-            collapse(state, animated: false)
+        for state in screens.values {
+            _ = applyFullscreenBehavior(state, fullscreen: isFullscreenNow(state.screen))
+        }
+    }
+
+    func layoutDidChange() {
+        for state in screens.values {
+            state.appTransitionGeneration += 1
+            state.view.refreshLayout()
+            state.panel.setFrame(barFrame(for: state.screen), display: true)
+        }
+    }
+
+    func appearanceDidChange() {
+        for state in screens.values {
+            state.view.refreshAppearance()
         }
     }
 
@@ -334,6 +392,10 @@ final class TideBarController {
 
     private func animatePanel(_ panel: NSPanel, to frame: NSRect) {
         guard panel.frame != frame else { return }
+        guard !Motion.shouldReduceMotion else {
+            panel.setFrame(frame, display: true)
+            return
+        }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Motion.listResizeDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)

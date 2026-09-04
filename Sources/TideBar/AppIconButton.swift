@@ -54,6 +54,10 @@ private final class HoverHaloView: PassthroughView {
         updateAppearance()
     }
 
+    func refreshAppearance() {
+        updateAppearance()
+    }
+
     private func updateAppearance() {
         layer?.backgroundColor = AppearanceColors.cgColor(
             .labelColor, alpha: 0.12, for: effectiveAppearance
@@ -81,7 +85,6 @@ final class AppIconButton: NSView {
         case press
     }
 
-    private static let visualSide: CGFloat = 46
     /// 左下角 transform 原点放在图标底边中心；视觉内容相对它向左右各展开一半。
     private let motionPivot = PassthroughView(frame: .zero)
     private let visualContainer = PassthroughView(frame: .zero)
@@ -129,10 +132,18 @@ final class AppIconButton: NSView {
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    func refreshLayout() {
+        needsLayout = true
+    }
+
+    func refreshAppearance() {
+        haloView.refreshAppearance()
+    }
+
     override func layout() {
         super.layout()
         statusIndicatorView.frame = bounds
-        let side = Self.visualSide
+        let side = Layout.iconVisualSide
         motionPivot.frame = NSRect(x: bounds.midX,
                                    y: (bounds.height - side) / 2,
                                    width: 1,
@@ -157,7 +168,7 @@ final class AppIconButton: NSView {
         guard let visualLayer = motionPivot.layer, let haloLayer = haloView.layer else { return }
         let haloOpacity: Float = hovering ? (pressed ? 0.82 : 1) : 0
 
-        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+        if Motion.shouldReduceMotion {
             visualLayer.removeAnimation(forKey: "motion.transform.translation.y")
             visualLayer.removeAnimation(forKey: "motion.transform.scale")
             CATransaction.begin()

@@ -72,7 +72,7 @@ final class AppStatusIndicatorView: NSView {
     private static let markersLimit = 5
 
     private func apply(_ next: State, animated: Bool, previous: State) {
-        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let reduceMotion = Motion.shouldReduceMotion
         let shouldAnimate = animated && !reduceMotion
         let tone = AppearanceColors.cgColor(.labelColor, for: effectiveAppearance)
         let quietTone = AppearanceColors.cgColor(.secondaryLabelColor, for: effectiveAppearance)

@@ -7,6 +7,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var configurationObserver: NSObjectProtocol?
     private var appearanceObserver: NSObjectProtocol?
+    private var layoutObserver: NSObjectProtocol?
+    private var behaviorObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         applyAppearance()
@@ -21,7 +23,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appearanceObserver = NotificationCenter.default.addObserver(
             forName: AppConfiguration.appearanceDidChange, object: nil, queue: .main
         ) { [weak self] _ in
-            MainThreadBridge { [weak self] in self?.applyAppearance() }.call()
+            MainThreadBridge { [weak self] in
+                self?.applyAppearance()
+                self?.controller.appearanceDidChange()
+            }.call()
+        }
+        layoutObserver = NotificationCenter.default.addObserver(
+            forName: AppConfiguration.layoutDidChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainThreadBridge { [weak self] in self?.controller.layoutDidChange() }.call()
+        }
+        behaviorObserver = NotificationCenter.default.addObserver(
+            forName: AppConfiguration.behaviorDidChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainThreadBridge { [weak self] in self?.controller.behaviorDidChange() }.call()
         }
 
         if !AppConfiguration.shared.onboardingCompleted {
@@ -39,6 +54,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if let appearanceObserver {
             NotificationCenter.default.removeObserver(appearanceObserver)
+        }
+        if let layoutObserver {
+            NotificationCenter.default.removeObserver(layoutObserver)
+        }
+        if let behaviorObserver {
+            NotificationCenter.default.removeObserver(behaviorObserver)
         }
     }
 

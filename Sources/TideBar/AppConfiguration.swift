@@ -32,6 +32,8 @@ final class AppConfiguration {
     static let didChange = Notification.Name("TideBar.configurationDidChange")
     static let pinnedDidChange = Notification.Name("TideBar.pinnedAppsDidChange")
     static let appearanceDidChange = Notification.Name("TideBar.appearanceDidChange")
+    static let layoutDidChange = Notification.Name("TideBar.layoutDidChange")
+    static let behaviorDidChange = Notification.Name("TideBar.behaviorDidChange")
 
     /// 默认固定常用应用；Finder 不在此列，由窗口模型在存在可用窗口时自然出现。
     static let defaultPinnedBundleIDs = [
@@ -47,6 +49,11 @@ final class AppConfiguration {
     private let pinnedKey = "tidebar.pinned"
     private let onboardingKey = "tidebar.onboardingCompleted"
     private let appearanceKey = "tidebar.appearance"
+    private let iconSizeKey = "tidebar.iconSize"
+    private let tidelineBrightnessKey = "tidebar.tidelineBrightness"
+    private let animationKey = "tidebar.animation"
+    private let reducedMotionKey = "tidebar.reducedMotion"
+    private let fullscreenBehaviorKey = "tidebar.fullscreenBehavior"
     private init() {}
 
     /// TideBar 是否负责系统 Dock 的可见入口。正式产品只有启用与停用两种运行状态。
@@ -71,6 +78,58 @@ final class AppConfiguration {
             defaults.set(newValue.rawValue, forKey: appearanceKey)
             NotificationCenter.default.post(name: Self.appearanceDidChange, object: self)
         }
+    }
+
+    var iconSize: IconSizePreset {
+        get { stored(iconSizeKey, default: .standard) }
+        set {
+            guard iconSize != newValue else { return }
+            defaults.set(newValue.rawValue, forKey: iconSizeKey)
+            NotificationCenter.default.post(name: Self.layoutDidChange, object: self)
+        }
+    }
+
+    var tidelineBrightness: TideLineBrightness {
+        get { stored(tidelineBrightnessKey, default: .automatic) }
+        set {
+            guard tidelineBrightness != newValue else { return }
+            defaults.set(newValue.rawValue, forKey: tidelineBrightnessKey)
+            NotificationCenter.default.post(name: Self.appearanceDidChange, object: self)
+        }
+    }
+
+    var animation: AnimationPreset {
+        get { stored(animationKey, default: .standard) }
+        set {
+            guard animation != newValue else { return }
+            defaults.set(newValue.rawValue, forKey: animationKey)
+            NotificationCenter.default.post(name: Self.behaviorDidChange, object: self)
+        }
+    }
+
+    var reducedMotion: ReducedMotionPreference {
+        get { stored(reducedMotionKey, default: .automatic) }
+        set {
+            guard reducedMotion != newValue else { return }
+            defaults.set(newValue.rawValue, forKey: reducedMotionKey)
+            NotificationCenter.default.post(name: Self.behaviorDidChange, object: self)
+        }
+    }
+
+    var fullscreenBehavior: FullscreenBehavior {
+        get { stored(fullscreenBehaviorKey, default: .lineOnly) }
+        set {
+            guard fullscreenBehavior != newValue else { return }
+            defaults.set(newValue.rawValue, forKey: fullscreenBehaviorKey)
+            NotificationCenter.default.post(name: Self.behaviorDidChange, object: self)
+        }
+    }
+
+    private func stored<Value: RawRepresentable>(_ key: String, default fallback: Value) -> Value where Value.RawValue == String {
+        guard let rawValue = defaults.string(forKey: key), let value = Value(rawValue: rawValue) else {
+            return fallback
+        }
+        return value
     }
 
     /// 固定项 bundle id 列表；未设置时使用内建默认值。

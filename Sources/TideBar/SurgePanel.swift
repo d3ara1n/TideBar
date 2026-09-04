@@ -156,11 +156,16 @@ final class SurgeView: NSView {
         for (index, row) in rowsBottomUp.enumerated() {
             guard let layer = row.layer else { continue }
             let delay = Double(index) * Layout.surgeStaggerStep
-            Motion.spring(layer, keyPath: "transform.translation.y", from: Motion.surgeRowRiseOffset, to: 0,
-                          stiffness: Motion.iconRiseStiffness, damping: Motion.iconRiseDamping,
-                          minDuration: Motion.iconRiseDuration, delay: delay)
-            Motion.basic(layer, keyPath: "opacity", from: 0.0, to: 1.0,
-                         duration: Motion.iconRiseDuration, delay: delay)
+            if Motion.shouldReduceMotion {
+                Motion.basic(layer, keyPath: "opacity", from: 0.0, to: 1.0,
+                             duration: Motion.reducedMotionFadeDuration, delay: delay)
+            } else {
+                Motion.spring(layer, keyPath: "transform.translation.y", from: Motion.surgeRowRiseOffset, to: 0,
+                              stiffness: Motion.iconRiseStiffness, damping: Motion.iconRiseDamping,
+                              minDuration: Motion.iconRiseDuration, delay: delay)
+                Motion.basic(layer, keyPath: "opacity", from: 0.0, to: 1.0,
+                             duration: Motion.iconRiseDuration, delay: delay)
+            }
         }
     }
 
@@ -171,12 +176,16 @@ final class SurgeView: NSView {
         for (index, row) in rowsTopDown.enumerated() {
             guard let layer = row.layer else { continue }
             let delay = Double(index) * Layout.surgeStaggerStep
-            Motion.basic(layer, keyPath: "transform.translation.y", to: Motion.iconDropOffset,
-                         duration: Motion.dropDuration, curve: .easeIn, delay: delay)
+            if !Motion.shouldReduceMotion {
+                Motion.basic(layer, keyPath: "transform.translation.y", to: Motion.iconDropOffset,
+                             duration: Motion.dropDuration, curve: .easeIn, delay: delay)
+            }
             Motion.basic(layer, keyPath: "opacity", to: 0.0,
-                         duration: Motion.dropDuration, curve: .easeIn, delay: delay)
+                         duration: Motion.shouldReduceMotion ? Motion.reducedMotionFadeDuration : Motion.dropDuration,
+                         curve: .easeIn, delay: delay)
         }
-        return Layout.surgeStaggerStep * Double(max(rowsTopDown.count - 1, 0)) + Motion.dropDuration
+        return Layout.surgeStaggerStep * Double(max(rowsTopDown.count - 1, 0))
+            + (Motion.shouldReduceMotion ? Motion.reducedMotionFadeDuration : Motion.dropDuration)
     }
 }
 

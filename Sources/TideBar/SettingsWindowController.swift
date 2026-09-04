@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import TideBarCore
 
 @MainActor
 final class SettingsWindowController: NSWindowController {
@@ -44,6 +45,11 @@ private final class SettingsModel: ObservableObject {
     @Published private(set) var pinnedApps: [PinnedApplication] = []
     @Published private(set) var operation: Operation = .idle
     @Published private(set) var applicationTheme: ApplicationTheme = .system
+    @Published private(set) var iconSize: IconSizePreset = .standard
+    @Published private(set) var tidelineBrightness: TideLineBrightness = .automatic
+    @Published private(set) var animation: AnimationPreset = .standard
+    @Published private(set) var reducedMotion: ReducedMotionPreference = .automatic
+    @Published private(set) var fullscreenBehavior: FullscreenBehavior = .lineOnly
 
     private var observers: [NSObjectProtocol] = []
     private var permissionTimer: Timer?
@@ -66,6 +72,12 @@ private final class SettingsModel: ObservableObject {
         observers.append(NotificationCenter.default.addObserver(
             forName: AppConfiguration.appearanceDidChange, object: nil, queue: .main
         ) { _ in configBridge() })
+        observers.append(NotificationCenter.default.addObserver(
+            forName: AppConfiguration.layoutDidChange, object: nil, queue: .main
+        ) { _ in configBridge() })
+        observers.append(NotificationCenter.default.addObserver(
+            forName: AppConfiguration.behaviorDidChange, object: nil, queue: .main
+        ) { _ in configBridge() })
 
         // AX 授权没有通知渠道，只在设置窗口存活期间低频刷新展示状态。
         permissionTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
@@ -77,7 +89,13 @@ private final class SettingsModel: ObservableObject {
         refreshDock()
         refreshPermission()
         refreshPinnedApps()
-        applicationTheme = AppConfiguration.shared.appearance
+        let configuration = AppConfiguration.shared
+        applicationTheme = configuration.appearance
+        iconSize = configuration.iconSize
+        tidelineBrightness = configuration.tidelineBrightness
+        animation = configuration.animation
+        reducedMotion = configuration.reducedMotion
+        fullscreenBehavior = configuration.fullscreenBehavior
     }
 
     func refreshDock() {
@@ -91,6 +109,31 @@ private final class SettingsModel: ObservableObject {
     func setApplicationTheme(_ theme: ApplicationTheme) {
         applicationTheme = theme
         AppConfiguration.shared.appearance = theme
+    }
+
+    func setIconSize(_ value: IconSizePreset) {
+        iconSize = value
+        AppConfiguration.shared.iconSize = value
+    }
+
+    func setTidelineBrightness(_ value: TideLineBrightness) {
+        tidelineBrightness = value
+        AppConfiguration.shared.tidelineBrightness = value
+    }
+
+    func setAnimation(_ value: AnimationPreset) {
+        animation = value
+        AppConfiguration.shared.animation = value
+    }
+
+    func setReducedMotion(_ value: ReducedMotionPreference) {
+        reducedMotion = value
+        AppConfiguration.shared.reducedMotion = value
+    }
+
+    func setFullscreenBehavior(_ value: FullscreenBehavior) {
+        fullscreenBehavior = value
+        AppConfiguration.shared.fullscreenBehavior = value
     }
 
     func enableTakeover() {
@@ -616,41 +659,75 @@ private struct AppearancePage: View {
             }
 
             Section {
-                ComingSoonRow(title: "汐线亮度", description: "让收起态在不同桌面背景上保持清晰。")
-                ComingSoonRow(title: "展开动画", description: "调整潮涌展开与退回的动态节奏。")
-                ComingSoonRow(title: "应用图标大小", description: "选择更紧凑或更舒展的应用栏密度。")
+                Picker("应用图标大小", selection: Binding(
+                    get: { model.iconSize },
+                    set: { model.setIconSize($0) }
+                )) {
+                    ForEach(IconSizePreset.allCases) { value in
+                        Text(value.title).tag(value)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Picker("汐线亮度", selection: Binding(
+                    get: { model.tidelineBrightness },
+                    set: { model.setTidelineBrightness($0) }
+                )) {
+                    ForEach(TideLineBrightness.allCases) { value in
+                        Text(value.title).tag(value)
+                    }
+                }
+                .pickerStyle(.segmented)
             } header: {
                 Text("汐线与应用栏")
+            } footer: {
+                Text("图标大小会同时调整图标槽位；汐线亮度只影响收起态视觉，不改变接近热区。")
             }
 
             Section {
-                ComingSoonRow(title: "全屏应用中的显示行为", description: "决定全屏空间中是否保留汐线。")
-                ComingSoonRow(title: "减少动态效果", description: "跟随 macOS 的减少动态效果设置。")
+                Picker("展开动画", selection: Binding(
+                    get: { model.animation },
+                    set: { model.setAnimation($0) }
+                )) {
+                    ForEach(AnimationPreset.allCases) { value in
+                        Text(value.title).tag(value)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Picker("减少动态效果", selection: Binding(
+                    get: { model.reducedMotion },
+                    set: { model.setReducedMotion($0) }
+                )) {
+                    ForEach(ReducedMotionPreference.allCases) { value in
+                        Text(value.title).tag(value)
+                    }
+                }
+                .pickerStyle(.segmented)
             } header: {
-                Text("行为")
+                Text("动画")
+            } footer: {
+                Text("减少动态效果会覆盖系统设置；始终关闭会保留弹簧与位移动效。")
+            }
+
+            Section {
+                Picker("全屏应用中的显示行为", selection: Binding(
+                    get: { model.fullscreenBehavior },
+                    set: { model.setFullscreenBehavior($0) }
+                )) {
+                    ForEach(FullscreenBehavior.allCases) { value in
+                        Text(value.title).tag(value)
+                    }
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("全屏空间")
+            } footer: {
+                Text("仅显示汐线不会在全屏空间展开；完全隐藏会暂时移除汐线并停止命中检测。")
             }
         }
         .formStyle(.grouped)
         .navigationTitle("外观与交互")
-    }
-}
-
-private struct ComingSoonRow: View {
-    let title: String
-    let description: String
-
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                Text(description).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            Text("即将推出")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
-        .opacity(0.72)
     }
 }
 
