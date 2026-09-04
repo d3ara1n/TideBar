@@ -169,6 +169,13 @@ final class WindowStore {
 
     // MARK: 观测生命周期
 
+    /// 对账：移除 pid 已不存在的观测（挂起期间终止通知迟到的兜底）
+    func reconcile(aliveProcessIdentifiers: Set<pid_t>) {
+        for pid in watches.keys where !aliveProcessIdentifiers.contains(pid) {
+            removeWatch(pid: pid)
+        }
+    }
+
     private func addWatch(_ app: NSRunningApplication, delay: TimeInterval) {
         guard isWatchable(app) else { return }
         let pid = app.processIdentifier

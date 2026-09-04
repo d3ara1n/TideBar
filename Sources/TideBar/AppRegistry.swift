@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import TideBarCore
 import UniformTypeIdentifiers
 
@@ -67,7 +68,9 @@ struct AppEntry: Identifiable {
     /// 主点击：仅剩最小化窗口 → 还原最近一个；否则 activate
     /// （activate 隐含 raise 最近窗口，与 Dock 一致；无 AX 信息时退化为纯激活）
     func primaryClick() {
-        if runningApp != nil {
+        if let app = runningApp {
+            // 垂死实例（挂起期间进程已死、刷新未及消费）：不动作，等对账清场
+            guard app.isProcessAlive else { return }
             if let windows, !windows.isEmpty, windows.allSatisfy(\.isMinimized),
                let window = windows.last, let owner = runningApp(for: window) {
                 AXReader.raise(window, app: owner)
@@ -84,6 +87,8 @@ struct AppEntry: Identifiable {
     /// 固定未运行 → 启动。reopen 事件若需 TCC 授权则静默跳过（零权限原则）
     func activate() {
         if let app = runningApp {
+            // 垂死实例：不激活、不发事件，避免向死 pid 报 procNotFound
+            guard app.isProcessAlive else { return }
             _ = app.activate()
             sendReopen(to: app)
         } else if let applicationURL {
@@ -107,6 +112,14 @@ struct AppEntry: Identifiable {
         } catch {
             NSLog("TideBar reopen event not sent for %@: %@", app.bundleIdentifier ?? "?", String(describing: error))
         }
+    }
+}
+
+extension NSRunningApplication {
+    /// 进程仍在运行：LS 未标记垂死，且 pid 探测存在（kill 0 探测；
+    /// 僵尸态短窗口内探测为活，可接受——彼时 LS 同样未标记）。
+    var isProcessAlive: Bool {
+        !isTerminated && kill(processIdentifier, 0) == 0
     }
 }
 
@@ -185,7 +198,8 @@ final class AppRegistry {
         let workspace = NSWorkspace.shared
         let pinned = AppConfiguration.shared.effectivePinnedBundleIDs
         let running = workspace.runningApplications.filter {
-            guard $0.activationPolicy == .regular, let bundleIdentifier = $0.bundleIdentifier else {
+            guard !$0.isTerminated, $0.activationPolicy == .regular,
+                  let bundleIdentifier = $0.bundleIdentifier else {
                 return false
             }
             return !Self.hiddenApps.contains(AppIdentity(bundleIdentifier))
@@ -200,6 +214,7 @@ final class AppRegistry {
         let runningByPID = Dictionary(uniqueKeysWithValues: running.map {
             ($0.processIdentifier, $0)
         })
+        windowStore.reconcile(aliveProcessIdentifiers: Set(runningByPID.keys))
 
         func icon(app: NSRunningApplication?, applicationURL: URL?) -> NSImage {
             if let image = app?.icon { return image }

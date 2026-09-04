@@ -550,6 +550,8 @@ final class TideBarController {
         // WindowServer 对非 key 窗口会降级玻璃的背景采样（退化为纯模糊）——
         // 展开期间保持 key，材质层全质量常驻；nonactivating 面板不夺取系统焦点
         state.panel.makeKey()
+        // 挂起期间积压的终止通知可能尚未消费；展开即用户可见时刻，先同步对账
+        registry.refresh()
         state.view.setExpanded(true, apps: registry.entries)
         NSLog("TideBar expanded on screen %u", displayID(of: state.screen) ?? 0)
     }
