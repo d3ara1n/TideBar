@@ -54,6 +54,7 @@ final class AppConfiguration {
     private let animationKey = "tidebar.animation"
     private let reducedMotionKey = "tidebar.reducedMotion"
     private let fullscreenBehaviorKey = "tidebar.fullscreenBehavior"
+    private let switcherDelayKey = "tidebar.shortcut.switcherDelay"
     private init() {}
 
     /// TideBar 是否负责系统 Dock 的可见入口。正式产品只有启用与停用两种运行状态。
@@ -123,6 +124,24 @@ final class AppConfiguration {
             defaults.set(newValue.rawValue, forKey: fullscreenBehaviorKey)
             NotificationCenter.default.post(name: Self.behaviorDidChange, object: self)
         }
+    }
+
+    var switcherCommitDelay: Double {
+        get {
+            let value = defaults.double(forKey: switcherDelayKey)
+            return value > 0 ? min(max(value, 0.2), 5.0) : 0.9
+        }
+        set {
+            let value = min(max(newValue, 0.2), 5.0)
+            guard abs(switcherCommitDelay - value) > 0.001 else { return }
+            defaults.set(value, forKey: switcherDelayKey)
+            NotificationCenter.default.post(name: Self.behaviorDidChange, object: self)
+        }
+    }
+
+    func restoreDefaultSwitcherDelay() {
+        defaults.removeObject(forKey: switcherDelayKey)
+        NotificationCenter.default.post(name: Self.behaviorDidChange, object: self)
     }
 
     private func stored<Value: RawRepresentable>(_ key: String, default fallback: Value) -> Value where Value.RawValue == String {

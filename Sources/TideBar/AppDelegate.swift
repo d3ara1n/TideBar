@@ -3,6 +3,7 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let controller = TideBarController()
+    private let shortcutManager = ShortcutManager()
     private var settingsWindow: SettingsWindowController?
     private var statusItem: NSStatusItem?
     private var configurationObserver: NSObjectProtocol?
@@ -15,6 +16,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         configureStatusItem()
         DockController.shared.start()
         controller.start()
+        shortcutManager.onAction = { [weak self] action in
+            self?.controller.handleShortcut(action)
+        }
+        shortcutManager.start()
         configurationObserver = NotificationCenter.default.addObserver(
             forName: AppConfiguration.didChange, object: nil, queue: .main
         ) { [weak self] _ in
@@ -46,6 +51,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        shortcutManager.stop()
+        controller.stop()
         if AppConfiguration.shared.isTakeoverEnabled {
             DockController.shared.restore()
         }
@@ -61,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let behaviorObserver {
             NotificationCenter.default.removeObserver(behaviorObserver)
         }
+
     }
 
     private func applyAppearance() {

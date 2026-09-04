@@ -11,6 +11,7 @@ final class SurgeRowView: NSView {
     private let icon: NSImage
     private let title: String
     private var hovering = false
+    private var keyboardSelected = false
 
     var onPick: ((WindowSnapshot) -> Void)?
 
@@ -41,6 +42,14 @@ final class SurgeRowView: NSView {
         needsDisplay = true
     }
 
+    func setKeyboardSelected(_ on: Bool) {
+        guard keyboardSelected != on else { return }
+        keyboardSelected = on
+        needsDisplay = true
+    }
+
+    var windowIdentifier: Int { snapshot.elementIdentifier }
+
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -50,12 +59,12 @@ final class SurgeRowView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         let onGlass = BarBackgroundFactory.usesGlass
-        if hovering {
+        if hovering || keyboardSelected {
             let highlight = NSBezierPath(roundedRect: bounds.insetBy(dx: 6, dy: 2), xRadius: 6, yRadius: 6)
             if onGlass {
-                NSColor.labelColor.withAlphaComponent(0.12).setFill()
+                NSColor.labelColor.withAlphaComponent(keyboardSelected && !hovering ? 0.18 : 0.12).setFill()
             } else {
-                NSColor.white.withAlphaComponent(0.14).setFill()
+                NSColor.white.withAlphaComponent(keyboardSelected && !hovering ? 0.2 : 0.14).setFill()
             }
             highlight.fill()
         }
@@ -148,6 +157,20 @@ final class SurgeView: NSView {
         for case let row as SurgeRowView in subviews {
             row.setHovered(row === hit)
         }
+    }
+
+    func setKeyboardSelection(_ identifier: Int?) {
+        for case let row as SurgeRowView in subviews {
+            row.setKeyboardSelected(row.windowIdentifier == identifier)
+        }
+    }
+
+    func rowIdentifiers() -> [Int] {
+        subviews.compactMap { ($0 as? SurgeRowView)?.windowIdentifier }
+    }
+
+    func row(for identifier: Int) -> SurgeRowView? {
+        subviews.compactMap { $0 as? SurgeRowView }.first { $0.windowIdentifier == identifier }
     }
 
     /// 错峰升起：靠近图标的行先动，逐行向上传递（与汐线展开共用语言）

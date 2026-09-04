@@ -1,4 +1,5 @@
 import AppKit
+import KeyboardShortcuts
 import SwiftUI
 import TideBarCore
 
@@ -50,6 +51,7 @@ private final class SettingsModel: ObservableObject {
     @Published private(set) var animation: AnimationPreset = .standard
     @Published private(set) var reducedMotion: ReducedMotionPreference = .automatic
     @Published private(set) var fullscreenBehavior: FullscreenBehavior = .lineOnly
+    @Published private(set) var switcherCommitDelay: Double = 0.9
 
     private var observers: [NSObjectProtocol] = []
     private var permissionTimer: Timer?
@@ -96,6 +98,7 @@ private final class SettingsModel: ObservableObject {
         animation = configuration.animation
         reducedMotion = configuration.reducedMotion
         fullscreenBehavior = configuration.fullscreenBehavior
+        switcherCommitDelay = configuration.switcherCommitDelay
     }
 
     func refreshDock() {
@@ -134,6 +137,17 @@ private final class SettingsModel: ObservableObject {
     func setFullscreenBehavior(_ value: FullscreenBehavior) {
         fullscreenBehavior = value
         AppConfiguration.shared.fullscreenBehavior = value
+    }
+
+    func setSwitcherCommitDelay(_ value: Double) {
+        switcherCommitDelay = value
+        AppConfiguration.shared.switcherCommitDelay = value
+    }
+
+    func restoreDefaultShortcuts() {
+        KeyboardShortcuts.reset(.toggleTideBar, .cycleTideBarApplication)
+        AppConfiguration.shared.restoreDefaultSwitcherDelay()
+        refresh()
     }
 
     func enableTakeover() {
@@ -284,6 +298,7 @@ private enum SettingsPage: String, CaseIterable, Identifiable {
     case pinned
     case windows
     case appearance
+    case shortcuts
     case dock
     case permissions
     case about
@@ -296,6 +311,7 @@ private enum SettingsPage: String, CaseIterable, Identifiable {
         case .pinned: return "固定项目"
         case .windows: return "窗口管理"
         case .appearance: return "外观与交互"
+        case .shortcuts: return "快捷键"
         case .dock: return "Dock 与恢复"
         case .permissions: return "权限"
         case .about: return "关于"
@@ -308,6 +324,7 @@ private enum SettingsPage: String, CaseIterable, Identifiable {
         case .pinned: return "pin"
         case .windows: return "macwindow.on.rectangle"
         case .appearance: return "paintbrush"
+        case .shortcuts: return "keyboard"
         case .dock: return "dock.rectangle"
         case .permissions: return "checkmark.shield"
         case .about: return "info.circle"
@@ -327,6 +344,7 @@ private struct SettingsRootView: View {
                     pageRow(.pinned)
                     pageRow(.windows)
                     pageRow(.appearance)
+                    pageRow(.shortcuts)
                 }
                 Section("系统") {
                     pageRow(.dock)
@@ -345,6 +363,7 @@ private struct SettingsRootView: View {
                 case .pinned: PinnedPage(model: model)
                 case .windows: WindowsPage(model: model)
                 case .appearance: AppearancePage(model: model)
+                case .shortcuts: ShortcutsPage(model: model)
                 case .dock: DockPage(model: model)
                 case .permissions: PermissionsPage(model: model)
                 case .about: AboutPage()
@@ -728,6 +747,52 @@ private struct AppearancePage: View {
         }
         .formStyle(.grouped)
         .navigationTitle("外观与交互")
+    }
+}
+
+// MARK: - 快捷键
+
+private struct ShortcutsPage: View {
+    @ObservedObject var model: SettingsModel
+
+    var body: some View {
+        Form {
+            PageHeader(title: "快捷键", description: "设置全局快捷键与临时切换的提交等待时间。")
+
+            Section {
+                KeyboardShortcuts.Recorder("展开/收起 TideBar", name: .toggleTideBar)
+                KeyboardShortcuts.Recorder("临时切换应用", name: .cycleTideBarApplication)
+            } header: {
+                Text("全局快捷键")
+            } footer: {
+                Text("点击快捷键字段后输入新的组合键。录制期间 TideBar 热键会自动暂停；按 Esc 取消，按 Delete 清除。")
+            }
+
+            Section {
+                HStack {
+                    Text("提交延迟")
+                    Slider(value: Binding(
+                        get: { model.switcherCommitDelay },
+                        set: { model.setSwitcherCommitDelay($0) }
+                    ), in: 0.2...5.0, step: 0.1)
+                    Text(String(format: "%.1f 秒", model.switcherCommitDelay))
+                        .monospacedDigit()
+                        .frame(width: 58, alignment: .trailing)
+                }
+            } header: {
+                Text("临时切换")
+            } footer: {
+                Text("停止操作达到该时间后，TideBar 会提交当前选择并结束临时切换会话。")
+            }
+
+            Section {
+                Button("恢复默认快捷键与延迟") {
+                    model.restoreDefaultShortcuts()
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("快捷键")
     }
 }
 

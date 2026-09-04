@@ -14,6 +14,8 @@ final class TideBarController {
         var isExpanded = false
         var collapseDebounce: DispatchWorkItem?
         var collapseHeldUntilMouseMoves = false
+        /// 快捷键会话收起后，直到下一次真实鼠标移动前抑制热区重开。
+        var suppressExpandUntilMouseMove = false
         /// 使延迟的面板缩宽在后续应用变化后自动失效。
         var appTransitionGeneration = 0
         var hiddenForFullscreen = false
@@ -30,6 +32,9 @@ final class TideBarController {
     private var globalMonitor: Any?
     private var localMonitor: Any?
     private var pollTimer: Timer?
+    private var keyboardMonitor: Any?
+    private var barSession: BarSessionState?
+    private var switcherCommitWork: DispatchWorkItem?
     private var observers: [NSObjectProtocol] = []
     private var lastSampleTime: CFTimeInterval = 0
     private var fullscreenCache: [CGDirectDisplayID: (time: CFTimeInterval, value: Bool)] = [:]
@@ -62,6 +67,10 @@ final class TideBarController {
         pollTimer = Timer.scheduledTimer(withTimeInterval: Layout.pollInterval, repeats: true) { _ in
             pollSample()
         }
+        keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+            guard let self else { return event }
+            return self.handleKeyDown(event) ? nil : event
+        }
 
         let screenBridge = MainThreadBridge { [weak self] in self?.screensChanged() }
         observers.append(NotificationCenter.default.addObserver(
@@ -77,11 +86,309 @@ final class TideBarController {
         NSLog("TideBar started: screens=%d", screens.count)
     }
 
+    func stop() {
+        if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }
+        if let localMonitor { NSEvent.removeMonitor(localMonitor) }
+        if let keyboardMonitor { NSEvent.removeMonitor(keyboardMonitor) }
+        pollTimer?.invalidate()
+        globalMonitor = nil
+        localMonitor = nil
+        keyboardMonitor = nil
+        pollTimer = nil
+        endBarSession(collapse: false, suppressMouse: false)
+    }
+
+    // MARK: - 快捷键与键盘导航
+
+    func handleShortcut(_ action: ShortcutManager.Action) {
+        switch action {
+        case .toggleBar:
+            togglePersistentSession()
+        case .cycleApplication:
+            cycleSwitcherSession()
+        }
+    }
+
+    private func handleKeyDown(_ event: NSEvent) -> Bool {
+        if event.keyCode == 53, surgePanel != nil {
+            guard var session = barSession else {
+                dismissSurge(animated: true)
+                return true
+            }
+            if case .windows = session.level {
+                _ = session.escape()
+                barSession = session
+                dismissSurge(animated: true)
+                if let state = screens[session.displayID] {
+                    state.view.setKeyboardSelection(session.selectedApplication)
+                }
+            } else {
+                cancelBarSession()
+            }
+            return true
+        }
+        guard barSession != nil else { return false }
+        switch event.keyCode {
+        case 123: // left
+            guard barSession?.level == .applications else { return false }
+            moveApplication(by: -1)
+        case 124: // right
+            guard barSession?.level == .applications else { return false }
+            moveApplication(by: 1)
+        case 125: // down
+            if barSession?.level == .applications {
+                openSelectedSurge()
+            } else if case .windows = barSession?.level {
+                moveWindow(by: 1)
+            } else {
+                return false
+            }
+        case 126: // up
+            guard case .windows = barSession?.level else { return false }
+            moveWindow(by: -1)
+        case 36, 76: // return / enter
+            commitBarSession()
+        case 53: // escape
+            if let session = barSession, case .windows = session.level {
+                var updated = session
+                _ = updated.escape()
+                barSession = updated
+                dismissSurge(animated: true)
+                if let state = screens[updated.displayID] {
+                    state.view.setKeyboardSelection(updated.selectedApplication)
+                }
+            } else {
+                cancelBarSession()
+            }
+        default:
+            return false
+        }
+        touchSwitcherTimeout()
+        return true
+    }
+
+    private var switcherTimeout: TimeInterval { AppConfiguration.shared.switcherCommitDelay }
+
+    private func togglePersistentSession() {
+        guard AppConfiguration.shared.isTakeoverEnabled,
+              let state = targetScreenState(),
+              !state.hiddenForFullscreen else { return }
+        if let session = barSession {
+            guard session.displayID == displayID(of: state.screen) else { return }
+            cancelBarSession()
+            return
+        }
+        // 必须在展开面板前读取，避免 key 面板改变 frontmostApplication。
+        let initialApplication = preferredInitialApplication()
+        let openedBySession = !state.isExpanded
+        if !state.isExpanded { expand(state) }
+        beginSession(mode: .persistent, on: state, openedBySession: openedBySession,
+                     initialApplication: initialApplication)
+    }
+
+    private func cycleSwitcherSession() {
+        guard AppConfiguration.shared.isTakeoverEnabled else { return }
+        let state: ScreenState?
+        if let session = barSession {
+            state = screens[session.displayID]
+        } else {
+            state = targetScreenState()
+        }
+        guard let state, !state.hiddenForFullscreen else { return }
+
+        if let session = barSession, session.isPersistent {
+            moveApplication(by: 1)
+            return
+        }
+        if barSession == nil {
+            // 必须在展开面板前读取，避免 key 面板改变 frontmostApplication。
+            let initialApplication = preferredInitialApplication()
+            let openedBySession = !state.isExpanded
+            if !state.isExpanded { expand(state) }
+            beginSession(mode: .switcher, on: state, openedBySession: openedBySession,
+                         initialApplication: initialApplication)
+        } else {
+            moveApplication(by: 1)
+            armSwitcherTimeout()
+        }
+    }
+
+    private func frontmostIdentity() -> AppIdentity? {
+        guard let bundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return nil }
+        return AppIdentity(bundleIdentifier)
+    }
+
+    private func preferredInitialApplication() -> AppIdentity? {
+        if let frontmost = frontmostIdentity(),
+           registry.entries.contains(where: { $0.identity == frontmost }) {
+            return frontmost
+        }
+        return registry.entries.first?.identity
+    }
+
+    private func beginSession(mode: BarSessionMode, on state: ScreenState,
+                              openedBySession: Bool,
+                              initialApplication: AppIdentity?) {
+        guard let displayID = displayID(of: state.screen) else { return }
+        barSession = BarSessionState(mode: mode,
+                                     displayID: displayID,
+                                     openedBySession: openedBySession,
+                                     firstApplication: initialApplication,
+                                     now: CACurrentMediaTime(),
+                                     timeout: switcherTimeout)
+        state.view.setKeyboardSelection(barSession?.selectedApplication)
+        if mode == .switcher { armSwitcherTimeout() }
+    }
+
+    private func isKeyboardHolding(_ state: ScreenState) -> Bool {
+        guard let session = barSession,
+              session.displayID == self.displayID(of: state.screen) else { return false }
+        return true
+    }
+
+    private func targetScreenState() -> ScreenState? {
+        let location = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { $0.frame.contains(location) } ?? NSScreen.main
+        guard let screen, let id = displayID(of: screen) else { return nil }
+        return screens[id]
+    }
+
+    private func selectApplication(_ identity: AppIdentity) {
+        guard var session = barSession else { return }
+        session.selectApplication(identity,
+                                  now: CACurrentMediaTime(),
+                                  timeout: switcherTimeout)
+        barSession = session
+        if let state = screens[session.displayID] {
+            state.view.setKeyboardSelection(identity)
+        }
+    }
+
+    private func moveApplication(by offset: Int) {
+        guard !registry.entries.isEmpty, var session = barSession else { return }
+        if case .windows = session.level {
+            _ = session.escape()
+            dismissSurge(animated: true)
+        }
+        let current = session.selectedApplication
+        let index = current.flatMap { identity in registry.entries.firstIndex { $0.identity == identity } } ?? 0
+        let next = (index + offset + registry.entries.count) % registry.entries.count
+        session.selectApplication(registry.entries[next].identity,
+                                  now: CACurrentMediaTime(),
+                                  timeout: switcherTimeout)
+        barSession = session
+        if let state = screens[session.displayID] {
+            state.view.setKeyboardSelection(session.selectedApplication)
+        }
+        if session.isSwitcher { armSwitcherTimeout() }
+    }
+
+    private func openSelectedSurge() {
+        guard let session = barSession,
+              let state = screens[session.displayID],
+              let identity = session.selectedApplication,
+              let entry = registry.entries.first(where: { $0.identity == identity }),
+              let iconFrame = state.view.iconFrame(for: identity) else { return }
+        showSurge(entry: entry, state: state, iconFrame: iconFrame, fromKeyboard: true)
+        cancelSwitcherTimeout()
+    }
+
+    private func moveWindow(by offset: Int) {
+        guard let session = barSession,
+              case let .windows(identity) = session.level,
+              let entry = registry.entries.first(where: { $0.identity == identity }),
+              let windows = entry.windows, !windows.isEmpty else { return }
+        let ids = windows.map(\.elementIdentifier)
+        let index = session.selectedWindowIdentifier.flatMap { ids.firstIndex(of: $0) } ?? 0
+        let next = (index + offset + ids.count) % ids.count
+        var updated = session
+        updated.selectWindow(ids[next], now: nil, timeout: nil)
+        barSession = updated
+        (surgePanel?.contentView as? SurgeView)?.setKeyboardSelection(ids[next])
+    }
+
+    private func commitBarSession() {
+        guard let session = barSession,
+              let state = screens[session.displayID] else { return }
+        cancelSwitcherTimeout()
+        switch session.level {
+        case .inactive:
+            endBarSession(collapse: true, suppressMouse: true)
+        case .applications:
+            if let identity = session.selectedApplication,
+               let entry = registry.entries.first(where: { $0.identity == identity }) {
+                entry.primaryClick()
+            }
+            endBarSession(collapse: session.isPersistent || session.openedBySession,
+                          suppressMouse: session.openedBySession)
+        case .windows(let identity):
+            if let entry = registry.entries.first(where: { $0.identity == identity }),
+               let identifier = session.selectedWindowIdentifier,
+               let window = entry.windows?.first(where: { $0.elementIdentifier == identifier }),
+               let app = entry.runningApp(for: window) {
+                AXReader.raise(window, app: app)
+            } else if let entry = registry.entries.first(where: { $0.identity == identity }) {
+                entry.activate()
+            }
+            endBarSession(collapse: session.isPersistent || session.openedBySession,
+                          suppressMouse: session.openedBySession)
+        }
+        _ = state
+    }
+
+    private func cancelBarSession() {
+        guard let session = barSession else {
+            dismissSurge(animated: true)
+            return
+        }
+        endBarSession(collapse: session.isPersistent || session.openedBySession,
+                      suppressMouse: session.openedBySession)
+    }
+
+    private func endBarSession(collapse shouldCollapse: Bool, suppressMouse: Bool) {
+        cancelSwitcherTimeout()
+        let session = barSession
+        barSession = nil
+        dismissSurge(animated: true)
+        guard let session, let state = screens[session.displayID] else { return }
+        state.view.setKeyboardSelection(nil)
+        if shouldCollapse && state.isExpanded {
+            collapse(state, animated: true, suppressReexpand: suppressMouse)
+        }
+    }
+
+    private func armSwitcherTimeout() {
+        cancelSwitcherTimeout()
+        guard barSession?.isSwitcher == true else { return }
+        let bridge = MainThreadBridge { [weak self] in self?.commitSwitcherIfIdle() }
+        let work = DispatchWorkItem { bridge() }
+        switcherCommitWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + switcherTimeout, execute: work)
+    }
+
+    private func cancelSwitcherTimeout() {
+        switcherCommitWork?.cancel()
+        switcherCommitWork = nil
+    }
+
+    private func touchSwitcherTimeout() {
+        guard barSession?.isSwitcher == true else { return }
+        if case .windows = barSession?.level { return }
+        armSwitcherTimeout()
+    }
+
+    private func commitSwitcherIfIdle() {
+        switcherCommitWork = nil
+        guard barSession?.isSwitcher == true else { return }
+        commitBarSession()
+    }
+
     // MARK: - 面板生命周期
 
     /// 接管状态变化时启动或停止底部面板；固定列表变化则刷新现有模型。
     func configurationDidChange() {
         guard AppConfiguration.shared.isTakeoverEnabled else {
+            endBarSession(collapse: false, suppressMouse: false)
             dismissSurge(animated: false)
             for state in screens.values {
                 state.collapseDebounce?.cancel()
@@ -97,6 +404,7 @@ final class TideBarController {
 
     private func rebuildPanels() {
         guard AppConfiguration.shared.isTakeoverEnabled else { return }
+        endBarSession(collapse: false, suppressMouse: false)
         dismissSurge(animated: false)
         for state in screens.values {
             state.collapseDebounce?.cancel()
@@ -112,6 +420,10 @@ final class TideBarController {
             let view = TideBarView(frame: NSRect(origin: .zero, size: frame.size))
             panel.contentView = view
             let state = ScreenState(screen: screen, panel: panel, view: view)
+            view.onUserLaunch = { [weak self] in
+                guard let self, self.barSession != nil else { return }
+                self.cancelBarSession()
+            }
             view.onSetHidden = { [weak self] identity, hidden in
                 self?.registry.requestSetHidden(hidden, of: identity)
             }
@@ -175,6 +487,7 @@ final class TideBarController {
         if isMovement {
             for state in screens.values {
                 state.collapseHeldUntilMouseMoves = false
+                state.suppressExpandUntilMouseMove = false
             }
         }
 
@@ -189,7 +502,7 @@ final class TideBarController {
                 continue
             }
             if state.isExpanded {
-                if state.collapseHeldUntilMouseMoves {
+                if state.collapseHeldUntilMouseMoves || isKeyboardHolding(state) {
                     cancelCollapse(state)
                     state.view.updateHover(atScreen: location)
                     continue
@@ -205,7 +518,8 @@ final class TideBarController {
                     scheduleCollapse(state)
                 }
                 state.view.updateHover(atScreen: location)
-            } else if hotZone(for: state.screen).contains(location) {
+            } else if !state.suppressExpandUntilMouseMove,
+                      hotZone(for: state.screen).contains(location) {
                 expand(state)
             }
         }
@@ -215,6 +529,7 @@ final class TideBarController {
     /// 潮涌悬停与离场判定：命中面板内则行高亮 + 取消收起；否则重排收起防抖
     private func updateSurgeHover(at location: NSPoint) {
         guard let panel = surgePanel, panel.isVisible else { return }
+        if barSession != nil { return }
         guard panel.frame.contains(location) else {
             scheduleSurgeDismiss()
             return
@@ -227,6 +542,8 @@ final class TideBarController {
     }
 
     private func expand(_ state: ScreenState) {
+        guard !state.hiddenForFullscreen else { return }
+        state.suppressExpandUntilMouseMove = false
         state.isExpanded = true
         cancelCollapse(state)
         state.panel.ignoresMouseEvents = false
@@ -237,9 +554,10 @@ final class TideBarController {
         NSLog("TideBar expanded on screen %u", displayID(of: state.screen) ?? 0)
     }
 
-    private func collapse(_ state: ScreenState, animated: Bool) {
+    private func collapse(_ state: ScreenState, animated: Bool, suppressReexpand: Bool = false) {
         state.isExpanded = false
         state.collapseHeldUntilMouseMoves = false
+        if suppressReexpand { state.suppressExpandUntilMouseMove = true }
         cancelCollapse(state)
         if surgeOriginDisplayID == displayID(of: state.screen) {
             dismissSurge(animated: animated)
@@ -294,9 +612,15 @@ final class TideBarController {
                     state.panel.ignoresMouseEvents = !state.isExpanded
                 }
                 if state.isExpanded { collapse(state, animated: false) }
+                if barSession?.displayID == displayID(of: state.screen) {
+                    endBarSession(collapse: false, suppressMouse: false)
+                }
                 return true
             case .hidden:
                 if state.isExpanded { collapse(state, animated: false) }
+                if barSession?.displayID == displayID(of: state.screen) {
+                    endBarSession(collapse: false, suppressMouse: false)
+                }
                 state.panel.ignoresMouseEvents = true
                 if !state.hiddenForFullscreen {
                     state.hiddenForFullscreen = true
@@ -388,6 +712,29 @@ final class TideBarController {
                 state.panel.setFrame(target, display: true)
             }
         }
+        syncKeyboardSelection()
+    }
+
+    private func syncKeyboardSelection() {
+        guard var session = barSession,
+              let state = screens[session.displayID] else {
+            return
+        }
+        let applications = Set(registry.entries.map(\.identity))
+        let windowIDs: Set<Int>?
+        if case let .windows(identity) = session.level,
+           let entry = registry.entries.first(where: { $0.identity == identity }),
+           let windows = entry.windows {
+            windowIDs = Set(windows.map(\.elementIdentifier))
+        } else {
+            windowIDs = nil
+        }
+        session.reconcile(applications: applications, windowIdentifiers: windowIDs)
+        barSession = session
+        state.view.setKeyboardSelection(session.selectedApplication)
+        if case .windows = session.level {
+            (surgePanel?.contentView as? SurgeView)?.setKeyboardSelection(session.selectedWindowIdentifier)
+        }
     }
 
     private func animatePanel(_ panel: NSPanel, to frame: NSRect) {
@@ -410,15 +757,20 @@ final class TideBarController {
 
     // MARK: - 潮涌
 
-    private func showSurge(entry: AppEntry, state: ScreenState, iconFrame: NSRect) {
+    private func showSurge(entry: AppEntry, state: ScreenState, iconFrame: NSRect,
+                           fromKeyboard: Bool = false) {
         guard let windows = entry.windows, !windows.isEmpty else { return }
         dismissSurge(animated: false)
 
         let list = SurgeView(windows: windows, screen: state.screen, appIcon: entry.icon)
         list.onPick = { [weak self] window in
-            self?.dismissSurge(animated: true)
+            guard let self else { return }
+            self.dismissSurge(animated: true)
             if let app = entry.runningApp(for: window) {
                 AXReader.raise(window, app: app)
+            }
+            if self.barSession != nil {
+                self.cancelBarSession()
             }
         }
 
@@ -439,6 +791,12 @@ final class TideBarController {
         surgeIdentity = entry.id
         surgeWindowRevision = entry.windowRevision
         surgeOriginDisplayID = displayID(of: state.screen)
+        if fromKeyboard, var session = barSession {
+            _ = session.enterWindows(for: entry.identity,
+                                     firstWindowIdentifier: list.rowIdentifiers().first)
+            barSession = session
+            list.setKeyboardSelection(session.selectedWindowIdentifier)
+        }
         list.riseRows()
         NSLog("TideBar surge shown for %@ (%d windows)", entry.id.bundleIdentifier, windows.count)
     }

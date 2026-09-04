@@ -153,3 +153,13 @@ defaults delete com.apple.dock autohide-delay && killall Dock
 3. **固定与运行状态解耦**：固定 Finder 即使没有收录窗口也保留图标；未固定 Finder 则仅在逻辑运行时显示。默认固定列表不包含 Finder，用户可通过 UI 手动固定或取消固定。
 4. **系统进程引用继续保留**：Finder 的 `NSRunningApplication` 仍用于激活、reopen、隐藏和显示等系统动作，但不能直接决定 `AppEntry.isRunning`。固定且无窗口时点击现有 Finder 进程并发送 reopen，以打开资源管理器窗口。
 5. **终止保护不变**：Finder 不提供退出动作，也不尝试终止 Finder 后恢复桌面。
+
+## 2026-09 快捷键与开发启动边界
+
+1. **全局热键不引入新的 TCC 权限**：使用 Carbon `RegisterEventHotKey` 接收有限的快捷键事件，不使用全局键盘监控；快捷键本身不新增辅助功能或屏幕录制授权要求。窗口级导航仍受现有辅助功能授权约束，未授权时退化为应用激活。
+2. **快捷键与鼠标状态机分层**：热键注册、键盘导航状态和 TideBar 鼠标接近/展开状态分别维护；热键注册失败或注销时，鼠标交互必须保持完整。
+3. **开发与发布启动路径分离**：`swift run` 继续作为开发期主路径，保留已授权 Terminal 的调试体验；正式 `TideBar.app` 只承担发布和登录项启动，不作为快捷键或核心功能的开发前置条件。
+4. **正式 Bundle 使用稳定签名**：Bundle 从 Finder、登录项或 `open` 启动时作为独立 TCC 主体处理，需要单独授予辅助功能权限。开发 Bundle 不采用每次重建都会变化的 ad-hoc 身份作为长期授权方案，改用稳定的自签名或 Apple Development 签名。
+5. **首版 `⌥Tab` 采用临时切换会话**：第一次触发优先定位当前前台应用，后续按键循环切换；空闲延迟可在设置页配置（默认约 0.9 秒），超时后自动提交当前选择并收起。`Return` 立即提交，`Esc` 取消。`⌥Space` 独立作为持久 toggle，不受超时影响。该条取代上一条“Return/Esc 唯二出口”的试运行约定。
+6. **快捷键配置统一由运行时重载**：设置页保存快捷键后，使用 KeyboardShortcuts 的内置存储与 Carbon 注册机制立即生效；快捷键录入至少包含一个修饰键和一个普通键，注册成功不等于系统层面无冲突。`⌥Space` 与 `⌥Tab` 的初始选择共用当前前台应用优先、首个条目回退的规则。
+7. **快捷键录入采用 KeyboardShortcuts**：不再维护自制 Recorder 和第二套 Carbon 注册；使用 KeyboardShortcuts 3.0.1 的 SwiftUI Recorder，利用其录制期间暂停热键、失焦结束录制、Esc 取消和 Delete 清除等机制。该依赖是快捷键功能的专项例外，不引入 SwiftUIX 等通用 UI 大依赖。

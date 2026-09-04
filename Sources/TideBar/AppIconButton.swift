@@ -92,6 +92,7 @@ final class AppIconButton: NSView {
     private let artworkView: IconArtworkView
     private let statusIndicatorView: AppStatusIndicatorView
     private var hovering = false
+    private var keyboardSelected = false
     private var pressed = false
     private var pressTimer: Timer?
     private var surged = false
@@ -164,9 +165,18 @@ final class AppIconButton: NSView {
         animateVisualState(on ? .enter : .exit)
     }
 
+    func setKeyboardSelected(_ on: Bool) {
+        guard keyboardSelected != on else { return }
+        keyboardSelected = on
+        guard let layer = haloView.layer else { return }
+        let opacity: Float = on ? 0.72 : (hovering ? (pressed ? 0.82 : 1) : 0)
+        Motion.basic(layer, keyPath: "opacity", to: opacity,
+                     duration: Motion.shouldReduceMotion ? Motion.reducedMotionFadeDuration : Motion.hoverEnterDuration)
+    }
+
     private func animateVisualState(_ transition: VisualTransition) {
         guard let visualLayer = motionPivot.layer, let haloLayer = haloView.layer else { return }
-        let haloOpacity: Float = hovering ? (pressed ? 0.82 : 1) : 0
+        let haloOpacity: Float = hovering ? (pressed ? 0.82 : 1) : (keyboardSelected ? 0.72 : 0)
 
         if Motion.shouldReduceMotion {
             visualLayer.removeAnimation(forKey: "motion.transform.translation.y")

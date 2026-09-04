@@ -67,6 +67,7 @@ struct AppListUpdate {
 @MainActor
 final class IconRowView: NSView {
     var onLaunch: ((AppEntry) -> Void)?
+    var onUserLaunch: (() -> Void)?
     var onSetHidden: ((AppIdentity, Bool) -> Void)?
     var onTerminate: ((AppIdentity) -> Void)?
     var onSetPinned: ((AppIdentity, Bool) -> Void)?
@@ -154,7 +155,10 @@ final class IconRowView: NSView {
 
     private func makeButton(_ app: AppEntry) -> AppIconButton {
         let button = AppIconButton(entry: app)
-        button.onClick = { [weak self] entry in self?.onLaunch?(entry) }
+        button.onClick = { [weak self] entry in
+            self?.onUserLaunch?()
+            self?.onLaunch?(entry)
+        }
         button.onSetHidden = { [weak self] identity, hidden in self?.onSetHidden?(identity, hidden) }
         button.onTerminate = { [weak self] identity in self?.onTerminate?(identity) }
         button.onSetPinned = { [weak self] identity, pinned in self?.onSetPinned?(identity, pinned) }
@@ -167,6 +171,16 @@ final class IconRowView: NSView {
         for button in buttons {
             button.setHovered(button === hit)
         }
+    }
+
+    func setKeyboardSelection(_ identity: AppIdentity?) {
+        for button in buttons {
+            button.setKeyboardSelected(button.entry.identity == identity)
+        }
+    }
+
+    func button(for identity: AppIdentity) -> AppIconButton? {
+        buttons.first { $0.entry.identity == identity }
     }
 
     func refreshLayout() {
@@ -299,6 +313,7 @@ final class TideBarView: NSView {
     private let tideline = CALayer()
     private let iconRow = IconRowView()
     private(set) var isExpandedState = false
+    var onUserLaunch: (() -> Void)?
     var onSetHidden: ((AppIdentity, Bool) -> Void)?
     var onTerminate: ((AppIdentity) -> Void)?
     var onSetPinned: ((AppIdentity, Bool) -> Void)?
@@ -356,6 +371,7 @@ final class TideBarView: NSView {
         breath.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         tideline.add(breath, forKey: "breath")
         iconRow.onLaunch = { $0.primaryClick() }
+        iconRow.onUserLaunch = { [weak self] in self?.onUserLaunch?() }
         iconRow.onSetHidden = { [weak self] identity, hidden in self?.onSetHidden?(identity, hidden) }
         iconRow.onTerminate = { [weak self] identity in self?.onTerminate?(identity) }
         iconRow.onSetPinned = { [weak self] identity, pinned in self?.onSetPinned?(identity, pinned) }
@@ -525,6 +541,14 @@ final class TideBarView: NSView {
     func refreshAppearance() {
         updateAppearance()
         iconRow.refreshAppearance()
+    }
+
+    func setKeyboardSelection(_ identity: AppIdentity?) {
+        iconRow.setKeyboardSelection(identity)
+    }
+
+    func iconFrame(for identity: AppIdentity) -> NSRect? {
+        iconRow.button(for: identity)?.frame
     }
 
     /// 立即回到收起终态（全屏抑制用）
