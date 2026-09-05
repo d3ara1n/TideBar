@@ -1,6 +1,6 @@
 # 品牌与文档
 
-> 状态：话术源（双语）、README（双语）、LICENSE、命名统一、关于页已完成；本地化升格为发布前置（App UI 层由 todo-2026-09-05-localization.md 承接）；品牌资产改由用户自行准备；演示素材待录屏。
+> 状态：话术源（双语）、README（双语）、LICENSE、命名统一、关于页已完成；本地化升格为发布前置（App UI 层由 todo-2026-09-05-localization.md 承接）；实心品牌标记已定稿，单色／彩色与菜单栏素材已导出、待接入；Dock 图标由用户通过 Icon Composer 制作；演示素材待录屏。
 
 ## 背景
 
@@ -16,11 +16,15 @@
 
 - [docs/copy.md](../docs/copy.md)：对外文案唯一源头，后续 README、关于页、Releases 说明、官网均从它派生；文案变更先改该档再同步载体。
 
-### 1. 品牌资产（用户自行准备，2026-09-06 拍板）
+### 1. 品牌资产（素材已导出，接入待执行）
 
-- App 图标与菜单栏模板图由用户设计交付；agent 生成的候选（汐线/潮涌/月下潮纹）已否决，生成脚本与产物已删除。
-- 交付后接入：图标入 `brand/` 供 app-bundle 打包取用；菜单栏图标替换 `water.waves` 占位（AppDelegate `configureStatusItem`）；关于页图标同步替换。
-- 菜单栏图标建议交付模板图（template image），适配亮暗菜单栏。
+- 构图：三条独立绘制的波浪配日月圆盘；圆盘位于波浪上方，呈升起意象，外围透明留白截断第一条波浪，下两条波浪完整。实心版为主标记，空心版为正式备选，两版及单色预览均保留。
+- 正式素材与使用说明：`brand/ASSETS.md`。`mono/` 提供黑白两色 SVG / PNG / PDF；`color/` 提供 Light 深青蓝＋琥珀金、Dark 浅青蓝＋柔月金的实心版，均为透明纯色，不含光影或背景。
+- `menubar/` 提供光学校正后的 18pt 模板 PDF、18/36px PNG 与 SVG；接入时显式设置 `isTemplate = true`，由系统适配颜色。
+- `composer/light/`、`composer/dark/` 提供对齐的波浪／圆盘两层 SVG 与透明 PNG；完整 Dock 图标由用户通过 Icon Composer 制作，打包由 app-bundle 任务承接。
+- `previews/` 保留单色选稿预览，并提供彩色与菜单栏对照；`tools/` 保留统一几何导出、预览生成和素材验证脚本。
+- 验证：SVG 语法、PNG 尺寸／透明度／主题几何一致性、Composer 分层逐像素重建、PDF 页尺寸已通过，静态渲染已检查。实际菜单栏显示与 Icon Composer 导入待用户确认。
+- 待接入：菜单栏（AppDelegate `configureStatusItem`）、关于页与引导页的 `water.waves` 占位，以及 README／网站标记。本轮不改应用代码。
 
 ### 2. README 重写（已完成）
 

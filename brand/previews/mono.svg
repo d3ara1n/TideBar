@@ -1,0 +1,422 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
+<rect width="1200" height="1200" fill="#e9eaed"/>
+<text x="40" y="46" font-family="Helvetica Neue, Arial, sans-serif" font-size="26" fill="#181a20">TideBar / Mark studies</text>
+<text x="40" y="75" font-family="Helvetica Neue, Arial, sans-serif" font-size="15" fill="#72757d">Original vector artwork · Transparent wave cutouts · No app-icon background</text>
+<rect x="24" y="102" width="564" height="482" rx="16" fill="#ffffff"/>
+<text x="48" y="136" font-family="Helvetica Neue, Arial, sans-serif" font-size="18" fill="#191b22">A / Solid orb</text>
+<text x="444" y="136" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">LIGHT</text>
+<svg x="186" y="156" width="240" height="240" viewBox="0 0 256 256" fill="none" color="#191b22">
+  
+  <defs>
+    <clipPath id="water-instance-0">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-0)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="40" fill="currentColor"/>
+</svg>
+<svg x="74" y="468" width="16" height="16" viewBox="0 0 256 256" fill="none" color="#191b22">
+  
+  <defs>
+    <clipPath id="water-instance-1">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-1)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="40" fill="currentColor"/>
+</svg>
+<text x="68" y="555" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">16px</text>
+<svg x="163" y="467" width="18" height="18" viewBox="0 0 256 256" fill="none" color="#191b22">
+  
+  <defs>
+    <clipPath id="water-instance-2">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-2)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="40" fill="currentColor"/>
+</svg>
+<text x="158" y="555" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">18px</text>
+<svg x="250" y="460" width="32" height="32" viewBox="0 0 256 256" fill="none" color="#191b22">
+  
+  <defs>
+    <clipPath id="water-instance-3">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-3)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="40" fill="currentColor"/>
+</svg>
+<text x="252" y="555" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">32px</text>
+<svg x="338" y="444" width="64" height="64" viewBox="0 0 256 256" fill="none" color="#191b22">
+  
+  <defs>
+    <clipPath id="water-instance-4">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-4)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="40" fill="currentColor"/>
+</svg>
+<text x="356" y="555" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">64px</text>
+<svg x="430" y="412" width="128" height="128" viewBox="0 0 256 256" fill="none" color="#191b22">
+  
+  <defs>
+    <clipPath id="water-instance-5">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-5)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="40" fill="currentColor"/>
+</svg>
+<text x="480" y="555" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">128px</text>
+<rect x="612" y="102" width="564" height="482" rx="16" fill="#191b22"/>
+<text x="636" y="136" font-family="Helvetica Neue, Arial, sans-serif" font-size="18" fill="#f4f5f7">A / Solid orb</text>
+<text x="1032" y="136" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">DARK</text>
+<svg x="774" y="156" width="240" height="240" viewBox="0 0 256 256" fill="none" color="#f4f5f7">
+  
+  <defs>
+    <clipPath id="water-instance-6">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-6)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="40" fill="currentColor"/>
+</svg>
+<svg x="662" y="468" width="16" height="16" viewBox="0 0 256 256" fill="none" color="#f4f5f7">
+  
+  <defs>
+    <clipPath id="water-instance-7">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-7)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="40" fill="currentColor"/>
+</svg>
+<text x="656" y="555" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">16px</text>
+<svg x="751" y="467" width="18" height="18" viewBox="0 0 256 256" fill="none" color="#f4f5f7">
+  
+  <defs>
+    <clipPath id="water-instance-8">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-8)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="40" fill="currentColor"/>
+</svg>
+<text x="746" y="555" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">18px</text>
+<svg x="838" y="460" width="32" height="32" viewBox="0 0 256 256" fill="none" color="#f4f5f7">
+  
+  <defs>
+    <clipPath id="water-instance-9">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-9)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="40" fill="currentColor"/>
+</svg>
+<text x="840" y="555" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">32px</text>
+<svg x="926" y="444" width="64" height="64" viewBox="0 0 256 256" fill="none" color="#f4f5f7">
+  
+  <defs>
+    <clipPath id="water-instance-10">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-10)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="40" fill="currentColor"/>
+</svg>
+<text x="944" y="555" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">64px</text>
+<svg x="1018" y="412" width="128" height="128" viewBox="0 0 256 256" fill="none" color="#f4f5f7">
+  
+  <defs>
+    <clipPath id="water-instance-11">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-11)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="40" fill="currentColor"/>
+</svg>
+<text x="1068" y="555" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">128px</text>
+<rect x="24" y="602" width="564" height="482" rx="16" fill="#ffffff"/>
+<text x="48" y="636" font-family="Helvetica Neue, Arial, sans-serif" font-size="18" fill="#191b22">B / Outline orb</text>
+<text x="444" y="636" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">LIGHT</text>
+<svg x="186" y="656" width="240" height="240" viewBox="0 0 256 256" fill="none" color="#191b22">
+  
+  <defs>
+    <clipPath id="water-instance-12">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-12)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="35" stroke="currentColor" stroke-width="10"/>
+</svg>
+<svg x="74" y="968" width="16" height="16" viewBox="0 0 256 256" fill="none" color="#191b22">
+  
+  <defs>
+    <clipPath id="water-instance-13">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-13)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="35" stroke="currentColor" stroke-width="10"/>
+</svg>
+<text x="68" y="1055" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">16px</text>
+<svg x="163" y="967" width="18" height="18" viewBox="0 0 256 256" fill="none" color="#191b22">
+  
+  <defs>
+    <clipPath id="water-instance-14">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-14)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="35" stroke="currentColor" stroke-width="10"/>
+</svg>
+<text x="158" y="1055" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">18px</text>
+<svg x="250" y="960" width="32" height="32" viewBox="0 0 256 256" fill="none" color="#191b22">
+  
+  <defs>
+    <clipPath id="water-instance-15">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-15)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="35" stroke="currentColor" stroke-width="10"/>
+</svg>
+<text x="252" y="1055" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">32px</text>
+<svg x="338" y="944" width="64" height="64" viewBox="0 0 256 256" fill="none" color="#191b22">
+  
+  <defs>
+    <clipPath id="water-instance-16">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-16)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="35" stroke="currentColor" stroke-width="10"/>
+</svg>
+<text x="356" y="1055" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">64px</text>
+<svg x="430" y="912" width="128" height="128" viewBox="0 0 256 256" fill="none" color="#191b22">
+  
+  <defs>
+    <clipPath id="water-instance-17">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-17)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="35" stroke="currentColor" stroke-width="10"/>
+</svg>
+<text x="480" y="1055" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">128px</text>
+<rect x="612" y="602" width="564" height="482" rx="16" fill="#191b22"/>
+<text x="636" y="636" font-family="Helvetica Neue, Arial, sans-serif" font-size="18" fill="#f4f5f7">B / Outline orb</text>
+<text x="1032" y="636" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">DARK</text>
+<svg x="774" y="656" width="240" height="240" viewBox="0 0 256 256" fill="none" color="#f4f5f7">
+  
+  <defs>
+    <clipPath id="water-instance-18">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-18)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="35" stroke="currentColor" stroke-width="10"/>
+</svg>
+<svg x="662" y="968" width="16" height="16" viewBox="0 0 256 256" fill="none" color="#f4f5f7">
+  
+  <defs>
+    <clipPath id="water-instance-19">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-19)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="35" stroke="currentColor" stroke-width="10"/>
+</svg>
+<text x="656" y="1055" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">16px</text>
+<svg x="751" y="967" width="18" height="18" viewBox="0 0 256 256" fill="none" color="#f4f5f7">
+  
+  <defs>
+    <clipPath id="water-instance-20">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-20)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="35" stroke="currentColor" stroke-width="10"/>
+</svg>
+<text x="746" y="1055" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">18px</text>
+<svg x="838" y="960" width="32" height="32" viewBox="0 0 256 256" fill="none" color="#f4f5f7">
+  
+  <defs>
+    <clipPath id="water-instance-21">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-21)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="35" stroke="currentColor" stroke-width="10"/>
+</svg>
+<text x="840" y="1055" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">32px</text>
+<svg x="926" y="944" width="64" height="64" viewBox="0 0 256 256" fill="none" color="#f4f5f7">
+  
+  <defs>
+    <clipPath id="water-instance-22">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-22)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="35" stroke="currentColor" stroke-width="10"/>
+</svg>
+<text x="944" y="1055" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">64px</text>
+<svg x="1018" y="912" width="128" height="128" viewBox="0 0 256 256" fill="none" color="#f4f5f7">
+  
+  <defs>
+    <clipPath id="water-instance-23">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round" clip-path="url(#water-instance-23)">
+    <path d="M24 100C46 100 54 80 76 80S106 100 128 100S158 80 180 80S210 100 232 100"/>
+  </g>
+  <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+    <path d="M24 144C46 144 54 124 76 124S106 144 128 144S158 124 180 124S210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168S106 188 128 188S158 168 180 168S210 188 232 188"/>
+  </g>
+  <circle cx="128" cy="72" r="35" stroke="currentColor" stroke-width="10"/>
+</svg>
+<text x="1068" y="1055" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">128px</text>
+<text x="40" y="1140" font-family="Helvetica Neue, Arial, sans-serif" font-size="14" fill="#72757d">Review at 100% for small-size comparison. Menu-bar optical correction follows shape approval.</text>
+</svg>

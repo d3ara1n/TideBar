@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
+<rect width="1200" height="1200" fill="#e9eaed"/>
+<text x="40" y="46" font-family="Helvetica Neue, Arial, sans-serif" font-size="26" fill="#191b22">TideBar / Sea &amp; Sky</text>
+<text x="40" y="75" font-family="Helvetica Neue, Arial, sans-serif" font-size="15" fill="#72757d">Solid-color artwork · Transparent backgrounds · No baked-in lighting or shadows</text>
+<rect x="24" y="102" width="564" height="570" rx="16" fill="#ffffff"/>
+<text x="48" y="140" font-family="Helvetica Neue, Arial, sans-serif" font-size="18" fill="#191b22">Light / Sunlit water</text>
+<svg x="146" y="152" width="320" height="320" viewBox="0 0 256 256" fill="none" color="#191b22">
+
+<defs><clipPath id="preview-0"><path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/></clipPath></defs>
+<g fill="none" stroke="#167D9A" stroke-width="12" stroke-linecap="round"><path d="M24 100C46 100 54 80 76 80C98 80 106 100 128 100C150 100 158 80 180 80C202 80 210 100 232 100" clip-path="url(#preview-0)"/>
+<path d="M24 144C46 144 54 124 76 124C98 124 106 144 128 144C150 144 158 124 180 124C202 124 210 144 232 144"/>
+<path d="M24 188C46 188 54 168 76 168C98 168 106 188 128 188C150 188 158 168 180 168C202 168 210 188 232 188"/>
+</g>
+<circle cx="128" cy="72" r="40" fill="#F2AE49"/>
+</svg>
+<svg x="106" y="508" width="32" height="32" viewBox="0 0 256 256" fill="none" color="#191b22">
+
+<defs><clipPath id="preview-1"><path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/></clipPath></defs>
+<g fill="none" stroke="#167D9A" stroke-width="12" stroke-linecap="round"><path d="M24 100C46 100 54 80 76 80C98 80 106 100 128 100C150 100 158 80 180 80C202 80 210 100 232 100" clip-path="url(#preview-1)"/>
+<path d="M24 144C46 144 54 124 76 124C98 124 106 144 128 144C150 144 158 124 180 124C202 124 210 144 232 144"/>
+<path d="M24 188C46 188 54 168 76 168C98 168 106 188 128 188C150 188 158 168 180 168C202 168 210 188 232 188"/>
+</g>
+<circle cx="128" cy="72" r="40" fill="#F2AE49"/>
+</svg>
+<text x="106" y="605" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">32px</text>
+<svg x="252" y="492" width="64" height="64" viewBox="0 0 256 256" fill="none" color="#191b22">
+
+<defs><clipPath id="preview-2"><path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/></clipPath></defs>
+<g fill="none" stroke="#167D9A" stroke-width="12" stroke-linecap="round"><path d="M24 100C46 100 54 80 76 80C98 80 106 100 128 100C150 100 158 80 180 80C202 80 210 100 232 100" clip-path="url(#preview-2)"/>
+<path d="M24 144C46 144 54 124 76 124C98 124 106 144 128 144C150 144 158 124 180 124C202 124 210 144 232 144"/>
+<path d="M24 188C46 188 54 168 76 168C98 168 106 188 128 188C150 188 158 168 180 168C202 168 210 188 232 188"/>
+</g>
+<circle cx="128" cy="72" r="40" fill="#F2AE49"/>
+</svg>
+<text x="268" y="605" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">64px</text>
+<svg x="408" y="460" width="128" height="128" viewBox="0 0 256 256" fill="none" color="#191b22">
+
+<defs><clipPath id="preview-3"><path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/></clipPath></defs>
+<g fill="none" stroke="#167D9A" stroke-width="12" stroke-linecap="round"><path d="M24 100C46 100 54 80 76 80C98 80 106 100 128 100C150 100 158 80 180 80C202 80 210 100 232 100" clip-path="url(#preview-3)"/>
+<path d="M24 144C46 144 54 124 76 124C98 124 106 144 128 144C150 144 158 124 180 124C202 124 210 144 232 144"/>
+<path d="M24 188C46 188 54 168 76 168C98 168 106 188 128 188C150 188 158 168 180 168C202 168 210 188 232 188"/>
+</g>
+<circle cx="128" cy="72" r="40" fill="#F2AE49"/>
+</svg>
+<text x="456" y="605" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">128px</text>
+<text x="48" y="645" font-family="Helvetica Neue, Arial, sans-serif" font-size="13" fill="#72757d">SEA #167D9A     ORB #F2AE49</text>
+<rect x="612" y="102" width="564" height="570" rx="16" fill="#191b22"/>
+<text x="636" y="140" font-family="Helvetica Neue, Arial, sans-serif" font-size="18" fill="#f4f5f7">Dark / Moonlit water</text>
+<svg x="734" y="152" width="320" height="320" viewBox="0 0 256 256" fill="none" color="#191b22">
+
+<defs><clipPath id="preview-4"><path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/></clipPath></defs>
+<g fill="none" stroke="#65CADD" stroke-width="12" stroke-linecap="round"><path d="M24 100C46 100 54 80 76 80C98 80 106 100 128 100C150 100 158 80 180 80C202 80 210 100 232 100" clip-path="url(#preview-4)"/>
+<path d="M24 144C46 144 54 124 76 124C98 124 106 144 128 144C150 144 158 124 180 124C202 124 210 144 232 144"/>
+<path d="M24 188C46 188 54 168 76 168C98 168 106 188 128 188C150 188 158 168 180 168C202 168 210 188 232 188"/>
+</g>
+<circle cx="128" cy="72" r="40" fill="#F5D69A"/>
+</svg>
+<svg x="694" y="508" width="32" height="32" viewBox="0 0 256 256" fill="none" color="#191b22">
+
+<defs><clipPath id="preview-5"><path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/></clipPath></defs>
+<g fill="none" stroke="#65CADD" stroke-width="12" stroke-linecap="round"><path d="M24 100C46 100 54 80 76 80C98 80 106 100 128 100C150 100 158 80 180 80C202 80 210 100 232 100" clip-path="url(#preview-5)"/>
+<path d="M24 144C46 144 54 124 76 124C98 124 106 144 128 144C150 144 158 124 180 124C202 124 210 144 232 144"/>
+<path d="M24 188C46 188 54 168 76 168C98 168 106 188 128 188C150 188 158 168 180 168C202 168 210 188 232 188"/>
+</g>
+<circle cx="128" cy="72" r="40" fill="#F5D69A"/>
+</svg>
+<text x="694" y="605" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">32px</text>
+<svg x="840" y="492" width="64" height="64" viewBox="0 0 256 256" fill="none" color="#191b22">
+
+<defs><clipPath id="preview-6"><path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/></clipPath></defs>
+<g fill="none" stroke="#65CADD" stroke-width="12" stroke-linecap="round"><path d="M24 100C46 100 54 80 76 80C98 80 106 100 128 100C150 100 158 80 180 80C202 80 210 100 232 100" clip-path="url(#preview-6)"/>
+<path d="M24 144C46 144 54 124 76 124C98 124 106 144 128 144C150 144 158 124 180 124C202 124 210 144 232 144"/>
+<path d="M24 188C46 188 54 168 76 168C98 168 106 188 128 188C150 188 158 168 180 168C202 168 210 188 232 188"/>
+</g>
+<circle cx="128" cy="72" r="40" fill="#F5D69A"/>
+</svg>
+<text x="856" y="605" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">64px</text>
+<svg x="996" y="460" width="128" height="128" viewBox="0 0 256 256" fill="none" color="#191b22">
+
+<defs><clipPath id="preview-7"><path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/></clipPath></defs>
+<g fill="none" stroke="#65CADD" stroke-width="12" stroke-linecap="round"><path d="M24 100C46 100 54 80 76 80C98 80 106 100 128 100C150 100 158 80 180 80C202 80 210 100 232 100" clip-path="url(#preview-7)"/>
+<path d="M24 144C46 144 54 124 76 124C98 124 106 144 128 144C150 144 158 124 180 124C202 124 210 144 232 144"/>
+<path d="M24 188C46 188 54 168 76 168C98 168 106 188 128 188C150 188 158 168 180 168C202 168 210 188 232 188"/>
+</g>
+<circle cx="128" cy="72" r="40" fill="#F5D69A"/>
+</svg>
+<text x="1044" y="605" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">128px</text>
+<text x="636" y="645" font-family="Helvetica Neue, Arial, sans-serif" font-size="13" fill="#a8acb6">SEA #65CADD     ORB #F5D69A</text>
+<rect x="24" y="692" width="1152" height="420" rx="16" fill="#ffffff"/>
+<text x="48" y="732" font-family="Helvetica Neue, Arial, sans-serif" font-size="18" fill="#191b22">Menu bar / Optical-size template</text>
+<text x="48" y="760" font-family="Helvetica Neue, Arial, sans-serif" font-size="14" fill="#72757d">18pt canvas · Stronger strokes · Tighter framing · System-controlled color</text>
+<rect x="48" y="792" width="504" height="68" rx="10" fill="#eff0f3"/>
+<image x="124" y="817" width="18" height="18" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAEqADAAQAAAABAAAAEgAAAACaqbJVAAABY0lEQVQ4Ec2SOy8FQRiG1zWuhYRGRaLyE3QqoVIp9MdpXQoF1SmE4gg6foVGRKWVaJUSkYiIS0gkLkeE51k7J2Mj2ejOmzw733zf++3O7EySNJqaChY0Qn068+wznhf4/yzPkK3BV4axuX+pG/cThJeE0Zy1QrXi6IExCM350ZoevXU116Off+E/0Hgb5fOhNT16w/9LPSWeZ1CDNQhLPyDOr8ac0qPXHnt9RzIBy+AJxeplsgePGcbmYtljr++oq5NoBU7hBBahDYKMzVnTo9eeVN6jIZiCJWgHv2xTGe5hC9Q89MMufMAcvMMmpFuuElzCOngaQX0EO3CVsc1oLkjvBthbdUWxBpm43084hDuINcBkElrgCK7hlzqYrcIrWPSIn2EB3KYYm7OmR6899qaq8HyDG5hNM0ni/SrBA7xkGJsLd0+vPfZW3NooDMMx2BTL4x7PEtZdUawuJtYv4mRjxN84SlmONAkqxgAAAABJRU5ErkJggg=="/>
+<text x="156" y="831" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">1×</text>
+<image x="316" y="817" width="18" height="18" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACQAAAAkCAYAAADhAJiYAAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAJKADAAQAAAABAAAAJAAAAAAqDuP8AAAC/0lEQVRYCe2WOWhUQRjHn4pCQBHxwlIjqBEr8Si09Wg8ICJCOtHWWm2CtY3W2qhExbPTQm0sJKI24n0EDRYqXggKwev3i/sts8t7+94WiUH2Dz/mm5nvmJ03M0mWddTZgYmxA5NYhvxTzaL6IXgAIzW0HXNuXLWOau/gdwFvGddnXLScKl+haDExro++Y66bVIiiZa2+Y6oVZC9bRPO8MZU1ubLnX8f1bfrr3lZM2YJmk7A7WcScxK5qmiNkrrQf4/W2aEEz8DgMw7Cl7p1l7xO7qpnGbCXInOa2RiVFUJyFY0lUD3aMV22NCR3HiDgXZq1cuQsH4RZEgO01WAupbtBJfVrZ+qYy13VIY6xp7fqX2NjkoLOPXh/kaQmDnyFNmmfro2+ezJ33sLqWbClEgafY/VD29K/G5w3kLcQx5/RpJWv0gzWNafgBUxmQduSh3A93wFdZtB2rfGDxVfX6ZX+h/ZXbYCH8gsdwrtbSlMrd3wG23ughuAy3oS0txvsq5H0SF3YK5kORnNNH37wc5rZGqbrw8MR/h0j0A9t/K55AWuAT/b0wBULajjkX8cYYaw5zxbg1rGXNBvn9DsBpSE++wUdgHoQWYQxAJLV9BSdqaKdz+hoTMpc504VZ09quYfQcb8dIk2jfhZVQpA1MvIDmuOg7p0+RzG2N8I/WtWQLYBA8sBehFzyAZZqGw264As9qaDvmXJmsYS1rWts1uJaJpVbX3l/ZB+m193CehUvgYW0ld8BPsBN8se0PgdfeGzgClbUZz5cQ37a5vcfcqhbZnNOnOS765t7UIr4+5QN4BiLQ9nVt7AKt/0rE3E/sozAXQtqOORd+xhhr3uFk3HlvlzUbNJPeANwHP0Mk+oC9B3xbQl0YXk/fkPBz690N0Y7xb9j6GhMylzk/QvhZ09quwbWMnvSYtNXhJKTvD90GddPzRqVxqe2cPkUytzXSDTC+10M9HXysXN1DcBsfQRWtwcmrG38GnmOfh0GoomU47YIe+AL7oKPODvxfO/AHiGJEnOIiX24AAAAASUVORK5CYII="/>
+<text x="348" y="831" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#72757d">2×</text>
+<rect x="600" y="792" width="504" height="68" rx="10" fill="#191b22"/>
+<image x="676" y="817" width="18" height="18" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAEqADAAQAAAABAAAAEgAAAACaqbJVAAABY0lEQVQ4Ec2SOy8FQRiG1zWuhYRGRaLyE3QqoVIp9MdpXQoF1SmE4gg6foVGRKWVaJUSkYiIS0gkLkeE51k7J2Mj2ejOmzw733zf++3O7EySNJqaChY0Qn068+wznhf4/yzPkK3BV4axuX+pG/cThJeE0Zy1QrXi6IExCM350ZoevXU116Off+E/0Hgb5fOhNT16w/9LPSWeZ1CDNQhLPyDOr8ac0qPXHnt9RzIBy+AJxeplsgePGcbmYtljr++oq5NoBU7hBBahDYKMzVnTo9eeVN6jIZiCJWgHv2xTGe5hC9Q89MMufMAcvMMmpFuuElzCOngaQX0EO3CVsc1oLkjvBthbdUWxBpm43084hDuINcBkElrgCK7hlzqYrcIrWPSIn2EB3KYYm7OmR6899qaq8HyDG5hNM0ni/SrBA7xkGJsLd0+vPfZW3NooDMMx2BTL4x7PEtZdUawuJtYv4mRjxN84SlmONAkqxgAAAABJRU5ErkJggg==" filter="url(#white-template)"/>
+<text x="708" y="831" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">1×</text>
+<image x="868" y="817" width="18" height="18" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACQAAAAkCAYAAADhAJiYAAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAJKADAAQAAAABAAAAJAAAAAAqDuP8AAAC/0lEQVRYCe2WOWhUQRjHn4pCQBHxwlIjqBEr8Si09Wg8ICJCOtHWWm2CtY3W2qhExbPTQm0sJKI24n0EDRYqXggKwev3i/sts8t7+94WiUH2Dz/mm5nvmJ03M0mWddTZgYmxA5NYhvxTzaL6IXgAIzW0HXNuXLWOau/gdwFvGddnXLScKl+haDExro++Y66bVIiiZa2+Y6oVZC9bRPO8MZU1ubLnX8f1bfrr3lZM2YJmk7A7WcScxK5qmiNkrrQf4/W2aEEz8DgMw7Cl7p1l7xO7qpnGbCXInOa2RiVFUJyFY0lUD3aMV22NCR3HiDgXZq1cuQsH4RZEgO01WAupbtBJfVrZ+qYy13VIY6xp7fqX2NjkoLOPXh/kaQmDnyFNmmfro2+ezJ33sLqWbClEgafY/VD29K/G5w3kLcQx5/RpJWv0gzWNafgBUxmQduSh3A93wFdZtB2rfGDxVfX6ZX+h/ZXbYCH8gsdwrtbSlMrd3wG23ughuAy3oS0txvsq5H0SF3YK5kORnNNH37wc5rZGqbrw8MR/h0j0A9t/K55AWuAT/b0wBULajjkX8cYYaw5zxbg1rGXNBvn9DsBpSE++wUdgHoQWYQxAJLV9BSdqaKdz+hoTMpc504VZ09quYfQcb8dIk2jfhZVQpA1MvIDmuOg7p0+RzG2N8I/WtWQLYBA8sBehFzyAZZqGw264As9qaDvmXJmsYS1rWts1uJaJpVbX3l/ZB+m193CehUvgYW0ld8BPsBN8se0PgdfeGzgClbUZz5cQ37a5vcfcqhbZnNOnOS765t7UIr4+5QN4BiLQ9nVt7AKt/0rE3E/sozAXQtqOORd+xhhr3uFk3HlvlzUbNJPeANwHP0Mk+oC9B3xbQl0YXk/fkPBz690N0Y7xb9j6GhMylzk/QvhZ09quwbWMnvSYtNXhJKTvD90GddPzRqVxqe2cPkUytzXSDTC+10M9HXysXN1DcBsfQRWtwcmrG38GnmOfh0GoomU47YIe+AL7oKPODvxfO/AHiGJEnOIiX24AAAAASUVORK5CYII=" filter="url(#white-template)"/>
+<text x="900" y="831" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#a8acb6">2×</text>
+<defs><filter id="white-template" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0"/></filter></defs>
+<svg x="100" y="884" width="144" height="144" viewBox="12 -2 232 232" fill="none" color="#191b22">
+
+<defs><clipPath id="preview-8"><path clip-rule="evenodd" d="M0 0H256V256H0Z M190 72a62 62 0 1 0-124 0a62 62 0 1 0 124 0Z"/></clipPath></defs>
+<g fill="none" stroke="#000000" stroke-width="16" stroke-linecap="round"><path d="M24 100C46 100 54 80 76 80C98 80 106 100 128 100C150 100 158 80 180 80C202 80 210 100 232 100" clip-path="url(#preview-8)"/>
+<path d="M24 144C46 144 54 124 76 124C98 124 106 144 128 144C150 144 158 124 180 124C202 124 210 144 232 144"/>
+<path d="M24 188C46 188 54 168 76 168C98 168 106 188 128 188C150 188 158 168 180 168C202 168 210 188 232 188"/>
+</g>
+<circle cx="128" cy="72" r="42" fill="#000000"/>
+</svg>
+<text x="270" y="952" font-family="Helvetica Neue, Arial, sans-serif" font-size="14" fill="#72757d">Template silhouette / 8×</text>
+<svg x="610" y="884" width="144" height="144" viewBox="0 0 256 256" fill="none" color="#191b22">
+
+<defs><clipPath id="preview-9"><path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/></clipPath></defs>
+<g fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round"><path d="M24 100C46 100 54 80 76 80C98 80 106 100 128 100C150 100 158 80 180 80C202 80 210 100 232 100" clip-path="url(#preview-9)"/>
+<path d="M24 144C46 144 54 124 76 124C98 124 106 144 128 144C150 144 158 124 180 124C202 124 210 144 232 144"/>
+<path d="M24 188C46 188 54 168 76 168C98 168 106 188 128 188C150 188 158 168 180 168C202 168 210 188 232 188"/>
+</g>
+<circle cx="128" cy="72" r="40" fill="currentColor"/>
+</svg>
+<svg x="854" y="884" width="144" height="144" viewBox="0 0 256 256" fill="none" color="#191b22">
+
+<defs><clipPath id="preview-10"><path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/></clipPath></defs>
+<g fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round"><path d="M24 100C46 100 54 80 76 80C98 80 106 100 128 100C150 100 158 80 180 80C202 80 210 100 232 100" clip-path="url(#preview-10)"/>
+<path d="M24 144C46 144 54 124 76 124C98 124 106 144 128 144C150 144 158 124 180 124C202 124 210 144 232 144"/>
+<path d="M24 188C46 188 54 168 76 168C98 168 106 188 128 188C150 188 158 168 180 168C202 168 210 188 232 188"/>
+</g>
+<circle cx="128" cy="72" r="35" fill="none" stroke="currentColor" stroke-width="10"/>
+</svg>
+<text x="630" y="1058" font-family="Helvetica Neue, Arial, sans-serif" font-size="13" fill="#72757d">Primary / Solid</text>
+<text x="870" y="1058" font-family="Helvetica Neue, Arial, sans-serif" font-size="13" fill="#72757d">Alternate / Outline</text>
+<text x="40" y="1155" font-family="Helvetica Neue, Arial, sans-serif" font-size="14" fill="#72757d">The original monochrome comparison is preserved separately as previews/mono.svg and mono.png.</text>
+</svg>
