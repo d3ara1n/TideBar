@@ -1,0 +1,16 @@
+{
+  "mono": {
+    "primary": "currentColor",
+    "inverse": "#FFFFFF"
+  },
+  "themes": {
+    "light": {
+      "waves": "#167D9A",
+      "orb": "#F2AE49"
+    },
+    "dark": {
+      "waves": "#65CADD",
+      "orb": "#F5D69A"
+    }
+  }
+}

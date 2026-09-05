@@ -19,11 +19,11 @@
 ### 1. 品牌资产（素材已导出，接入待执行）
 
 - 构图：三条独立绘制的波浪配日月圆盘；圆盘位于波浪上方，呈升起意象，外围透明留白截断第一条波浪，下两条波浪完整。实心版为主标记，空心版为正式备选，两版及单色预览均保留。
-- 正式素材与使用说明：`brand/ASSETS.md`。`mono/` 提供黑白两色 SVG / PNG / PDF；`color/` 提供 Light 深青蓝＋琥珀金、Dark 浅青蓝＋柔月金的实心版，均为透明纯色，不含光影或背景。
+- 正式素材与使用说明：`brand/ASSETS.md`。唯一设计源为 `brand/sources/` 的实心／空心／菜单栏三份 SVG 与 `palettes.json`。`mono/` 提供单色 SVG / PNG / PDF；`color/` 提供配色表驱动的 Light／Dark 实心版，均为透明纯色，不含光影或背景。
 - `menubar/` 提供光学校正后的 18pt 模板 PDF、18/36px PNG 与 SVG；接入时显式设置 `isTemplate = true`，由系统适配颜色。
 - `composer/light/`、`composer/dark/` 提供对齐的波浪／圆盘两层 SVG 与透明 PNG；完整 Dock 图标由用户通过 Icon Composer 制作，打包由 app-bundle 任务承接。
-- `previews/` 保留单色选稿预览，并提供彩色与菜单栏对照；`tools/` 保留统一几何导出、预览生成和素材验证脚本。
-- 验证：SVG 语法、PNG 尺寸／透明度／主题几何一致性、Composer 分层逐像素重建、PDF 页尺寸已通过，静态渲染已检查。实际菜单栏显示与 Icon Composer 导入待用户确认。
+- `node tools/export-brand.mjs` 一键生成全部成品及两张预览 SVG／PNG；使用系统 XML 变换与 librsvg，不在脚本中维护图形坐标。`previews/` 保留实心／空心对照布局，并提供彩色与菜单栏对照。
+- 验证：一键命令检查 12 份素材 PNG、7 份 PDF、2 张 PNG 预览的尺寸、透明背景、模板纯黑、主题几何及 Composer 分层合成；回归测试覆盖重复导出、配色／几何替换、错误输入保护和旧产物清理。实际菜单栏显示与 Icon Composer 导入待用户确认。
 - 待接入：菜单栏（AppDelegate `configureStatusItem`）、关于页与引导页的 `water.waves` 占位，以及 README／网站标记。本轮不改应用代码。
 
 ### 2. README 重写（已完成）

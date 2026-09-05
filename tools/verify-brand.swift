@@ -2,7 +2,11 @@ import Foundation
 import CoreGraphics
 import ImageIO
 
-let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("brand")
+guard CommandLine.arguments.count == 3 else {
+    fatalError("Usage: verify-brand.swift <asset-directory> <bottom-layer,top-layer>")
+}
+let root = URL(fileURLWithPath: CommandLine.arguments[1])
+let layerOrder = CommandLine.arguments[2].split(separator: ",").map(String.init)
 func require(_ condition: @autoclosure () -> Bool, _ message: String) throws {
     if !condition() { throw NSError(domain: "BrandVerification", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
 }
@@ -26,9 +30,14 @@ struct Raster {
     func alpha(_ x: Int, _ y: Int) -> UInt8 { bytes[(y * width + x) * 4 + 3] }
 }
 let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)!.allObjects as! [URL]
-var pngCount = 0, pdfCount = 0
+var pngCount = 0, pdfCount = 0, previewCount = 0
 for file in files {
     let relative = String(file.path.dropFirst(root.path.count + 1))
+    if file.pathExtension == "png" && relative.hasPrefix("previews/") {
+        let raster = try Raster(relative)
+        try require(raster.width == 1200 && raster.height == 1200, "Unexpected preview size: \(relative)")
+        previewCount += 1
+    }
     if file.pathExtension == "png" && !relative.hasPrefix("previews/") {
         let raster = try Raster(relative)
         let expected = relative.contains("@2x") ? 36 : relative.hasPrefix("menubar/") ? 18 : 1024
@@ -52,20 +61,20 @@ for file in files {
     }
 }
 let mono = try Raster("mono/solid.png")
-let outline = try Raster("mono/outline.png")
-try require(mono.alpha(512, 288) == 255 && outline.alpha(512, 288) == 0, "Orb fill mismatch")
-try require(mono.alpha(512, 480) == 0 && mono.alpha(736, 360) == 0, "Wave cutout is not transparent")
+try require(Set(layerOrder) == Set(["waves", "orb"]) && layerOrder.count == 2, "Invalid Composer layer order")
 for theme in ["light", "dark"] {
     let full = try Raster("color/\(theme).png")
-    let waves = try Raster("composer/\(theme)/waves.png")
-    let orb = try Raster("composer/\(theme)/orb.png")
+    let bottom = try Raster("composer/\(theme)/\(layerOrder[0]).png")
+    let top = try Raster("composer/\(theme)/\(layerOrder[1]).png")
     for offset in stride(from: 0, to: full.bytes.count, by: 4) {
         try require(full.bytes[offset + 3] == mono.bytes[offset + 3], "Color variant geometry differs from primary mark")
-        try require(waves.bytes[offset + 3] == 0 || orb.bytes[offset + 3] == 0, "Composer layers overlap")
+        // 按母版绘制顺序做 source-over；允许抗锯齿与预乘通道舍入误差。
+        let remaining = 255 - Int(top.bytes[offset + 3])
         for channel in 0..<4 {
-            try require(Int(full.bytes[offset + channel]) == Int(waves.bytes[offset + channel]) + Int(orb.bytes[offset + channel]), "Composer layers do not reconstruct the complete mark")
+            let composed = Int(top.bytes[offset + channel]) + (Int(bottom.bytes[offset + channel]) * remaining + 127) / 255
+            try require(abs(Int(full.bytes[offset + channel]) - composed) <= 2, "Composer layers do not reconstruct the complete mark")
         }
     }
 }
-try require(pngCount == 12 && pdfCount == 7, "Incomplete export set")
-print("Verified \(pngCount) PNGs and \(pdfCount) PDFs: dimensions, transparent backgrounds/cutouts, monochrome template, theme geometry, and exact Composer layer reconstruction.")
+try require(pngCount == 12 && pdfCount == 7 && previewCount == 2, "Incomplete export set")
+print("Verified \(pngCount) PNGs, \(pdfCount) PDFs and \(previewCount) previews: dimensions, transparent backgrounds, black template, theme geometry and Composer layer reconstruction.")

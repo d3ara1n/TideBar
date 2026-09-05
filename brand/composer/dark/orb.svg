@@ -1,4 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 256 256" fill="none">
-<title>TideBar — Solid Orb</title>
-<circle cx="128" cy="72" r="40" fill="#F5D69A"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none" width="1024" height="1024">
+  <title>TideBar — Solid Orb</title>
+  <defs>
+    <clipPath id="water-cutout">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g id="orb" fill="currentColor" color="#F5D69A">
+    <circle cx="128" cy="72" r="40"/>
+  </g>
 </svg>
