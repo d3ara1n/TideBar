@@ -79,15 +79,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func configureStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = item.button {
-            button.image = NSImage(systemSymbolName: "water.waves", accessibilityDescription: "TideBar")
-            button.toolTip = "TideBar"
+            button.image = NSImage(systemSymbolName: "water.waves", accessibilityDescription: "汐")
+            button.toolTip = "汐"
         }
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "打开设置…", action: #selector(openSettings), keyEquivalent: ","))
         menu.addItem(NSMenuItem(title: "重看引导…", action: #selector(showOnboarding), keyEquivalent: ""))
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "检查 TideBar 状态", action: #selector(checkDock), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "退出 TideBar", action: #selector(terminate), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: "检查汐的状态", action: #selector(checkDock), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "退出汐", action: #selector(terminate), keyEquivalent: "q"))
         for item in menu.items { item.target = self }
         item.menu = menu
         statusItem = item

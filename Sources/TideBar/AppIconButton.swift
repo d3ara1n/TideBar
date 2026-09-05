@@ -387,8 +387,8 @@ final class AppIconButton: NSView {
         // 固定按 bundle identifier 存配置；裸进程（无 bundle）不提供固定项
         if entry.bundleIdentifier != nil {
             let pin = NSMenuItem(title: entry.isPinned
-                                 ? "取消在 TideBar 中固定"
-                                 : "固定到 TideBar",
+                                 ? "取消在汐中固定"
+                                 : "固定到汐",
                                  action: #selector(MenuAction.run),
                                  keyEquivalent: "")
             let shouldPin = !entry.isPinned

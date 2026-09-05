@@ -261,21 +261,21 @@ private struct TakeoverStep: View {
 
             if case .idle = model.dockOperation, !model.isTakeoverEnabled, isNormalDockState {
                 HStack(spacing: 10) {
-                    Button("启用 TideBar") { showEnableConfirmation = true }
+                    Button("启用汐") { showEnableConfirmation = true }
                     Button("暂不启用", action: model.goNext)
                 }
             }
 
             Spacer()
 
-            Text("启用前会保存当前 Dock 配置；关闭 TideBar 或退出应用时都会自动恢复，设置中心的「Dock 与恢复」页也可随时手动恢复。")
+            Text("启用前会保存当前 Dock 配置；关闭汐或退出应用时都会自动恢复，设置中心的「Dock 与恢复」页也可随时手动恢复。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 44)
-        .confirmationDialog("启用 TideBar？", isPresented: $showEnableConfirmation) {
-            Button("启用 TideBar") { model.enableTakeover() }
+        .confirmationDialog("启用汐？", isPresented: $showEnableConfirmation) {
+            Button("启用汐") { model.enableTakeover() }
             Button("取消", role: .cancel) {}
         } message: {
             Text("汐会保存当前 Dock 设置、应用接管配置并重新启动系统 Dock。已打开的应用不会关闭。")
@@ -296,14 +296,14 @@ private struct TakeoverStep: View {
             HStack(spacing: 10) {
                 ProgressView()
                     .controlSize(.small)
-                Text("正在启用 TideBar…")
+                Text("正在启用汐…")
                     .foregroundStyle(.secondary)
             }
             .padding(.vertical, 24)
             .frame(maxWidth: .infinity)
         case .success(let message):
             StatusCard(symbol: "checkmark.circle.fill", tint: .green,
-                       title: "TideBar 已启用",
+                       title: "汐已启用",
                        message: message)
         case .failure(let message):
             StatusCard(symbol: "xmark.circle.fill", tint: .red,
@@ -320,7 +320,7 @@ private struct TakeoverStep: View {
         if model.isTakeoverEnabled {
             // 重看引导或中途关窗后重开：已是接管态，只展示现状，不重复执行
             StatusCard(symbol: "checkmark.circle.fill", tint: .green,
-                       title: "TideBar 正在接管系统 Dock",
+                       title: "汐正在接管系统 Dock",
                        message: "系统 Dock 的可见入口已由汐接替，汐线正在屏幕底部待命。")
         } else {
             switch model.dockState {

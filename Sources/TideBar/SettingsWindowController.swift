@@ -170,7 +170,7 @@ private final class SettingsModel: ObservableObject {
     }
 
     func enableTakeover() {
-        perform("正在启用 TideBar…") {
+        perform("正在启用汐…") {
             DockController.shared.applyTakeover()
         }
     }
@@ -182,7 +182,7 @@ private final class SettingsModel: ObservableObject {
     }
 
     func repairDock() {
-        perform("正在重新应用 TideBar 设置…") {
+        perform("正在重新应用接管设置…") {
             DockController.shared.repair()
         }
     }
@@ -195,7 +195,7 @@ private final class SettingsModel: ObservableObject {
         case .takeover:
             operation = .success("系统 Dock 设置正常。")
         case .notEnabled:
-            operation = .success("TideBar 尚未启用。")
+            operation = .success("汐尚未启用。")
         case .drifted:
             operation = .failure("系统 Dock 设置已发生变化。")
         case .manualRecoveryRequired:
@@ -214,9 +214,9 @@ private final class SettingsModel: ObservableObject {
             guard let self else { return }
             switch self.dockState {
             case .takeover:
-                self.operation = .success("TideBar 已启用，系统 Dock 设置正常。")
+                self.operation = .success("汐已启用，系统 Dock 设置正常。")
             case .notEnabled:
-                self.operation = .success("已关闭 TideBar，macOS Dock 已恢复。")
+                self.operation = .success("已关闭汐，macOS Dock 已恢复。")
             case .drifted:
                 self.operation = .failure("系统 Dock 设置仍不一致，请重新检查。")
             case .manualRecoveryRequired:
@@ -474,17 +474,17 @@ private struct OverviewPage: View {
         }
         .formStyle(.grouped)
         .navigationTitle("概览")
-        .confirmationDialog("启用 TideBar？", isPresented: $showEnableConfirmation) {
-            Button("启用 TideBar") { model.enableTakeover() }
+        .confirmationDialog("启用汐？", isPresented: $showEnableConfirmation) {
+            Button("启用汐") { model.enableTakeover() }
             Button("取消", role: .cancel) {}
         } message: {
             Text("汐会保存当前 Dock 设置、应用接管配置并重新启动系统 Dock。已打开的应用不会关闭。")
         }
-        .confirmationDialog("关闭 TideBar 并恢复 macOS Dock？", isPresented: $showRestoreConfirmation) {
+        .confirmationDialog("关闭汐并恢复 macOS Dock？", isPresented: $showRestoreConfirmation) {
             Button("关闭并恢复", role: .destructive) { model.restoreDock() }
             Button("取消", role: .cancel) {}
         } message: {
-            Text("汐会恢复启用前保存的 Dock 设置，并停止底部 TideBar 面板。")
+            Text("汐会恢复启用前保存的 Dock 设置，并停止屏幕底部的汐线。")
         }
     }
 
@@ -493,19 +493,19 @@ private struct OverviewPage: View {
         switch model.dockState {
         case .notEnabled:
             StatusCard(symbol: "circle.dashed", tint: .secondary,
-                       title: "TideBar 尚未启用",
+                       title: "汐尚未启用",
                        message: "启用后，汐会隐藏系统 Dock 的可见入口，并在屏幕底部提供应用与窗口访问。",
-                       actionTitle: "启用 TideBar", action: { showEnableConfirmation = true })
+                       actionTitle: "启用汐", action: { showEnableConfirmation = true })
         case .takeover:
             StatusCard(symbol: "checkmark.circle.fill", tint: .green,
-                       title: "TideBar 正在运行",
+                       title: "汐正在运行",
                        message: "系统 Dock 的可见入口已由汐接替。汐线会在屏幕底部收起，靠近时展开。",
                        actionTitle: "关闭并恢复 macOS Dock", action: { showRestoreConfirmation = true })
         case .drifted:
             StatusCard(symbol: "exclamationmark.triangle.fill", tint: .orange,
                        title: "系统 Dock 设置已发生变化",
                        message: "汐发现当前 Dock 设置与接管配置不一致。你可以重新应用汐的设置，或关闭汐并恢复原始配置。",
-                       actionTitle: "重新应用 TideBar 设置", action: { model.repairDock() })
+                       actionTitle: "重新应用接管设置", action: { model.repairDock() })
         case .manualRecoveryRequired:
             StatusCard(symbol: "exclamationmark.octagon.fill", tint: .red,
                        title: "无法自动恢复 macOS Dock",
@@ -555,7 +555,7 @@ private struct PinnedPage: View {
                     Button("恢复默认", action: { showResetConfirmation = true })
                 }
             } header: {
-                Text("固定到 TideBar")
+                Text("固定到汐")
             } footer: {
                 Text("拖拽可调整顺序，右键或悬浮按钮可移除项目。固定项目只决定应用在汐中的位置，不会阻止应用自动显示或隐藏。")
             }
@@ -965,12 +965,12 @@ private struct ShortcutsPage: View {
             PageHeader(title: "快捷键", description: "设置全局快捷键与临时切换的提交等待时间。")
 
             Section {
-                KeyboardShortcuts.Recorder("展开/收起 TideBar", name: .toggleTideBar)
+                KeyboardShortcuts.Recorder("展开/收起汐", name: .toggleTideBar)
                 KeyboardShortcuts.Recorder("临时切换应用", name: .cycleTideBarApplication)
             } header: {
                 Text("全局快捷键")
             } footer: {
-                Text("点击快捷键字段后输入新的组合键。录制期间 TideBar 热键会自动暂停；按 Esc 取消，按 Delete 清除。")
+                Text("点击快捷键字段后输入新的组合键。录制期间汐的热键会自动暂停；按 Esc 取消，按 Delete 清除。")
             }
 
             Section {
@@ -987,7 +987,7 @@ private struct ShortcutsPage: View {
             } header: {
                 Text("临时切换")
             } footer: {
-                Text("停止操作达到该时间后，TideBar 会提交当前选择并结束临时切换会话。")
+                Text("停止操作达到该时间后，汐会提交当前选择并结束临时切换会话。")
             }
 
             Section {
@@ -1021,9 +1021,9 @@ private struct DockPage: View {
             }
 
             Section {
-                Button("重新应用 TideBar 设置", action: model.repairDock)
+                Button("重新应用接管设置", action: model.repairDock)
                     .disabled(model.dockState != .drifted)
-                Button("关闭 TideBar 并恢复 macOS Dock", role: .destructive) {
+                Button("关闭汐并恢复 macOS Dock", role: .destructive) {
                     showRestoreConfirmation = true
                 }
                 .disabled(model.dockState == .notEnabled)
@@ -1040,11 +1040,11 @@ private struct DockPage: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Dock 与恢复")
-        .confirmationDialog("关闭 TideBar 并恢复 macOS Dock？", isPresented: $showRestoreConfirmation) {
+        .confirmationDialog("关闭汐并恢复 macOS Dock？", isPresented: $showRestoreConfirmation) {
             Button("关闭并恢复", role: .destructive, action: model.restoreDock)
             Button("取消", role: .cancel) {}
         } message: {
-            Text("汐会恢复启用前保存的 Dock 设置，并停止底部 TideBar 面板。")
+            Text("汐会恢复启用前保存的 Dock 设置，并停止屏幕底部的汐线。")
         }
     }
 
@@ -1115,9 +1115,13 @@ private struct AboutPage: View {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
     }
 
+    private var feedbackURL: URL {
+        URL(string: "https://github.com/d3ara1n/TideBar/issues")!
+    }
+
     var body: some View {
         Form {
-            PageHeader(title: "关于汐", description: "细线收起，靠近展开；窗口状态一目了然。")
+            PageHeader(title: "关于汐", description: "平时是一条线，需要时是一片海。")
 
             Section {
                 HStack(spacing: 14) {
@@ -1127,6 +1131,9 @@ private struct AboutPage: View {
                         .frame(width: 48, height: 48)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("汐 TideBar").font(.headline)
+                        Text("零占用窗口任务栏")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
                         Text("版本 \(version)（Build \(build)）")
                             .font(.callout)
                             .foregroundStyle(.secondary)
@@ -1136,7 +1143,10 @@ private struct AboutPage: View {
 
             Section {
                 LabeledContent("系统要求", value: "macOS 26 或更高版本")
-                LabeledContent("产品定位", value: "窗口任务栏与 Dock 替代")
+                LabeledContent("版权", value: "© 2026 Chien Zhang")
+                LabeledContent("反馈") {
+                    Link("GitHub Issues", destination: feedbackURL)
+                }
             }
         }
         .formStyle(.grouped)

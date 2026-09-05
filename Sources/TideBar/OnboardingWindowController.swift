@@ -140,7 +140,7 @@ final class OnboardingModel: ObservableObject {
             refreshDock()
             switch dockState {
             case .takeover:
-                dockOperation = .success("TideBar 已启用，汐线正在屏幕底部待命。")
+                dockOperation = .success("汐已启用，汐线正在屏幕底部待命。")
             case .failed(let message):
                 dockOperation = .failure(message)
             default:
