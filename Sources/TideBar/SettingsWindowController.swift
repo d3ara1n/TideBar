@@ -247,17 +247,8 @@ private final class SettingsModel: ObservableObject {
         }
     }
 
-    func addApplications() {
-        let panel = NSOpenPanel()
-        panel.title = "添加应用到 TideBar"
-        panel.message = "选择要固定到 TideBar 的应用。"
-        panel.allowedContentTypes = [.application]
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        guard panel.runModal() == .OK else { return }
-
-        for url in panel.urls {
-            guard let bundleIdentifier = Bundle(url: url)?.bundleIdentifier else { continue }
+    func addPinned(bundleIdentifiers: [String]) {
+        for bundleIdentifier in bundleIdentifiers {
             AppConfiguration.shared.setPinned(true, bundleIdentifier: bundleIdentifier)
         }
         refreshPinnedApps()
@@ -279,14 +270,6 @@ private final class SettingsModel: ObservableObject {
     func removePinned(_ app: PinnedApplication) {
         guard let index = pinnedApps.firstIndex(of: app) else { return }
         removePinned(at: IndexSet(integer: index))
-    }
-
-    func movePinnedItem(_ app: PinnedApplication, by offset: Int) {
-        guard let index = pinnedApps.firstIndex(of: app) else { return }
-        let destination = min(max(index + offset, 0), pinnedApps.count - 1)
-        guard destination != index else { return }
-        movePinned(from: IndexSet(integer: index),
-                   to: offset > 0 ? destination + 1 : destination)
     }
 
     func restoreDefaultPinned() {
@@ -544,7 +527,7 @@ private struct OverviewPage: View {
 private struct PinnedPage: View {
     @ObservedObject var model: SettingsModel
     @State private var showResetConfirmation = false
-    @State private var isEditing = false
+    @State private var isShowingApplicationPicker = false
 
     var body: some View {
         Form {
@@ -556,61 +539,266 @@ private struct PinnedPage: View {
                         .foregroundStyle(.secondary)
                 } else {
                     List {
-                        ForEach(Array(model.pinnedApps.enumerated()), id: \.element.id) { index, app in
-                            HStack(spacing: 10) {
-                                Image(nsImage: app.icon)
-                                    .resizable()
-                                    .frame(width: 28, height: 28)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(app.name)
-                                    if !app.isInstalled {
-                                        Text("应用未安装或已移动")
-                                            .font(.caption)
-                                            .foregroundStyle(.orange)
-                                    }
-                                }
-                                Spacer()
-                                if isEditing {
-                                    Button { model.movePinnedItem(app, by: -1) } label: {
-                                        Image(systemName: "chevron.up")
-                                    }
-                                    .disabled(index == 0)
-                                    .buttonStyle(.borderless)
-                                    Button { model.movePinnedItem(app, by: 1) } label: {
-                                        Image(systemName: "chevron.down")
-                                    }
-                                    .disabled(index == model.pinnedApps.count - 1)
-                                    .buttonStyle(.borderless)
-                                    Button("移除", role: .destructive) {
-                                        model.removePinned(app)
-                                    }
-                                    .buttonStyle(.borderless)
-                                }
+                        ForEach(model.pinnedApps) { app in
+                            PinnedRow(app: app) {
+                                model.removePinned(app)
                             }
+                        }
+                        .onMove { offsets, destination in
+                            model.movePinned(from: offsets, to: destination)
                         }
                     }
                     .frame(minHeight: 180, maxHeight: 300)
                 }
 
                 HStack {
-                    Button("添加应用…", action: model.addApplications)
-                    Button(isEditing ? "完成" : "编辑") {
-                        isEditing.toggle()
-                    }
+                    Button("添加应用…", action: { isShowingApplicationPicker = true })
                     Spacer()
                     Button("恢复默认", action: { showResetConfirmation = true })
                 }
             } header: {
                 Text("固定到 TideBar")
             } footer: {
-                Text("点击“编辑”可以移除或重新排序固定项目。固定项目只决定应用在汐中的位置，不会阻止应用自动显示或隐藏。")
+                Text("拖拽可调整顺序，右键或悬浮按钮可移除项目。固定项目只决定应用在汐中的位置，不会阻止应用自动显示或隐藏。")
             }
         }
         .formStyle(.grouped)
         .navigationTitle("固定项目")
+        .sheet(isPresented: $isShowingApplicationPicker) {
+            ApplicationPickerSheet(model: model)
+        }
         .confirmationDialog("恢复默认固定项目？", isPresented: $showResetConfirmation) {
             Button("恢复默认", role: .destructive, action: model.restoreDefaultPinned)
             Button("取消", role: .cancel) {}
+        }
+    }
+}
+
+private struct PinnedRow: View {
+    let app: PinnedApplication
+    let onRemove: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(nsImage: app.icon)
+                .resizable()
+                .frame(width: 28, height: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(app.name)
+                if !app.isInstalled {
+                    Text("应用未安装或已移动")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+            Spacer()
+            if isHovered {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 18, height: 18)
+                        .background(Circle().fill(.red))
+                }
+                .buttonStyle(.plain)
+                .help("移除")
+                .transition(.opacity)
+            }
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.tertiary)
+                .onHover { hovering in
+                    if hovering {
+                        NSCursor.openHand.push()
+                    } else {
+                        NSCursor.pop()
+                    }
+                }
+                .help("拖拽调整顺序")
+        }
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.12)) { isHovered = hovering }
+        }
+        .contextMenu {
+            Button("移除", role: .destructive, action: onRemove)
+        }
+    }
+}
+
+private struct InstalledApplicationInfo: Sendable {
+    let bundleIdentifier: String
+    let name: String
+    let path: String
+}
+
+private enum ApplicationScanner {
+    static func scanInstalledApplications() -> [InstalledApplicationInfo] {
+        let roots = ["/Applications", "/System/Applications",
+                     NSString(string: "~/Applications").expandingTildeInPath]
+        let fileManager = FileManager.default
+        var urls: [URL] = []
+        for root in roots {
+            guard let entries = try? fileManager.contentsOfDirectory(atPath: root) else { continue }
+            for entry in entries where entry.hasSuffix(".app") {
+                urls.append(URL(fileURLWithPath: root).appendingPathComponent(entry))
+            }
+            for entry in entries {
+                guard !entry.hasSuffix(".app") else { continue }
+                let directory = URL(fileURLWithPath: root).appendingPathComponent(entry)
+                var isDirectory: ObjCBool = false
+                guard fileManager.fileExists(atPath: directory.path, isDirectory: &isDirectory),
+                      isDirectory.boolValue,
+                      let subEntries = try? fileManager.contentsOfDirectory(atPath: directory.path)
+                else { continue }
+                urls.append(contentsOf: subEntries
+                    .filter { $0.hasSuffix(".app") }
+                    .map { directory.appendingPathComponent($0) })
+            }
+        }
+
+        var seenBundleIdentifiers = Set<String>()
+        var infos: [InstalledApplicationInfo] = []
+        for url in urls {
+            guard let bundle = Bundle(url: url),
+                  let bundleIdentifier = bundle.bundleIdentifier,
+                  seenBundleIdentifiers.insert(bundleIdentifier).inserted
+            else { continue }
+            let name = bundle.localizedInfoDictionary?["CFBundleDisplayName"] as? String
+                ?? bundle.infoDictionary?["CFBundleName"] as? String
+                ?? url.deletingPathExtension().lastPathComponent
+            infos.append(InstalledApplicationInfo(bundleIdentifier: bundleIdentifier,
+                                                  name: name,
+                                                  path: url.path))
+        }
+        infos.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        return infos
+    }
+}
+
+private struct ApplicationPickerSheet: View {
+    @ObservedObject var model: SettingsModel
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var installedApps: [PinnedApplication] = []
+    @State private var isScanning = true
+    @State private var searchText = ""
+    @State private var selectedBundleIdentifiers: Set<String> = []
+
+    private var filteredApps: [PinnedApplication] {
+        let keyword = searchText.trimmingCharacters(in: .whitespaces)
+        guard !keyword.isEmpty else { return installedApps }
+        return installedApps.filter { $0.name.localizedCaseInsensitiveContains(keyword) }
+    }
+
+    private var pinnedBundleIdentifiers: Set<String> {
+        Set(model.pinnedApps.map(\.bundleIdentifier))
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("搜索应用", text: $searchText)
+                    .textFieldStyle(.roundedBorder)
+            }
+            .padding(12)
+
+            Divider()
+
+            List(filteredApps) { app in
+                ApplicationPickerRow(app: app,
+                                     isPinned: pinnedBundleIdentifiers.contains(app.bundleIdentifier),
+                                     isSelected: selectedBundleIdentifiers.contains(app.bundleIdentifier)) {
+                    toggleSelection(app)
+                }
+            }
+            .listStyle(.inset)
+            .overlay {
+                if isScanning {
+                    ProgressView("正在扫描已安装应用…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+
+            Divider()
+
+            HStack {
+                Text("\(selectedBundleIdentifiers.count) 个已选")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("取消", action: { dismiss() })
+                Button("添加", action: confirmAdd)
+                    .disabled(selectedBundleIdentifiers.isEmpty)
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(12)
+        }
+        .frame(minWidth: 460, idealWidth: 460, minHeight: 420, idealHeight: 480)
+        .task {
+            guard installedApps.isEmpty else { return }
+            let infos = await Task.detached(priority: .userInitiated) {
+                ApplicationScanner.scanInstalledApplications()
+            }.value
+            installedApps = Self.pinnedApplications(from: infos)
+            isScanning = false
+        }
+    }
+
+    private static func pinnedApplications(from infos: [InstalledApplicationInfo]) -> [PinnedApplication] {
+        let workspace = NSWorkspace.shared
+        return infos.map { info in
+            PinnedApplication(bundleIdentifier: info.bundleIdentifier,
+                              name: info.name,
+                              icon: workspace.icon(forFile: info.path),
+                              isInstalled: true)
+        }
+    }
+
+    private func toggleSelection(_ app: PinnedApplication) {
+        if !selectedBundleIdentifiers.insert(app.bundleIdentifier).inserted {
+            selectedBundleIdentifiers.remove(app.bundleIdentifier)
+        }
+    }
+
+    private func confirmAdd() {
+        let bundleIdentifiers = installedApps
+            .filter { selectedBundleIdentifiers.contains($0.bundleIdentifier) }
+            .map(\.bundleIdentifier)
+        model.addPinned(bundleIdentifiers: bundleIdentifiers)
+        dismiss()
+    }
+}
+
+private struct ApplicationPickerRow: View {
+    let app: PinnedApplication
+    let isPinned: Bool
+    let isSelected: Bool
+    let onToggle: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(nsImage: app.icon)
+                .resizable()
+                .frame(width: 24, height: 24)
+            Text(app.name)
+                .foregroundStyle(isPinned ? .secondary : .primary)
+            Spacer()
+            if isPinned {
+                Text("已固定")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isSelected ? Color.blue : Color.secondary.opacity(0.35))
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if !isPinned { onToggle() }
         }
     }
 }
