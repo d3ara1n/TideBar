@@ -4,7 +4,7 @@
 
 ## 背景
 
-发布渠道已定（2026-09-06）：开源 GitHub、下载走 GitHub Releases，另建介绍性官网落地页。官网方案已定（同日拍板）：GitHub Pages，站点放仓库 `website/` 目录经 Actions 发布，域名 `tidebar.dearain.dev`（DNS 侧加 CNAME → `d3ara1n.github.io`）；不用 Vercel。发布产物（`.app` 打包）在品牌素材与 README 占位就绪后再开工。
+发布渠道已定（2026-09-06）：开源 GitHub、下载走 GitHub Releases，另建介绍性官网落地页。仓库已建：github.com/d3ara1n/TideBar（**private**，待品牌资产与演示素材就绪后再转 public）。官网方案已定（同日拍板）：GitHub Pages，站点放仓库 `website/` 目录经 Actions 发布，域名 `tidebar.dearain.dev`（DNS 侧加 CNAME → `d3ara1n.github.io`）；不用 Vercel。发布产物（`.app` 打包）在品牌素材与 README 占位就绪后再开工。
 
 品牌信息目前零散且占位：README 只是开发者骨架（构建命令 + 文档链接）；设置「关于」页仅有版本号与一句话定位；应用图标、菜单栏图标、关于页形象全部使用 SF Symbol `water.waves` 占位；「汐」「TideBar」「汐 TideBar」三种叫法在 UI 与文档中并存，未统一。
 
