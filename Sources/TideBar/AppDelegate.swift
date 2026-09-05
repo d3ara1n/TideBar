@@ -5,6 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let controller = TideBarController()
     private let shortcutManager = ShortcutManager()
     private var settingsWindow: SettingsWindowController?
+    private var onboardingWindow: OnboardingWindowController?
     private var statusItem: NSStatusItem?
     private var configurationObserver: NSObjectProtocol?
     private var appearanceObserver: NSObjectProtocol?
@@ -83,6 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "打开设置…", action: #selector(openSettings), keyEquivalent: ","))
+        menu.addItem(NSMenuItem(title: "重看引导…", action: #selector(showOnboarding), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "检查 TideBar 状态", action: #selector(checkDock), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "退出 TideBar", action: #selector(terminate), keyEquivalent: "q"))
@@ -91,18 +93,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = item
     }
 
-    private func showOnboarding() {
-        let alert = NSAlert()
-        alert.messageText = "欢迎使用汐 TideBar"
-        alert.informativeText = "汐会隐藏系统 Dock 的可见入口，并在屏幕底部提供应用与窗口访问。启用前会保存当前 Dock 设置，之后可以随时恢复。启用过程中系统 Dock 会重新启动一次，不会关闭已打开的应用。"
-        alert.addButton(withTitle: "启用 TideBar")
-        alert.addButton(withTitle: "稍后设置")
-        alert.alertStyle = .informational
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            DockController.shared.applyTakeover()
-        }
-        AppConfiguration.shared.onboardingCompleted = true
+    @objc private func showOnboarding() {
+        if onboardingWindow == nil { onboardingWindow = OnboardingWindowController() }
+        onboardingWindow?.showWindow(self)
     }
 
     @objc private func openSettings() {
