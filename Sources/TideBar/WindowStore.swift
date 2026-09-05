@@ -110,7 +110,6 @@ enum AXReader {
 final class WindowStore {
     private struct Watch {
         let identity: AppIdentity
-        let bundleIdentifier: String
         var observer: AXObserver?
         /// nil = 窗口集合无法完整确认（降级）；否则为当前收录快照
         var snapshots: [WindowSnapshot]?
@@ -155,9 +154,9 @@ final class WindowStore {
     }
 
     private func isWatchable(_ app: NSRunningApplication) -> Bool {
-        guard app.activationPolicy == .regular, let bundleIdentifier = app.bundleIdentifier else {
-            return false
-        }
+        guard app.activationPolicy == .regular else { return false }
+        // 裸进程（无 bundle 的 regular GUI）同样观测；Dock 隐藏名单仅对 bundle 进程生效
+        guard let bundleIdentifier = app.bundleIdentifier else { return true }
         return AppIdentity(bundleIdentifier) != AppIdentity("com.apple.dock")
     }
 
@@ -180,9 +179,10 @@ final class WindowStore {
         guard isWatchable(app) else { return }
         let pid = app.processIdentifier
         guard watches[pid] == nil else { return }
-        let bundleIdentifier = app.bundleIdentifier!
-        watches[pid] = Watch(identity: AppIdentity(bundleIdentifier),
-                             bundleIdentifier: bundleIdentifier,
+        // 身份：标准应用为 bundle identifier，裸进程为可执行路径（与 Registry 同源）
+        guard let identity = app.bundleIdentifier.map(AppIdentity.init)
+            ?? app.executablePath.map(AppIdentity.init) else { return }
+        watches[pid] = Watch(identity: identity,
                              snapshots: nil)
         scheduleReenumerate(pid: pid, after: delay)
     }
@@ -228,7 +228,7 @@ final class WindowStore {
             watches[pid] = watch
             if degraded {
                 NSLog("TideBar WindowStore degraded: %@ (pid %d) kAXWindows unreadable",
-                      watch.bundleIdentifier, pid)
+                      watch.identity.bundleIdentifier, pid)
                 onUpdate?(watch.identity)
             }
             _ = attachObserver(pid: pid, appElement: appElement, windows: [])
@@ -285,7 +285,7 @@ final class WindowStore {
             watches[pid] = watch
             if degraded {
                 NSLog("TideBar WindowStore degraded: %@ (pid %d) window attributes incomplete",
-                      watch.bundleIdentifier, pid)
+                      watch.identity.bundleIdentifier, pid)
                 onUpdate?(watch.identity)
             }
             _ = attachObserver(pid: pid, appElement: appElement, windows: [])
@@ -303,13 +303,13 @@ final class WindowStore {
             degradedWatch.snapshots = nil
             watches[pid] = degradedWatch
             NSLog("TideBar WindowStore degraded: %@ (pid %d) AX notifications incomplete",
-                  degradedWatch.bundleIdentifier, pid)
+                  degradedWatch.identity.bundleIdentifier, pid)
             onUpdate?(degradedWatch.identity)
         }
         if changed {
             let mini = snapshots.filter(\.isMinimized).count
             NSLog("TideBar WindowStore %@ (pid %d): %d windows (%d minimized)",
-                  watch.bundleIdentifier, pid, snapshots.count, mini)
+                  watch.identity.bundleIdentifier, pid, snapshots.count, mini)
             onUpdate?(watch.identity)
         }
     }

@@ -8,11 +8,11 @@ enum AppActionDispatcher {
         let apps = validatedRunningApps(for: entry, action: "visibility change")
         guard !apps.isEmpty else { return }
 
-        for (pid, app, bundleIdentifier) in apps {
+        for (pid, app, identityLabel) in apps {
             let succeeded = hidden ? app.hide() : app.unhide()
             if !succeeded {
                 NSLog("TideBar %@ request failed: %@ (pid %d)",
-                      hidden ? "hide" : "show", bundleIdentifier, pid)
+                      hidden ? "hide" : "show", identityLabel, pid)
             }
         }
         if !hidden {
@@ -28,9 +28,9 @@ enum AppActionDispatcher {
             return
         }
 
-        for (pid, app, bundleIdentifier) in validatedRunningApps(for: entry, action: "termination") {
+        for (pid, app, identityLabel) in validatedRunningApps(for: entry, action: "termination") {
             if !app.terminate() {
-                NSLog("TideBar termination request failed: %@ (pid %d)", bundleIdentifier, pid)
+                NSLog("TideBar termination request failed: %@ (pid %d)", identityLabel, pid)
             }
         }
     }
@@ -38,15 +38,26 @@ enum AppActionDispatcher {
     private static func validatedRunningApps(
         for entry: AppEntry,
         action: String
-    ) -> [(pid: pid_t, app: NSRunningApplication, bundleIdentifier: String)] {
+    ) -> [(pid: pid_t, app: NSRunningApplication, identityLabel: String)] {
         entry.runningAppsByPID.sorted(by: { $0.key < $1.key }).compactMap { pid, app in
-            guard let bundleIdentifier = app.bundleIdentifier,
-                  AppIdentity(bundleIdentifier) == entry.identity
-            else {
+            // 身份对账：标准应用按 bundle identifier，裸进程按可执行路径，均与条目规范化身份比对
+            let identity: AppIdentity?
+            let label: String
+            if let bundleIdentifier = app.bundleIdentifier {
+                identity = AppIdentity(bundleIdentifier)
+                label = bundleIdentifier
+            } else if let executablePath = app.executablePath {
+                identity = AppIdentity(executablePath)
+                label = executablePath
+            } else {
+                identity = nil
+                label = "?"
+            }
+            guard identity == entry.identity else {
                 NSLog("TideBar %@ skipped for mismatched pid %d", action, pid)
                 return nil
             }
-            return (pid, app, bundleIdentifier)
+            return (pid, app, label)
         }
     }
 }

@@ -176,3 +176,10 @@ defaults delete com.apple.dock autohide-delay && killall Dock
 2. **角标落地（取代可行性表「⭐⭐⭐ 可砍」的优先级结论；成本判定见上一节实测）**：BadgeStore 后台读 Dock AX 树，展开 1s/收起 4s 自适应、展开瞬间立即全量读、接管关闭时不轮询（系统 Dock 可见时镜像无意义）；badge 进 AppEntry 模型真值，不触发潮涌失效；Dock 标题与应用显示名小写规范化对位，匹配不到静默忽略。
 3. **汐线通知语言：轻涌 + 持久涟漪，展开即确认**：新角标一次轻涌，未确认期间双环错相涟漪循环（线源扁椭圆形态，横向 1.3 倍线宽、终态波高 14pt）；停止条件 = 任意一次展开（用户已知）或全部角标消失（从横幅读完）；减少动态效果时脉冲退化为短淡化、不做常驻循环。设计动机：一次性提醒与系统横幅注意力重复，持久动效表达「未被知晓」状态而非「事件发生」瞬间。
 4. **解析与展示约定**：AXStatusLabel 正整数→计数角标（99+ 封顶）、非空非数字→小圆点、空/零→不显示；连续读取失败 3 轮才清值，Dock 重启期间保留旧值防闪烁。
+
+## 2026-09 裸进程身份（扩展「应用身份与 Finder 行为决策」条目 1）
+
+1. **无 bundle 的 regular GUI 进程照收，身份由可执行路径派生**（`AppIdentity(路径)`，沿用 ASCII 小写规范化）：.NET/Avalonia 调试目标、直跑 jar 等裸 exe 在系统 Dock 有落点，TideBar 对齐；此前的 bundleIdentifier 硬过滤是漏洞。路径身份与 bundle 身份天然不碰撞（bundle identifier 不含路径分隔符）。
+2. **路径经 `proc_pidpath` 解析**（公升 libproc API），保留真实大小写供文件操作；规范化身份仅作聚合键。
+3. **裸进程不支持固定**：固定配置按 bundle identifier 存储，裸进程右键菜单不提供固定项；将来需要可扩展按路径固定。
+4. **身份对账双通道**：动作校验（AppActionDispatcher）与窗口观测（WindowStore）对 bundle 进程按 bundle identifier 比对，对裸进程按可执行路径比对，均归于条目的规范化身份。

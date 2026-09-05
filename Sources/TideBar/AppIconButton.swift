@@ -382,19 +382,22 @@ final class AppIconButton: NSView {
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = NSMenu()
         menuActions.removeAll()
-
-        let pin = NSMenuItem(title: entry.isPinned
-                             ? "取消在 TideBar 中固定"
-                             : "固定到 TideBar",
-                             action: #selector(MenuAction.run),
-                             keyEquivalent: "")
         let identity = entry.identity
-        let shouldPin = !entry.isPinned
-        let setPinned = onSetPinned
-        let pinAction = MenuAction { setPinned?(identity, shouldPin) }
-        menuActions.append(pinAction)
-        pin.target = pinAction
-        menu.addItem(pin)
+
+        // 固定按 bundle identifier 存配置；裸进程（无 bundle）不提供固定项
+        if entry.bundleIdentifier != nil {
+            let pin = NSMenuItem(title: entry.isPinned
+                                 ? "取消在 TideBar 中固定"
+                                 : "固定到 TideBar",
+                                 action: #selector(MenuAction.run),
+                                 keyEquivalent: "")
+            let shouldPin = !entry.isPinned
+            let setPinned = onSetPinned
+            let pinAction = MenuAction { setPinned?(identity, shouldPin) }
+            menuActions.append(pinAction)
+            pin.target = pinAction
+            menu.addItem(pin)
+        }
 
         if let url = entry.applicationURL {
             let reveal = NSMenuItem(title: "在 Finder 中显示",

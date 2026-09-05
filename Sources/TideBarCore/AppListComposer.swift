@@ -1,12 +1,26 @@
 /// 一个可参与应用列表组合的运行实例。系统对象仍由 TideBar 进程以 PID 映射持有。
+/// 标准应用以 bundle identifier 为身份；裸进程（无 bundle 的 regular GUI，
+/// 如 .NET/Avalonia 调试目标、直跑的 jar）以可执行路径为身份。
+/// 路径身份与 bundle 身份天然不碰撞（bundle identifier 不含路径分隔符）。
 public struct RunningAppDescription: Equatable, Sendable {
     public let identity: AppIdentity
-    public let bundleIdentifier: String
+    /// 标准应用的原始 bundle identifier；裸进程为 nil
+    public let bundleIdentifier: String?
+    /// 裸进程的可执行路径（真实大小写，供文件操作与展示）；标准应用为 nil
+    public let executablePath: String?
     public let processIdentifier: Int32
 
     public init(bundleIdentifier: String, processIdentifier: Int32) {
         self.identity = AppIdentity(bundleIdentifier)
         self.bundleIdentifier = bundleIdentifier
+        self.executablePath = nil
+        self.processIdentifier = processIdentifier
+    }
+
+    public init(executablePath: String, processIdentifier: Int32) {
+        self.identity = AppIdentity(executablePath)
+        self.bundleIdentifier = nil
+        self.executablePath = executablePath
         self.processIdentifier = processIdentifier
     }
 }

@@ -7,7 +7,8 @@ import UniformTypeIdentifiers
 struct AppEntry: Identifiable {
     let identity: AppIdentity
     /// 固定配置保留采集到的原始 bundle identifier，不用规范化身份代替 locator。
-    let bundleIdentifier: String
+    /// 裸进程（无 bundle 的 regular GUI）为 nil，此时身份由可执行路径派生，不支持固定。
+    let bundleIdentifier: String?
     /// 启动、显示安装位置等系统操作使用解析后的 URL，不反查规范化身份。
     let applicationURL: URL?
     let name: String
@@ -205,22 +206,30 @@ final class AppRegistry {
             NSLog("TideBar pin change ignored for unavailable app: %@", identity.bundleIdentifier)
             return
         }
-        AppConfiguration.shared.setPinned(pinned, bundleIdentifier: entry.bundleIdentifier)
+        guard let bundleIdentifier = entry.bundleIdentifier else {
+            NSLog("TideBar pin denied for bundle-less app: %@", identity.bundleIdentifier)
+            return
+        }
+        AppConfiguration.shared.setPinned(pinned, bundleIdentifier: bundleIdentifier)
     }
 
     func refresh() {
         let workspace = NSWorkspace.shared
         let pinned = AppConfiguration.shared.effectivePinnedBundleIDs
         let running = workspace.runningApplications.filter {
-            guard !$0.isTerminated, $0.activationPolicy == .regular,
-                  let bundleIdentifier = $0.bundleIdentifier else {
-                return false
-            }
+            guard !$0.isTerminated, $0.activationPolicy == .regular else { return false }
+            // 裸进程（无 bundle 的 regular GUI）照收，身份由可执行路径派生；
+            // 系统 Dock 对 regular 进程来者不拒，这里对齐它
+            guard let bundleIdentifier = $0.bundleIdentifier else { return true }
             return !Self.hiddenApps.contains(AppIdentity(bundleIdentifier))
         }
         let descriptions = running.compactMap { app -> RunningAppDescription? in
-            guard let bundleIdentifier = app.bundleIdentifier else { return nil }
-            return RunningAppDescription(bundleIdentifier: bundleIdentifier,
+            if let bundleIdentifier = app.bundleIdentifier {
+                return RunningAppDescription(bundleIdentifier: bundleIdentifier,
+                                             processIdentifier: app.processIdentifier)
+            }
+            guard let executablePath = app.executablePath else { return nil }
+            return RunningAppDescription(executablePath: executablePath,
                                          processIdentifier: app.processIdentifier)
         }
         let composed = AppListComposer.compose(pinnedBundleIdentifiers: pinned,
@@ -235,10 +244,10 @@ final class AppRegistry {
             if let applicationURL { return workspace.icon(forFile: applicationURL.path) }
             return workspace.icon(for: UTType.application)
         }
-        func name(locator: String, app: NSRunningApplication?, applicationURL: URL?) -> String {
+        func name(locator: String?, app: NSRunningApplication?, applicationURL: URL?) -> String {
             if let name = app?.localizedName { return name }
             if let applicationURL { return applicationURL.deletingPathExtension().lastPathComponent }
-            return locator
+            return locator ?? "?"
         }
 
         var pinnedEntries: [AppEntry] = []
@@ -260,14 +269,15 @@ final class AppRegistry {
             ) else { continue }
 
             let app = apps.first
-            guard let locator = app?.bundleIdentifier ?? description.pinnedBundleIdentifier else { continue }
+            let bundleIdentifier = app?.bundleIdentifier ?? description.pinnedBundleIdentifier
             let applicationURL = app?.bundleURL
-                ?? workspace.urlForApplication(withBundleIdentifier: locator)
+                ?? bundleIdentifier.flatMap { workspace.urlForApplication(withBundleIdentifier: $0) }
+                ?? app?.executablePath.map { URL(fileURLWithPath: $0) }
             guard app != nil || applicationURL != nil else { continue }
 
-            let displayName = name(locator: locator, app: app, applicationURL: applicationURL)
+            let displayName = name(locator: bundleIdentifier, app: app, applicationURL: applicationURL)
             let entry = AppEntry(identity: description.identity,
-                                 bundleIdentifier: locator,
+                                 bundleIdentifier: bundleIdentifier,
                                  applicationURL: applicationURL,
                                  name: displayName,
                                  icon: icon(app: app, applicationURL: applicationURL),
