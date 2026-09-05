@@ -447,8 +447,6 @@ private struct StatusCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(18)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
