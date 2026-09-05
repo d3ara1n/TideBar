@@ -72,8 +72,15 @@ final class OnboardingModel: ObservableObject {
     enum DockOperation: Equatable {
         case idle
         case working
-        case success(String)
-        case failure(String)
+        case success
+
+        /// 失败原因：系统错误描述（系统本地化，不经词条）或未知失败（走词条）。
+        enum FailureReason: Equatable {
+            case system(String)
+            case generic
+        }
+
+        case failure(FailureReason)
     }
 
     @Published private(set) var step = Step.intro
@@ -140,11 +147,11 @@ final class OnboardingModel: ObservableObject {
             refreshDock()
             switch dockState {
             case .takeover:
-                dockOperation = .success("汐已启用，汐线正在屏幕底部待命。")
+                dockOperation = .success
             case .failed(let message):
-                dockOperation = .failure(message)
+                dockOperation = .failure(.system(message))
             default:
-                dockOperation = .failure("启用未能完成，请重试或到设置中心检查。")
+                dockOperation = .failure(.generic)
             }
         }
     }

@@ -1,0 +1,155 @@
+// 通用动作与状态
+"action.cancel" = "取消";
+"action.remove" = "移除";
+"action.checkNow" = "立即检查";
+"action.openSystemSettings" = "打开系统设置";
+"state.available" = "可用";
+"state.pending" = "等待授权";
+"state.comingSoon" = "即将推出";
+"state.granted" = "已授权";
+"state.notGranted" = "未授权";
+
+// 窗口与侧栏
+"window.title" = "汐 TideBar";
+"sidebar.section.app" = "汐 TideBar";
+"sidebar.section.system" = "系统";
+"page.overview" = "概览";
+"page.pinned" = "固定项目";
+"page.windows" = "窗口管理";
+"page.appearance" = "外观与交互";
+"page.shortcuts" = "快捷键";
+"page.dock" = "Dock 与恢复";
+"page.permissions" = "权限";
+"page.about" = "关于";
+
+// 操作横幅（OperationKind）
+"op.working.enabling" = "正在启用汐…";
+"op.working.restoring" = "正在恢复 macOS Dock…";
+"op.working.repairing" = "正在重新应用接管设置…";
+"op.working.checking" = "正在检查系统 Dock…";
+"op.success.takeoverActive" = "汐已启用，系统 Dock 设置正常。";
+"op.success.restored" = "已关闭汐，macOS Dock 已恢复。";
+"op.success.checkHealthy" = "系统 Dock 设置正常。";
+"op.success.checkNotEnabled" = "汐尚未启用。";
+"op.failure.drifted" = "系统 Dock 设置仍不一致，请重新检查。";
+"op.failure.manualRecovery" = "缺少接管前保存的 Dock 配置，无法自动恢复。";
+
+// 概览
+"overview.header.title" = "概览";
+"overview.header.description" = "查看汐的运行状态，并管理系统 Dock 的接管关系。";
+"overview.section.recent" = "最近操作";
+"overview.state.notEnabled.title" = "汐尚未启用";
+"overview.state.notEnabled.message" = "启用后，汐会隐藏系统 Dock 的可见入口，并在屏幕底部提供应用与窗口访问。";
+"overview.state.takeover.title" = "汐正在运行";
+"overview.state.takeover.message" = "系统 Dock 的可见入口已由汐接替。汐线会在屏幕底部收起，靠近时展开。";
+"overview.state.drifted.title" = "系统 Dock 设置已发生变化";
+"overview.state.drifted.message" = "汐发现当前 Dock 设置与接管配置不一致。你可以重新应用汐的设置，或关闭汐并恢复原始配置。";
+"overview.state.manualRecovery.title" = "无法自动恢复 macOS Dock";
+"overview.state.manualRecovery.message" = "汐找不到启用前保存的 Dock 设置，因此无法安全执行自动恢复。请查看恢复说明，或联系支持以获取手动恢复步骤。";
+"overview.state.failed.title" = "需要处理系统 Dock";
+
+// 接管与恢复（概览与 Dock 页共用）
+"takeover.confirmTitle" = "启用汐？";
+"takeover.confirmEnable" = "启用汐";
+"takeover.confirmMessage" = "汐会保存当前 Dock 设置、应用接管配置并重新启动系统 Dock。已打开的应用不会关闭。";
+"restore.confirmTitle" = "关闭汐并恢复 macOS Dock？";
+"restore.confirmAction" = "关闭并恢复";
+"restore.confirmMessage" = "汐会恢复启用前保存的 Dock 设置，并停止屏幕底部的汐线。";
+"restore.action" = "关闭汐并恢复 macOS Dock";
+
+// 固定项目
+"pinned.header.description" = "选择始终显示在汐中的应用。运行中的其他应用会在固定项目之后自动出现。";
+"pinned.empty" = "还没有固定项目。";
+"pinned.add" = "添加应用…";
+"pinned.reset" = "恢复默认";
+"pinned.section.header" = "固定到汐";
+"pinned.section.footer" = "拖拽可调整顺序，右键或悬浮按钮可移除项目。固定项目只决定应用在汐中的位置，不会阻止应用自动显示或隐藏。";
+"pinned.resetConfirmTitle" = "恢复默认固定项目？";
+"pinned.notInstalled" = "应用未安装或已移动";
+"pinned.dragHelp" = "拖拽调整顺序";
+"pinned.searchPlaceholder" = "搜索应用";
+"pinned.scanning" = "正在扫描已安装应用…";
+"pinned.selectedCount" = "已选 %ld 项";
+"pinned.addShort" = "添加";
+"pinned.pinnedBadge" = "已固定";
+
+// 窗口管理
+"windows.header.description" = "汐的核心能力：让最小化窗口和多个窗口都能被直接找到。";
+"windows.section.capabilities" = "能力";
+"windows.cap.windowList.title" = "窗口列表";
+"windows.cap.windowList.description" = "按应用展开该应用的全部窗口。";
+"windows.cap.minimizeRestore.title" = "最小化窗口还原";
+"windows.cap.minimizeRestore.description" = "点击窗口后自动还原并置前。";
+"windows.cap.preview.title" = "窗口预览";
+"windows.cap.preview.description" = "悬停时查看窗口缩略图。";
+"windows.section.requirements" = "运行条件";
+"windows.accessibilityLabel" = "辅助功能权限";
+"windows.footer.granted" = "窗口管理已具备运行条件。若刚刚完成授权，请重新启动汐以开始观察已有应用。";
+"windows.footer.notGranted" = "辅助功能权限用于读取窗口列表、识别最小化状态并将窗口带回前台。";
+
+// 外观与交互
+"appearance.header.description" = "调整主题、汐线、展开动画和应用栏的表现。";
+"appearance.section.theme" = "外观";
+"appearance.theme" = "主题";
+"appearance.theme.footer" = "所选主题会应用到设置窗口、汐线、潮涌和应用菜单。";
+"appearance.iconSize" = "应用图标大小";
+"appearance.brightness" = "汐线亮度";
+"appearance.section.tideline" = "汐线与应用栏";
+"appearance.tideline.footer" = "图标大小会同时调整图标槽位；汐线亮度只影响收起态视觉，不改变接近热区。";
+"appearance.animation" = "展开动画";
+"appearance.reducedMotion" = "减少动态效果";
+"appearance.section.animation" = "动画";
+"appearance.animation.footer" = "减少动态效果会覆盖系统设置；始终关闭会保留弹簧与位移动效。";
+"appearance.fullscreen" = "全屏应用中的显示行为";
+"appearance.section.fullscreen" = "全屏空间";
+"appearance.fullscreen.footer" = "仅显示汐线不会在全屏空间展开；完全隐藏会暂时移除汐线并停止命中检测。";
+
+// 快捷键
+"shortcuts.header.description" = "设置全局快捷键与临时切换的提交等待时间。";
+"shortcuts.toggle" = "展开/收起汐";
+"shortcuts.cycle" = "临时切换应用";
+"shortcuts.section.global" = "全局快捷键";
+"shortcuts.global.footer" = "点击快捷键字段后输入新的组合键。录制期间汐的热键会自动暂停；按 Esc 取消，按 Delete 清除。";
+"shortcuts.commitDelay" = "提交延迟";
+"shortcuts.delayValue" = "%.1f 秒";
+"shortcuts.section.switcher" = "临时切换";
+"shortcuts.switcher.footer" = "停止操作达到该时间后，汐会提交当前选择并结束临时切换会话。";
+"shortcuts.resetDefaults" = "恢复默认快捷键与延迟";
+
+// Dock 与恢复
+"dock.header.description" = "查看系统 Dock 的接管配置，并在需要时检查、修复或恢复。";
+"dock.currentState" = "当前状态";
+"dock.section.dock" = "系统 Dock";
+"dock.reapply" = "重新应用接管设置";
+"dock.section.maintenance" = "维护与恢复";
+"dock.maintenance.footer" = "重新应用会覆盖汐所需的 Dock 设置并重新启动 Dock。恢复会使用启用前保存的设置。";
+"dock.status.notEnabled" = "尚未启用";
+"dock.status.takeover" = "正常运行";
+"dock.status.drifted" = "设置不一致";
+"dock.status.manualRecovery" = "无法自动恢复";
+"dock.status.failed" = "需要处理";
+
+// 权限
+"permissions.header.description" = "汐只在需要时请求系统能力，并清楚说明每项权限的用途。";
+"permissions.accessibility" = "辅助功能";
+"permissions.section.windows" = "窗口管理";
+"permissions.windows.footer" = "用于读取窗口列表、识别最小化状态，并将选中的窗口带回前台。";
+"permissions.section.privacy" = "隐私";
+"permissions.privacy.note" = "汐不会请求屏幕录制权限。窗口预览功能开放后，会在启用前单独说明用途。";
+
+// 关于
+"about.header.title" = "关于汐";
+"about.header.description" = "平时是一条线，需要时是一片海。";
+"about.name" = "汐 TideBar";
+"about.tagline" = "零占用窗口任务栏";
+"about.version" = "版本 %@（Build %@）";
+"about.devVersion" = "开发版本";
+"about.systemRequirements" = "系统要求";
+"about.requirementsValue" = "macOS 26 或更高版本";
+"about.copyright" = "版权";
+"about.feedback" = "反馈";
+
+// 语言
+"appearance.section.language" = "语言";
+"appearance.language" = "应用语言";
+"appearance.language.footer" = "切换立即应用到汐的所有界面。";

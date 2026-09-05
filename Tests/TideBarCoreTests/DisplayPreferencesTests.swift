@@ -26,9 +26,3 @@ import Testing
     #expect(!ReducedMotionPreference.alwaysOff.isEnabled(systemValue: true))
     #expect(ReducedMotionPreference.alwaysOn.isEnabled(systemValue: false))
 }
-
-@Test func fullscreenBehaviorPresetsExposeExpectedTitles() {
-    #expect(FullscreenBehavior.lineOnly.title == "仅显示汐线")
-    #expect(FullscreenBehavior.normal.title == "正常显示")
-    #expect(FullscreenBehavior.hidden.title == "完全隐藏")
-}

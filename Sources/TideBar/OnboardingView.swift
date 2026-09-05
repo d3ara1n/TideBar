@@ -9,12 +9,22 @@ import SwiftUI
 
 struct OnboardingRootView: View {
     @ObservedObject var model: OnboardingModel
+    // 持有语言管理器：切换语言时本视图重算，整树文案随词条更新。
+    @ObservedObject private var l10n = L10nManager.shared
 
     var body: some View {
         VStack(spacing: 0) {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.top, 44)
+                .overlay(alignment: .topTrailing) {
+                    // 语言切换只放首步：进入向导时语言未定，这是切换的入口
+                    if model.step == .intro {
+                        LanguagePicker()
+                            .padding(.top, 6)
+                            .padding(.trailing, 28)
+                    }
+                }
             Divider()
             navigationBar
         }
@@ -38,7 +48,7 @@ struct OnboardingRootView: View {
                 if model.isLastStep {
                     EmptyView()
                 } else {
-                    Button("跳过引导", action: model.finish)
+                    Button(L10n.string("nav.skip", table: .onboarding), action: model.finish)
                         .buttonStyle(.plain)
                         .foregroundStyle(.secondary)
                         .disabled(model.dockOperation == .working)
@@ -54,7 +64,7 @@ struct OnboardingRootView: View {
 
             HStack(spacing: 8) {
                 if model.canGoBack {
-                    Button("返回", action: model.goBack)
+                    Button(L10n.string("nav.back", table: .onboarding), action: model.goBack)
                         .disabled(model.dockOperation == .working)
                 }
                 mainButton
@@ -73,12 +83,36 @@ struct OnboardingRootView: View {
                 model.goNext()
             }
         } label: {
-            Text(model.isLastStep ? "开始使用" : "继续")
+            Text(model.isLastStep
+                 ? L10n.string("nav.getStarted", table: .onboarding)
+                 : L10n.string("nav.continue", table: .onboarding))
                 .frame(minWidth: 84)
         }
         .buttonStyle(.borderedProminent)
         .keyboardShortcut(.defaultAction)
         .disabled(model.dockOperation == .working)
+    }
+}
+
+/// 应用语言切换：三选（跟随系统 / English / 简体中文）。
+/// 语言名按自身语言显示，仅「跟随系统」项随词条翻译。
+private struct LanguagePicker: View {
+    var body: some View {
+        Picker(selection: Binding(
+            get: { L10nManager.shared.language },
+            set: { L10nManager.shared.setLanguage($0) }
+        )) {
+            ForEach(AppLanguage.allCases) { language in
+                Text(language.displayName).tag(language)
+            }
+        } label: {
+            EmptyView()
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .controlSize(.small)
+        .fixedSize()
+        .accessibilityLabel(L10n.string("nav.language", table: .onboarding))
     }
 }
 
@@ -96,7 +130,9 @@ private struct StepDots: View {
                     .frame(width: 7, height: 7)
             }
         }
-        .accessibilityLabel("第 \(step.rawValue + 1) 步，共 \(OnboardingModel.Step.allCases.count) 步")
+        .accessibilityLabel(L10n.string(
+            "nav.stepProgress", table: .onboarding,
+            arguments: step.rawValue + 1, OnboardingModel.Step.allCases.count))
     }
 }
 
@@ -183,9 +219,9 @@ private struct IntroStep: View {
                     .font(.system(size: 42, weight: .medium))
                     .foregroundStyle(.tint)
                     .accessibilityHidden(true)
-                Text("欢迎使用汐 TideBar")
+                Text(L10n.string("intro.title", table: .onboarding))
                     .font(.title.weight(.semibold))
-                Text("汐是一条收在屏幕底部的细线，空闲时几乎不可见。鼠标靠近时它潮汐般展开为应用栏；长按图标还能直达该应用的任意窗口——包括最小化的。")
+                Text(L10n.string("intro.message", table: .onboarding))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -195,13 +231,13 @@ private struct IntroStep: View {
 
             // 演示位 1：汐线 → 应用栏 → 潮涌（代码生成动画占位）
             DemoPlaceholder(
-                title: "演示：汐线 → 应用栏 → 潮涌",
-                caption: "鼠标靠近，细线展开为应用栏；长按（或 ⌥+点击）图标，潮涌列出该应用的全部窗口"
+                title: L10n.string("intro.demoTitle", table: .onboarding),
+                caption: L10n.string("intro.demoCaption", table: .onboarding)
             )
             .padding(.horizontal, 44)
             .frame(height: 190)
 
-            Text("汐不提供窗口内容缩略图，也不会请求屏幕录制权限。")
+            Text(L10n.string("intro.privacyNote", table: .onboarding))
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
@@ -215,29 +251,29 @@ private struct PermissionStep: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            StepHeader(title: "窗口管理权限",
-                       message: "辅助功能权限用于读取窗口列表、识别最小化状态，并把选中的窗口还原置前。")
+            StepHeader(title: L10n.string("permission.title", table: .onboarding),
+                       message: L10n.string("permission.message", table: .onboarding))
 
             if model.accessibilityTrusted {
                 StatusCard(symbol: "checkmark.circle.fill", tint: .green,
-                           title: "已授权",
-                           message: "窗口管理已具备运行条件。若刚刚完成授权，重启汐后即可管理已打开的应用。")
+                           title: L10n.string("permission.grantedTitle", table: .onboarding),
+                           message: L10n.string("permission.grantedMessage", table: .onboarding))
             } else {
                 StatusCard(symbol: "circle.dashed", tint: .orange,
-                           title: "未授权",
-                           message: "授权后汐才能列出并还原窗口。系统设置可能需要数秒刷新，可点击「重新检查」确认。")
+                           title: L10n.string("permission.deniedTitle", table: .onboarding),
+                           message: L10n.string("permission.deniedMessage", table: .onboarding))
             }
 
             if !model.accessibilityTrusted {
                 HStack(spacing: 10) {
-                    Button("打开系统设置", action: model.openAccessibilitySettings)
-                    Button("重新检查", action: model.refreshPermissionNow)
+                    Button(L10n.string("permission.openSettings", table: .onboarding), action: model.openAccessibilitySettings)
+                    Button(L10n.string("permission.recheck", table: .onboarding), action: model.refreshPermissionNow)
                 }
             }
 
             Spacer()
 
-            Text("未授权也可以继续使用：汐线与应用栏不受影响，只是无法列出和还原窗口。稍后可在设置中心的「权限」页完成授权。")
+            Text(L10n.string("permission.degradedNote", table: .onboarding))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -254,31 +290,32 @@ private struct TakeoverStep: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            StepHeader(title: "Dock 接管",
-                       message: "启用后，汐会隐藏系统 Dock 的可见入口，由屏幕底部的汐线接替。Dock 进程不会被关闭，已打开的应用不受影响。")
+            StepHeader(title: L10n.string("takeover.title", table: .onboarding),
+                       message: L10n.string("takeover.message", table: .onboarding))
 
             statusArea
 
             if case .idle = model.dockOperation, !model.isTakeoverEnabled, isNormalDockState {
                 HStack(spacing: 10) {
-                    Button("启用汐") { showEnableConfirmation = true }
-                    Button("暂不启用", action: model.goNext)
+                    Button(L10n.string("takeover.enable", table: .onboarding)) { showEnableConfirmation = true }
+                    Button(L10n.string("takeover.notNow", table: .onboarding), action: model.goNext)
                 }
             }
 
             Spacer()
 
-            Text("启用前会保存当前 Dock 配置；关闭汐或退出应用时都会自动恢复，设置中心的「Dock 与恢复」页也可随时手动恢复。")
+            Text(L10n.string("takeover.persistenceNote", table: .onboarding))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 44)
-        .confirmationDialog("启用汐？", isPresented: $showEnableConfirmation) {
-            Button("启用汐") { model.enableTakeover() }
-            Button("取消", role: .cancel) {}
+        .confirmationDialog(L10n.string("takeover.confirmTitle", table: .onboarding),
+                            isPresented: $showEnableConfirmation) {
+            Button(L10n.string("takeover.confirmEnable", table: .onboarding)) { model.enableTakeover() }
+            Button(L10n.string("takeover.cancel", table: .onboarding), role: .cancel) {}
         } message: {
-            Text("汐会保存当前 Dock 设置、应用接管配置并重新启动系统 Dock。已打开的应用不会关闭。")
+            Text(L10n.string("takeover.confirmMessage", table: .onboarding))
         }
     }
 
@@ -296,20 +333,25 @@ private struct TakeoverStep: View {
             HStack(spacing: 10) {
                 ProgressView()
                     .controlSize(.small)
-                Text("正在启用汐…")
+                Text(L10n.string("takeover.working", table: .onboarding))
                     .foregroundStyle(.secondary)
             }
             .padding(.vertical, 24)
             .frame(maxWidth: .infinity)
-        case .success(let message):
+        case .success:
             StatusCard(symbol: "checkmark.circle.fill", tint: .green,
-                       title: "汐已启用",
-                       message: message)
-        case .failure(let message):
+                       title: L10n.string("takeover.successTitle", table: .onboarding),
+                       message: L10n.string("takeover.successMessage", table: .onboarding))
+        case .failure(.system(let message)):
             StatusCard(symbol: "xmark.circle.fill", tint: .red,
-                       title: "启用失败",
-                       message: "\(message) Dock 设置已回滚到启用前状态，可以重试。")
-            Button("重试", action: model.enableTakeover)
+                       title: L10n.string("takeover.failureTitle", table: .onboarding),
+                       message: L10n.string("takeover.failureMessage", table: .onboarding, arguments: message))
+            Button(L10n.string("takeover.retry", table: .onboarding), action: model.enableTakeover)
+        case .failure(.generic):
+            StatusCard(symbol: "xmark.circle.fill", tint: .red,
+                       title: L10n.string("takeover.failureTitle", table: .onboarding),
+                       message: L10n.string("takeover.failureGenericMessage", table: .onboarding))
+            Button(L10n.string("takeover.retry", table: .onboarding), action: model.enableTakeover)
         case .idle:
             idleStatus
         }
@@ -320,23 +362,23 @@ private struct TakeoverStep: View {
         if model.isTakeoverEnabled {
             // 重看引导或中途关窗后重开：已是接管态，只展示现状，不重复执行
             StatusCard(symbol: "checkmark.circle.fill", tint: .green,
-                       title: "汐正在接管系统 Dock",
-                       message: "系统 Dock 的可见入口已由汐接替，汐线正在屏幕底部待命。")
+                       title: L10n.string("takeover.activeTitle", table: .onboarding),
+                       message: L10n.string("takeover.activeMessage", table: .onboarding))
         } else {
             switch model.dockState {
             case .drifted:
                 StatusCard(symbol: "exclamationmark.triangle.fill", tint: .orange,
-                           title: "系统 Dock 设置已发生变化",
-                           message: "汐检测到既有接管配置不一致。请到设置中心的「Dock 与恢复」页重新应用。")
+                           title: L10n.string("takeover.driftedTitle", table: .onboarding),
+                           message: L10n.string("takeover.driftedMessage", table: .onboarding))
             case .manualRecoveryRequired:
                 StatusCard(symbol: "exclamationmark.octagon.fill", tint: .red,
-                           title: "无法自动恢复 macOS Dock",
-                           message: "缺少接管前保存的 Dock 配置。请到设置中心的「Dock 与恢复」页查看处理方式。")
+                           title: L10n.string("takeover.recoveryTitle", table: .onboarding),
+                           message: L10n.string("takeover.recoveryMessage", table: .onboarding))
             default:
                 // 演示位 2：接管前后对比（代码生成动画或录制动图占位）
                 DemoPlaceholder(
-                    title: "演示：接管前后的底部变化",
-                    caption: "启用前系统 Dock 常驻屏幕底部；启用后 Dock 收起，汐线在原位待命"
+                    title: L10n.string("takeover.demoTitle", table: .onboarding),
+                    caption: L10n.string("takeover.demoCaption", table: .onboarding)
                 )
                 .frame(height: 150)
             }
@@ -351,34 +393,46 @@ private struct FinishStep: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            StepHeader(title: "一切就绪",
-                       message: "以下是当前的能力状态与常用操作，之后随时可在设置中心调整。")
+            StepHeader(title: L10n.string("finish.title", table: .onboarding),
+                       message: L10n.string("finish.message", table: .onboarding))
 
             VStack(spacing: 8) {
                 capabilityRow(symbol: model.isTakeoverEnabled ? "checkmark.circle.fill" : "circle.dashed",
                               tint: model.isTakeoverEnabled ? .green : .secondary,
-                              title: "Dock 接管",
-                              detail: model.isTakeoverEnabled ? "已启用，汐线在屏幕底部待命" : "未启用，可稍后在设置中心开启")
+                              title: L10n.string("finish.takeoverTitle", table: .onboarding),
+                              detail: L10n.string(model.isTakeoverEnabled ? "finish.takeoverOn" : "finish.takeoverOff",
+                                                  table: .onboarding))
                 capabilityRow(symbol: model.accessibilityTrusted ? "checkmark.circle.fill" : "circle.dashed",
                               tint: model.accessibilityTrusted ? .green : .secondary,
-                              title: "窗口管理",
-                              detail: model.accessibilityTrusted ? "已授权，可列出并还原窗口" : "待授权，稍后可在设置中心完成")
+                              title: L10n.string("finish.windowTitle", table: .onboarding),
+                              detail: L10n.string(model.accessibilityTrusted ? "finish.windowsOn" : "finish.windowsPending",
+                                                  table: .onboarding))
             }
 
-            Text("常用操作")
+            Text(L10n.string("finish.gesturesTitle", table: .onboarding))
                 .font(.headline)
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 105), spacing: 10)], spacing: 10) {
-                GestureHint(symbol: "cursorarrow", title: "靠近", detail: "汐线自动展开")
-                GestureHint(symbol: "cursorarrow.click", title: "点击", detail: "启动或切换应用")
-                GestureHint(symbol: "cursorarrow.click.2", title: "长按", detail: "潮涌窗口列表")
-                GestureHint(symbol: "option", title: "⌥+点击", detail: "直接弹出潮涌")
-                GestureHint(symbol: "cursorarrow.rays", title: "右键", detail: "固定、隐藏与退出")
+                GestureHint(symbol: "cursorarrow",
+                            title: L10n.string("finish.gesture.approachTitle", table: .onboarding),
+                            detail: L10n.string("finish.gesture.approachDetail", table: .onboarding))
+                GestureHint(symbol: "cursorarrow.click",
+                            title: L10n.string("finish.gesture.clickTitle", table: .onboarding),
+                            detail: L10n.string("finish.gesture.clickDetail", table: .onboarding))
+                GestureHint(symbol: "cursorarrow.click.2",
+                            title: L10n.string("finish.gesture.holdTitle", table: .onboarding),
+                            detail: L10n.string("finish.gesture.holdDetail", table: .onboarding))
+                GestureHint(symbol: "option",
+                            title: L10n.string("finish.gesture.optionClickTitle", table: .onboarding),
+                            detail: L10n.string("finish.gesture.optionClickDetail", table: .onboarding))
+                GestureHint(symbol: "cursorarrow.rays",
+                            title: L10n.string("finish.gesture.rightClickTitle", table: .onboarding),
+                            detail: L10n.string("finish.gesture.rightClickDetail", table: .onboarding))
             }
 
             Spacer()
 
-            Text("外观、全屏行为与快捷键都可在设置中心调整；菜单栏的汐图标随时可以打开设置。")
+            Text(L10n.string("finish.settingsNote", table: .onboarding))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

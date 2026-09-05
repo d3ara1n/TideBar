@@ -1,0 +1,15 @@
+// 状态栏（汐图标）
+"statusBar.name" = "汐";
+"statusBar.openSettings" = "打开设置…";
+"statusBar.replayOnboarding" = "重看引导…";
+"statusBar.checkStatus" = "检查汐的状态";
+"statusBar.quit" = "退出汐";
+
+// 应用右键菜单
+"appMenu.pin" = "固定到汐";
+"appMenu.unpin" = "取消在汐中固定";
+"appMenu.revealInFinder" = "在 Finder 中显示";
+"appMenu.hide" = "隐藏";
+"appMenu.show" = "显示";
+"appMenu.open" = "打开";
+"appMenu.quit" = "退出";

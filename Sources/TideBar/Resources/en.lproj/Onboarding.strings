@@ -1,0 +1,73 @@
+// 导航
+"nav.skip" = "Skip Tour";
+"nav.back" = "Back";
+"nav.continue" = "Continue";
+"nav.getStarted" = "Get Started";
+"nav.stepProgress" = "Step %1$ld of %2$ld";
+"nav.language" = "App language";
+
+// 第 1 步：认识汐
+"intro.title" = "Welcome to TideBar";
+"intro.message" = "TideBar is a hairline tucked against the bottom edge of your screen — nearly invisible at rest. Move the cursor close and it rises into an app bar; press and hold any icon to reach every window of that app, minimized ones included.";
+"intro.demoTitle" = "Demo: tide line → app bar → Surge";
+"intro.demoCaption" = "Move close and the hairline rises into the app bar; press and hold (or ⌥-click) an icon and Surge lays out all of that app's windows";
+"intro.privacyNote" = "TideBar shows no window content thumbnails and never requests screen recording.";
+
+// 第 2 步：窗口管理权限
+"permission.title" = "Window Management Access";
+"permission.message" = "Accessibility access is used to read the window list, tell minimized windows apart, and bring the window you pick back to the front.";
+"permission.grantedTitle" = "Access granted";
+"permission.grantedMessage" = "Window management is ready to run. If you just approved access, restart TideBar to manage your open apps.";
+"permission.deniedTitle" = "Not enabled";
+"permission.deniedMessage" = "TideBar needs this access to list and restore windows. System Settings may take a few seconds to refresh — click “Check Again” to confirm.";
+"permission.openSettings" = "Open System Settings";
+"permission.recheck" = "Check Again";
+"permission.degradedNote" = "You can keep going without granting access: the tide line and app bar are unaffected — TideBar just can't list or restore windows. You can grant it later in Settings → Access.";
+
+// 第 3 步：Dock 接管
+"takeover.title" = "Dock Takeover";
+"takeover.message" = "When enabled, TideBar hides the system Dock's visible entrance and the tide line takes its place at the bottom of the screen. The Dock process isn't quit, and open apps are unaffected.";
+"takeover.enable" = "Enable Takeover";
+"takeover.notNow" = "Not Now";
+"takeover.confirmTitle" = "Enable Dock takeover?";
+"takeover.confirmEnable" = "Enable";
+"takeover.cancel" = "Cancel";
+"takeover.confirmMessage" = "TideBar will save the current Dock settings and per-app takeover configuration, then restart the system Dock. Open apps won't be closed.";
+"takeover.persistenceNote" = "Your Dock configuration is saved before takeover; it is restored automatically whenever TideBar quits, and you can also restore it anytime from Settings → Dock & Recovery.";
+"takeover.working" = "Enabling takeover…";
+"takeover.successTitle" = "Takeover enabled";
+"takeover.successMessage" = "TideBar has taken over; the tide line is standing by at the bottom of the screen.";
+"takeover.failureTitle" = "Couldn't enable takeover";
+"takeover.failureMessage" = "%@ Dock settings were rolled back to their pre-enable state. You can retry.";
+"takeover.failureGenericMessage" = "Takeover couldn't be completed. Try again, or check Settings → Dock & Recovery.";
+"takeover.retry" = "Retry";
+"takeover.activeTitle" = "TideBar is taking over the Dock";
+"takeover.activeMessage" = "The system Dock's visible entrance has been replaced by TideBar; the tide line is standing by at the bottom of the screen.";
+"takeover.driftedTitle" = "System Dock settings have changed";
+"takeover.driftedMessage" = "TideBar detected an inconsistency with its saved takeover configuration. Re-apply it from Settings → Dock & Recovery.";
+"takeover.recoveryTitle" = "Can't restore the macOS Dock automatically";
+"takeover.recoveryMessage" = "The Dock configuration saved before takeover is missing. See Settings → Dock & Recovery for how to proceed.";
+"takeover.demoTitle" = "Demo: the bottom edge before and after takeover";
+"takeover.demoCaption" = "Before: the system Dock is a permanent fixture; after: the Dock steps aside and the tide line stands by in its place";
+
+// 第 4 步：完成与快速提示
+"finish.title" = "All Set";
+"finish.message" = "Here's where things stand, plus the gestures worth knowing. Everything can be adjusted later in Settings.";
+"finish.takeoverTitle" = "Dock takeover";
+"finish.takeoverOn" = "Enabled; the tide line is standing by";
+"finish.takeoverOff" = "Off — you can enable it later in Settings";
+"finish.windowTitle" = "Window management";
+"finish.windowsOn" = "Granted; windows can be listed and restored";
+"finish.windowsPending" = "Pending; you can grant it later in Settings";
+"finish.gesturesTitle" = "Gestures";
+"finish.gesture.approachTitle" = "Approach";
+"finish.gesture.approachDetail" = "The tide line rises to meet you";
+"finish.gesture.clickTitle" = "Click";
+"finish.gesture.clickDetail" = "Launch or switch apps";
+"finish.gesture.holdTitle" = "Press & hold";
+"finish.gesture.holdDetail" = "Surge window list";
+"finish.gesture.optionClickTitle" = "⌥-click";
+"finish.gesture.optionClickDetail" = "Open Surge instantly";
+"finish.gesture.rightClickTitle" = "Right-click";
+"finish.gesture.rightClickDetail" = "Pin, hide, and quit";
+"finish.settingsNote" = "Appearance, fullscreen behavior, and shortcuts live in Settings; the TideBar icon in the menu bar opens Settings anytime.";

@@ -1,0 +1,26 @@
+"language.system" = "Follow System";
+
+"theme.system" = "Follow System";
+"theme.light" = "Light";
+"theme.dark" = "Dark";
+
+"iconSize.compact" = "Compact";
+"iconSize.standard" = "Standard";
+"iconSize.spacious" = "Spacious";
+
+"brightness.automatic" = "Automatic";
+"brightness.low" = "Low";
+"brightness.standard" = "Standard";
+"brightness.high" = "High";
+
+"animation.standard" = "Standard";
+"animation.gentle" = "Gentle";
+"animation.fast" = "Fast";
+
+"reducedMotion.automatic" = "Follow System";
+"reducedMotion.alwaysOff" = "Always Off";
+"reducedMotion.alwaysOn" = "Always On";
+
+"fullscreen.lineOnly" = "Tide Line Only";
+"fullscreen.normal" = "Normal";
+"fullscreen.hidden" = "Fully Hidden";

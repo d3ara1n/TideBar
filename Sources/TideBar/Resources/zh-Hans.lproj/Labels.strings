@@ -1,0 +1,26 @@
+"language.system" = "跟随系统";
+
+"theme.system" = "跟随系统";
+"theme.light" = "亮色";
+"theme.dark" = "暗色";
+
+"iconSize.compact" = "紧凑";
+"iconSize.standard" = "标准";
+"iconSize.spacious" = "宽松";
+
+"brightness.automatic" = "自动";
+"brightness.low" = "低";
+"brightness.standard" = "标准";
+"brightness.high" = "高";
+
+"animation.standard" = "标准";
+"animation.gentle" = "柔和";
+"animation.fast" = "快速";
+
+"reducedMotion.automatic" = "跟随系统";
+"reducedMotion.alwaysOff" = "始终关闭";
+"reducedMotion.alwaysOn" = "始终开启";
+
+"fullscreen.lineOnly" = "仅显示汐线";
+"fullscreen.normal" = "正常显示";
+"fullscreen.hidden" = "完全隐藏";

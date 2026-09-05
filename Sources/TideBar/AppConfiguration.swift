@@ -8,14 +8,6 @@ enum ApplicationTheme: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
-        switch self {
-        case .system: return "跟随系统"
-        case .light: return "亮色"
-        case .dark: return "暗色"
-        }
-    }
-
     var appearance: NSAppearance? {
         switch self {
         case .system: return nil

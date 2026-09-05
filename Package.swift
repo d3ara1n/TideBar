@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "TideBar",
+    defaultLocalization: "en",
     platforms: [.macOS(.v26)],
     dependencies: [
         .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "3.0.1"),
@@ -15,7 +16,8 @@ let package = Package(
                 "TideBarCore",
                 .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts"),
             ],
-            path: "Sources/TideBar"
+            path: "Sources/TideBar",
+            resources: [.process("Resources")]
         ),
         .testTarget(name: "TideBarCoreTests", dependencies: ["TideBarCore"]),
     ]

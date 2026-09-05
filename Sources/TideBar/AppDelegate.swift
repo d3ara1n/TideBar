@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var appearanceObserver: NSObjectProtocol?
     private var layoutObserver: NSObjectProtocol?
     private var behaviorObserver: NSObjectProtocol?
+    private var languageObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         applyAppearance()
@@ -44,6 +45,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             MainThreadBridge { [weak self] in self?.controller.behaviorDidChange() }.call()
         }
+        languageObserver = NotificationCenter.default.addObserver(
+            forName: L10nManager.languageDidChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainThreadBridge { [weak self] in self?.rebuildStatusItemText() }.call()
+        }
 
         if !AppConfiguration.shared.onboardingCompleted {
             showOnboarding()
@@ -69,6 +75,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let behaviorObserver {
             NotificationCenter.default.removeObserver(behaviorObserver)
         }
+        if let languageObserver {
+            NotificationCenter.default.removeObserver(languageObserver)
+        }
 
     }
 
@@ -79,18 +88,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func configureStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = item.button {
-            button.image = NSImage(systemSymbolName: "water.waves", accessibilityDescription: "汐")
-            button.toolTip = "汐"
+            button.image = NSImage(systemSymbolName: "water.waves", accessibilityDescription: nil)
+        }
+        statusItem = item
+        rebuildStatusItemText()
+    }
+
+    /// 状态栏按钮文案与菜单词条化；语言切换时整体重建。
+    private func rebuildStatusItemText() {
+        guard let item = statusItem else { return }
+        if let button = item.button {
+            let name = L10n.string("statusBar.name", table: .menus)
+            button.setAccessibilityLabel(name)
+            button.toolTip = name
         }
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "打开设置…", action: #selector(openSettings), keyEquivalent: ","))
-        menu.addItem(NSMenuItem(title: "重看引导…", action: #selector(showOnboarding), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: L10n.string("statusBar.openSettings", table: .menus),
+                                action: #selector(openSettings), keyEquivalent: ","))
+        menu.addItem(NSMenuItem(title: L10n.string("statusBar.replayOnboarding", table: .menus),
+                                action: #selector(showOnboarding), keyEquivalent: ""))
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "检查汐的状态", action: #selector(checkDock), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "退出汐", action: #selector(terminate), keyEquivalent: "q"))
-        for item in menu.items { item.target = self }
+        menu.addItem(NSMenuItem(title: L10n.string("statusBar.checkStatus", table: .menus),
+                                action: #selector(checkDock), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: L10n.string("statusBar.quit", table: .menus),
+                                action: #selector(terminate), keyEquivalent: "q"))
+        for menuItem in menu.items { menuItem.target = self }
         item.menu = menu
-        statusItem = item
     }
 
     @objc private func showOnboarding() {

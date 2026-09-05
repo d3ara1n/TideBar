@@ -387,8 +387,8 @@ final class AppIconButton: NSView {
         // 固定按 bundle identifier 存配置；裸进程（无 bundle）不提供固定项
         if entry.bundleIdentifier != nil {
             let pin = NSMenuItem(title: entry.isPinned
-                                 ? "取消在汐中固定"
-                                 : "固定到汐",
+                                 ? L10n.string("appMenu.unpin", table: .menus)
+                                 : L10n.string("appMenu.pin", table: .menus),
                                  action: #selector(MenuAction.run),
                                  keyEquivalent: "")
             let shouldPin = !entry.isPinned
@@ -400,7 +400,7 @@ final class AppIconButton: NSView {
         }
 
         if let url = entry.applicationURL {
-            let reveal = NSMenuItem(title: "在 Finder 中显示",
+            let reveal = NSMenuItem(title: L10n.string("appMenu.revealInFinder", table: .menus),
                                     action: #selector(MenuAction.run),
                                     keyEquivalent: "")
             let action = MenuAction { NSWorkspace.shared.activateFileViewerSelecting([url]) }
@@ -412,7 +412,9 @@ final class AppIconButton: NSView {
 
         if entry.isRunning {
             let shouldHide = !entry.isHidden
-            let visibility = NSMenuItem(title: shouldHide ? "隐藏" : "显示",
+            let visibility = NSMenuItem(title: shouldHide
+                                        ? L10n.string("appMenu.hide", table: .menus)
+                                        : L10n.string("appMenu.show", table: .menus),
                                         action: #selector(MenuAction.run),
                                         keyEquivalent: shouldHide ? "h" : "")
             if shouldHide { visibility.keyEquivalentModifierMask = .command }
@@ -422,7 +424,7 @@ final class AppIconButton: NSView {
             visibility.target = action
             menu.addItem(visibility)
         } else {
-            let open = NSMenuItem(title: "打开", action: #selector(MenuAction.run), keyEquivalent: "")
+            let open = NSMenuItem(title: L10n.string("appMenu.open", table: .menus), action: #selector(MenuAction.run), keyEquivalent: "")
             let entry = entry
             let launch = onClick
             let action = MenuAction { launch?(entry) }
@@ -432,7 +434,7 @@ final class AppIconButton: NSView {
         }
 
         if entry.canTerminate, entry.isRunning {
-            let quit = NSMenuItem(title: "退出", action: #selector(MenuAction.run), keyEquivalent: "q")
+            let quit = NSMenuItem(title: L10n.string("appMenu.quit", table: .menus), action: #selector(MenuAction.run), keyEquivalent: "q")
             quit.keyEquivalentModifierMask = .command
             let terminate = onTerminate
             let action = MenuAction { terminate?(identity) }

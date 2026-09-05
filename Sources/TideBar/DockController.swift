@@ -115,10 +115,9 @@ final class DockController {
             state = .takeover
             NSLog("TideBar Dock takeover enabled")
         } catch {
-            state = .failed(error.localizedDescription)
+            state = .failed(dockFailure(error, log: "TideBar Dock takeover failed"))
             try? restoreSnapshot()
             _ = restartDock()
-            NSLog("TideBar Dock takeover failed: %@", error.localizedDescription)
         }
     }
 
@@ -135,8 +134,7 @@ final class DockController {
             defaults.removeObject(forKey: Self.snapshotKey)
             NSLog("TideBar Dock settings restored")
         } catch {
-            state = .failed(error.localizedDescription)
-            NSLog("TideBar Dock restore failed: %@", error.localizedDescription)
+            state = .failed(dockFailure(error, log: "TideBar Dock restore failed"))
         }
     }
 
@@ -160,27 +158,48 @@ final class DockController {
             state = .takeover
             NSLog("TideBar Dock takeover repaired by user")
         } catch {
-            state = .failed(error.localizedDescription)
-            NSLog("TideBar Dock takeover repair failed: %@", error.localizedDescription)
+            state = .failed(dockFailure(error, log: "TideBar Dock takeover repair failed"))
         }
     }
 
     func snapshotExists() -> Bool { snapshotData() != nil }
 
-    private enum DockError: LocalizedError {
+    /// Dock 配置操作错误。用户可见文案走词条，日志描述保持英文可 grep。
+    private enum DockError: Error {
         case unsupportedValue(String)
         case synchronizeFailed
         case verificationFailed
         case restartFailed
 
-        var errorDescription: String? {
+        /// 面向用户的本地化描述。
+        @MainActor var localizedMessage: String {
             switch self {
-            case .unsupportedValue(let key): return "Dock 配置项无法保存：\(key)"
-            case .synchronizeFailed: return "Dock 偏好设置同步失败"
-            case .verificationFailed: return "Dock 配置验证失败"
-            case .restartFailed: return "Dock 重启失败"
+            case .unsupportedValue(let key): return L10n.string("dock.error.unsupportedValue", table: .runtime, arguments: key)
+            case .synchronizeFailed: return L10n.string("dock.error.synchronizeFailed", table: .runtime)
+            case .verificationFailed: return L10n.string("dock.error.verificationFailed", table: .runtime)
+            case .restartFailed: return L10n.string("dock.error.restartFailed", table: .runtime)
             }
         }
+
+        /// 日志用英文描述。
+        var logDescription: String {
+            switch self {
+            case .unsupportedValue(let key): return "unsupported value for key \(key)"
+            case .synchronizeFailed: return "failed to synchronize Dock preferences"
+            case .verificationFailed: return "failed to verify Dock configuration"
+            case .restartFailed: return "failed to restart Dock"
+            }
+        }
+    }
+
+    /// 统一 Dock 操作失败的入态与日志：用户可见文案走词条，日志保持英文。
+    private func dockFailure(_ error: Error, log context: String) -> String {
+        if let dockError = error as? DockError {
+            NSLog("%@: %@", context, dockError.logDescription)
+            return dockError.localizedMessage
+        }
+        NSLog("%@: %@", context, String(describing: error))
+        return error.localizedDescription
     }
 
     private var appID: CFString { Self.domain as CFString }

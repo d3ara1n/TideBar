@@ -17,7 +17,7 @@ final class SurgeRowView: NSView {
 
     init(snapshot: WindowSnapshot, appIcon: NSImage, dimmed: Bool) {
         self.snapshot = snapshot
-        self.title = snapshot.title ?? "窗口"
+        self.title = snapshot.title ?? L10n.string("window.fallbackTitle", table: .runtime)
         self.icon = Self.icon(for: snapshot.document, appIcon: appIcon)
         super.init(frame: NSRect(x: 0, y: 0, width: Layout.surgeWidth, height: Layout.surgeRowHeight))
         wantsLayer = true

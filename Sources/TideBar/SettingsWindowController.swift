@@ -8,7 +8,7 @@ final class SettingsWindowController: NSWindowController {
     convenience init() {
         let hosting = NSHostingController(rootView: SettingsRootView())
         let window = NSWindow(contentViewController: hosting)
-        window.title = "汐 TideBar"
+        window.title = L10n.string("window.title", table: .settings)
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         // unified 标题栏与内容区融合，保留 macOS 26 的玻璃窗口观感。
         window.toolbar = NSToolbar(identifier: "TideBar.settings")
@@ -24,8 +24,20 @@ final class SettingsWindowController: NSWindowController {
     }
 
     private static let permissionDemand = "settings.permission"
+    private var languageObserver: NSObjectProtocol?
 
     override func showWindow(_ sender: Any?) {
+        // 窗口标题与语言同步：开窗时重设并在可见期间随语言变化更新（关窗即注销）
+        window?.title = L10n.string("window.title", table: .settings)
+        if languageObserver == nil {
+            languageObserver = NotificationCenter.default.addObserver(
+                forName: L10nManager.languageDidChange, object: nil, queue: .main
+            ) { [weak self] _ in
+                MainThreadBridge { [weak self] in
+                    self?.window?.title = L10n.string("window.title", table: .settings)
+                }.call()
+            }
+        }
         // AX 授权没有通知渠道：窗口可见期间注册轮询需求（关窗即注销），
         // 经通知送达状态模型；开窗先送一拍，展示不等人
         PollScheduler.shared.register(Self.permissionDemand, interval: 1) {
@@ -40,6 +52,10 @@ final class SettingsWindowController: NSWindowController {
 
     @objc func windowWillClose(_ notification: Notification) {
         PollScheduler.shared.unregister(Self.permissionDemand)
+        if let languageObserver {
+            NotificationCenter.default.removeObserver(languageObserver)
+            self.languageObserver = nil
+        }
     }
 }
 
@@ -53,11 +69,24 @@ private extension Notification.Name {
 // MARK: - 状态模型
 @MainActor
 private final class SettingsModel: ObservableObject {
+    /// 操作的阶段语义；文案由视图层按词条解析，语言切换后横幅随整树刷新。
+    enum OperationKind: String {
+        case enabling, restoring, repairing, checking
+        case takeoverActive, restored, checkHealthy, checkNotEnabled
+    }
+
+    /// 操作失败原因：系统错误描述（系统本地化，不经词条）或固定语义失败。
+    enum OperationFailure: Equatable {
+        case system(String)
+        case drifted
+        case manualRecovery
+    }
+
     enum Operation: Equatable {
         case idle
-        case working(String)
-        case success(String)
-        case failure(String)
+        case working(OperationKind)
+        case success(OperationKind)
+        case failure(OperationFailure)
     }
 
     @Published private(set) var dockState: DockController.State = .notEnabled
@@ -170,43 +199,43 @@ private final class SettingsModel: ObservableObject {
     }
 
     func enableTakeover() {
-        perform("正在启用汐…") {
+        perform(.enabling) {
             DockController.shared.applyTakeover()
         }
     }
 
     func restoreDock() {
-        perform("正在恢复 macOS Dock…") {
+        perform(.restoring) {
             DockController.shared.restore()
         }
     }
 
     func repairDock() {
-        perform("正在重新应用接管设置…") {
+        perform(.repairing) {
             DockController.shared.repair()
         }
     }
 
     func checkDock() {
-        operation = .working("正在检查系统 Dock…")
+        operation = .working(.checking)
         DockController.shared.checkStatus()
         refreshDock()
         switch dockState {
         case .takeover:
-            operation = .success("系统 Dock 设置正常。")
+            operation = .success(.checkHealthy)
         case .notEnabled:
-            operation = .success("汐尚未启用。")
+            operation = .success(.checkNotEnabled)
         case .drifted:
-            operation = .failure("系统 Dock 设置已发生变化。")
+            operation = .failure(.drifted)
         case .manualRecoveryRequired:
-            operation = .failure("缺少接管前保存的 Dock 配置，无法自动恢复。")
+            operation = .failure(.manualRecovery)
         case .failed(let message):
-            operation = .failure(message)
+            operation = .failure(.system(message))
         }
     }
 
-    private func perform(_ message: String, action: @escaping () -> Void) {
-        operation = .working(message)
+    private func perform(_ workingKind: OperationKind, action: @escaping () -> Void) {
+        operation = .working(workingKind)
         Task { @MainActor [weak self] in
             await Task.yield()
             action()
@@ -214,15 +243,15 @@ private final class SettingsModel: ObservableObject {
             guard let self else { return }
             switch self.dockState {
             case .takeover:
-                self.operation = .success("汐已启用，系统 Dock 设置正常。")
+                self.operation = .success(.takeoverActive)
             case .notEnabled:
-                self.operation = .success("已关闭汐，macOS Dock 已恢复。")
+                self.operation = .success(.restored)
             case .drifted:
-                self.operation = .failure("系统 Dock 设置仍不一致，请重新检查。")
+                self.operation = .failure(.drifted)
             case .manualRecoveryRequired:
-                self.operation = .failure("缺少接管前保存的 Dock 配置，无法自动恢复。")
+                self.operation = .failure(.manualRecovery)
             case .failed(let message):
-                self.operation = .failure(message)
+                self.operation = .failure(.system(message))
             }
         }
     }
@@ -307,17 +336,8 @@ private enum SettingsPage: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
-        switch self {
-        case .overview: return "概览"
-        case .pinned: return "固定项目"
-        case .windows: return "窗口管理"
-        case .appearance: return "外观与交互"
-        case .shortcuts: return "快捷键"
-        case .dock: return "Dock 与恢复"
-        case .permissions: return "权限"
-        case .about: return "关于"
-        }
+    @MainActor var title: String {
+        L10n.string("page.\(rawValue)", table: .settings)
     }
 
     var symbolName: String {
@@ -336,19 +356,21 @@ private enum SettingsPage: String, CaseIterable, Identifiable {
 
 private struct SettingsRootView: View {
     @StateObject private var model = SettingsModel()
+    // 持有语言管理器：切换语言时本视图重算，整树文案随词条更新。
+    @ObservedObject private var l10n = L10nManager.shared
     @State private var selection: SettingsPage? = .overview
 
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
-                Section("汐 TideBar") {
+                Section(L10n.string("sidebar.section.app", table: .settings)) {
                     pageRow(.overview)
                     pageRow(.pinned)
                     pageRow(.windows)
                     pageRow(.appearance)
                     pageRow(.shortcuts)
                 }
-                Section("系统") {
+                Section(L10n.string("sidebar.section.system", table: .settings)) {
                     pageRow(.dock)
                     pageRow(.permissions)
                 }
@@ -404,15 +426,25 @@ private struct OperationBanner: View {
         switch operation {
         case .idle:
             EmptyView()
-        case .working(let message):
-            Label(message, systemImage: "arrow.triangle.2.circlepath")
+        case .working(let kind):
+            Label(L10n.string("op.working.\(kind.rawValue)", table: .settings),
+                  systemImage: "arrow.triangle.2.circlepath")
                 .foregroundStyle(.secondary)
-        case .success(let message):
-            Label(message, systemImage: "checkmark.circle.fill")
+        case .success(let kind):
+            Label(L10n.string("op.success.\(kind.rawValue)", table: .settings),
+                  systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
-        case .failure(let message):
-            Label(message, systemImage: "exclamationmark.triangle.fill")
+        case .failure(let failure):
+            Label(failureText(failure), systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
+        }
+    }
+
+    private func failureText(_ failure: SettingsModel.OperationFailure) -> String {
+        switch failure {
+        case .system(let message): message
+        case .drifted: L10n.string("op.failure.drifted", table: .settings)
+        case .manualRecovery: L10n.string("op.failure.manualRecovery", table: .settings)
         }
     }
 }
@@ -459,7 +491,8 @@ private struct OverviewPage: View {
 
     var body: some View {
         Form {
-            PageHeader(title: "概览", description: "查看汐的运行状态，并管理系统 Dock 的接管关系。")
+            PageHeader(title: L10n.string("overview.header.title", table: .settings),
+                       description: L10n.string("overview.header.description", table: .settings))
 
             Section {
                 statusCard
@@ -468,23 +501,23 @@ private struct OverviewPage: View {
             Section {
                 OperationBanner(operation: model.operation)
             } header: {
-                Text("最近操作")
+                Text(L10n.string("overview.section.recent", table: .settings))
             }
             .opacity(model.operation == .idle ? 0 : 1)
         }
         .formStyle(.grouped)
-        .navigationTitle("概览")
-        .confirmationDialog("启用汐？", isPresented: $showEnableConfirmation) {
-            Button("启用汐") { model.enableTakeover() }
-            Button("取消", role: .cancel) {}
+        .navigationTitle(L10n.string("page.overview", table: .settings))
+        .confirmationDialog(L10n.string("takeover.confirmTitle", table: .settings), isPresented: $showEnableConfirmation) {
+            Button(L10n.string("takeover.confirmEnable", table: .settings)) { model.enableTakeover() }
+            Button(L10n.string("action.cancel", table: .settings), role: .cancel) {}
         } message: {
-            Text("汐会保存当前 Dock 设置、应用接管配置并重新启动系统 Dock。已打开的应用不会关闭。")
+            Text(L10n.string("takeover.confirmMessage", table: .settings))
         }
-        .confirmationDialog("关闭汐并恢复 macOS Dock？", isPresented: $showRestoreConfirmation) {
-            Button("关闭并恢复", role: .destructive) { model.restoreDock() }
-            Button("取消", role: .cancel) {}
+        .confirmationDialog(L10n.string("restore.confirmTitle", table: .settings), isPresented: $showRestoreConfirmation) {
+            Button(L10n.string("restore.confirmAction", table: .settings), role: .destructive) { model.restoreDock() }
+            Button(L10n.string("action.cancel", table: .settings), role: .cancel) {}
         } message: {
-            Text("汐会恢复启用前保存的 Dock 设置，并停止屏幕底部的汐线。")
+            Text(L10n.string("restore.confirmMessage", table: .settings))
         }
     }
 
@@ -493,29 +526,34 @@ private struct OverviewPage: View {
         switch model.dockState {
         case .notEnabled:
             StatusCard(symbol: "circle.dashed", tint: .secondary,
-                       title: "汐尚未启用",
-                       message: "启用后，汐会隐藏系统 Dock 的可见入口，并在屏幕底部提供应用与窗口访问。",
-                       actionTitle: "启用汐", action: { showEnableConfirmation = true })
+                       title: L10n.string("overview.state.notEnabled.title", table: .settings),
+                       message: L10n.string("overview.state.notEnabled.message", table: .settings),
+                       actionTitle: L10n.string("takeover.confirmEnable", table: .settings),
+                       action: { showEnableConfirmation = true })
         case .takeover:
             StatusCard(symbol: "checkmark.circle.fill", tint: .green,
-                       title: "汐正在运行",
-                       message: "系统 Dock 的可见入口已由汐接替。汐线会在屏幕底部收起，靠近时展开。",
-                       actionTitle: "关闭并恢复 macOS Dock", action: { showRestoreConfirmation = true })
+                       title: L10n.string("overview.state.takeover.title", table: .settings),
+                       message: L10n.string("overview.state.takeover.message", table: .settings),
+                       actionTitle: L10n.string("restore.action", table: .settings),
+                       action: { showRestoreConfirmation = true })
         case .drifted:
             StatusCard(symbol: "exclamationmark.triangle.fill", tint: .orange,
-                       title: "系统 Dock 设置已发生变化",
-                       message: "汐发现当前 Dock 设置与接管配置不一致。你可以重新应用汐的设置，或关闭汐并恢复原始配置。",
-                       actionTitle: "重新应用接管设置", action: { model.repairDock() })
+                       title: L10n.string("overview.state.drifted.title", table: .settings),
+                       message: L10n.string("overview.state.drifted.message", table: .settings),
+                       actionTitle: L10n.string("dock.reapply", table: .settings),
+                       action: { model.repairDock() })
         case .manualRecoveryRequired:
             StatusCard(symbol: "exclamationmark.octagon.fill", tint: .red,
-                       title: "无法自动恢复 macOS Dock",
-                       message: "汐找不到启用前保存的 Dock 设置，因此无法安全执行自动恢复。请查看恢复说明，或联系支持以获取手动恢复步骤。",
-                       actionTitle: "重新检查", action: { model.checkDock() })
+                       title: L10n.string("overview.state.manualRecovery.title", table: .settings),
+                       message: L10n.string("overview.state.manualRecovery.message", table: .settings),
+                       actionTitle: L10n.string("action.checkNow", table: .settings),
+                       action: { model.checkDock() })
         case .failed(let message):
             StatusCard(symbol: "xmark.circle.fill", tint: .red,
-                       title: "需要处理系统 Dock",
+                       title: L10n.string("overview.state.failed.title", table: .settings),
                        message: message,
-                       actionTitle: "重新检查", action: { model.checkDock() })
+                       actionTitle: L10n.string("action.checkNow", table: .settings),
+                       action: { model.checkDock() })
         }
     }
 }
@@ -529,11 +567,12 @@ private struct PinnedPage: View {
 
     var body: some View {
         Form {
-            PageHeader(title: "固定项目", description: "选择始终显示在汐中的应用。运行中的其他应用会在固定项目之后自动出现。")
+            PageHeader(title: L10n.string("page.pinned", table: .settings),
+                       description: L10n.string("pinned.header.description", table: .settings))
 
             Section {
                 if model.pinnedApps.isEmpty {
-                    Text("还没有固定项目。")
+                    Text(L10n.string("pinned.empty", table: .settings))
                         .foregroundStyle(.secondary)
                 } else {
                     List {
@@ -550,24 +589,24 @@ private struct PinnedPage: View {
                 }
 
                 HStack {
-                    Button("添加应用…", action: { isShowingApplicationPicker = true })
+                    Button(L10n.string("pinned.add", table: .settings), action: { isShowingApplicationPicker = true })
                     Spacer()
-                    Button("恢复默认", action: { showResetConfirmation = true })
+                    Button(L10n.string("pinned.reset", table: .settings), action: { showResetConfirmation = true })
                 }
             } header: {
-                Text("固定到汐")
+                Text(L10n.string("pinned.section.header", table: .settings))
             } footer: {
-                Text("拖拽可调整顺序，右键或悬浮按钮可移除项目。固定项目只决定应用在汐中的位置，不会阻止应用自动显示或隐藏。")
+                Text(L10n.string("pinned.section.footer", table: .settings))
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("固定项目")
+        .navigationTitle(L10n.string("page.pinned", table: .settings))
         .sheet(isPresented: $isShowingApplicationPicker) {
             ApplicationPickerSheet(model: model)
         }
-        .confirmationDialog("恢复默认固定项目？", isPresented: $showResetConfirmation) {
-            Button("恢复默认", role: .destructive, action: model.restoreDefaultPinned)
-            Button("取消", role: .cancel) {}
+        .confirmationDialog(L10n.string("pinned.resetConfirmTitle", table: .settings), isPresented: $showResetConfirmation) {
+            Button(L10n.string("pinned.reset", table: .settings), role: .destructive, action: model.restoreDefaultPinned)
+            Button(L10n.string("action.cancel", table: .settings), role: .cancel) {}
         }
     }
 }
@@ -586,7 +625,7 @@ private struct PinnedRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(app.name)
                 if !app.isInstalled {
-                    Text("应用未安装或已移动")
+                    Text(L10n.string("pinned.notInstalled", table: .settings))
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
@@ -601,7 +640,7 @@ private struct PinnedRow: View {
                         .background(Circle().fill(.red))
                 }
                 .buttonStyle(.plain)
-                .help("移除")
+                .help(L10n.string("action.remove", table: .settings))
                 .transition(.opacity)
             }
             Image(systemName: "line.3.horizontal")
@@ -614,13 +653,13 @@ private struct PinnedRow: View {
                         NSCursor.pop()
                     }
                 }
-                .help("拖拽调整顺序")
+                .help(L10n.string("pinned.dragHelp", table: .settings))
         }
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.12)) { isHovered = hovering }
         }
         .contextMenu {
-            Button("移除", role: .destructive, action: onRemove)
+            Button(L10n.string("action.remove", table: .settings), role: .destructive, action: onRemove)
         }
     }
 }
@@ -699,7 +738,7 @@ private struct ApplicationPickerSheet: View {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField("搜索应用", text: $searchText)
+                TextField(L10n.string("pinned.searchPlaceholder", table: .settings), text: $searchText)
                     .textFieldStyle(.roundedBorder)
             }
             .padding(12)
@@ -716,7 +755,7 @@ private struct ApplicationPickerSheet: View {
             .listStyle(.inset)
             .overlay {
                 if isScanning {
-                    ProgressView("正在扫描已安装应用…")
+                    ProgressView(L10n.string("pinned.scanning", table: .settings))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
@@ -724,12 +763,12 @@ private struct ApplicationPickerSheet: View {
             Divider()
 
             HStack {
-                Text("\(selectedBundleIdentifiers.count) 个已选")
+                Text(L10n.string("pinned.selectedCount", table: .settings, arguments: selectedBundleIdentifiers.count))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("取消", action: { dismiss() })
-                Button("添加", action: confirmAdd)
+                Button(L10n.string("action.cancel", table: .settings), action: { dismiss() })
+                Button(L10n.string("pinned.addShort", table: .settings), action: confirmAdd)
                     .disabled(selectedBundleIdentifiers.isEmpty)
                     .keyboardShortcut(.defaultAction)
             }
@@ -786,7 +825,7 @@ private struct ApplicationPickerRow: View {
                 .foregroundStyle(isPinned ? .secondary : .primary)
             Spacer()
             if isPinned {
-                Text("已固定")
+                Text(L10n.string("pinned.pinnedBadge", table: .settings))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
@@ -808,34 +847,41 @@ private struct WindowsPage: View {
 
     var body: some View {
         Form {
-            PageHeader(title: "窗口管理", description: "汐的核心能力：让最小化窗口和多个窗口都能被直接找到。")
+            PageHeader(title: L10n.string("page.windows", table: .settings),
+                       description: L10n.string("windows.header.description", table: .settings))
 
             Section {
-                CapabilityRow(title: "窗口列表", description: "按应用展开该应用的全部窗口。", state: model.accessibilityTrusted ? "可用" : "等待授权", tint: model.accessibilityTrusted ? .green : .orange)
-                CapabilityRow(title: "最小化窗口还原", description: "点击窗口后自动还原并置前。", state: model.accessibilityTrusted ? "可用" : "等待授权", tint: model.accessibilityTrusted ? .green : .orange)
-                CapabilityRow(title: "窗口预览", description: "悬停时查看窗口缩略图。", state: "即将推出", tint: .secondary)
+                CapabilityRow(title: L10n.string("windows.cap.windowList.title", table: .settings),
+                              description: L10n.string("windows.cap.windowList.description", table: .settings),
+                              state: L10n.string(model.accessibilityTrusted ? "state.available" : "state.pending", table: .settings),
+                              tint: model.accessibilityTrusted ? .green : .orange)
+                CapabilityRow(title: L10n.string("windows.cap.minimizeRestore.title", table: .settings),
+                              description: L10n.string("windows.cap.minimizeRestore.description", table: .settings),
+                              state: L10n.string(model.accessibilityTrusted ? "state.available" : "state.pending", table: .settings),
+                              tint: model.accessibilityTrusted ? .green : .orange)
+                CapabilityRow(title: L10n.string("windows.cap.preview.title", table: .settings),
+                              description: L10n.string("windows.cap.preview.description", table: .settings),
+                              state: L10n.string("state.comingSoon", table: .settings), tint: .secondary)
             } header: {
-                Text("能力")
+                Text(L10n.string("windows.section.capabilities", table: .settings))
             }
 
             Section {
-                LabeledContent("辅助功能权限") {
-                    Text(model.accessibilityTrusted ? "已授权" : "未授权")
+                LabeledContent(L10n.string("windows.accessibilityLabel", table: .settings)) {
+                    Text(L10n.string(model.accessibilityTrusted ? "state.granted" : "state.notGranted", table: .settings))
                         .foregroundStyle(model.accessibilityTrusted ? .green : .orange)
                 }
                 if !model.accessibilityTrusted {
-                    Button("打开系统设置", action: model.openAccessibilitySettings)
+                    Button(L10n.string("action.openSystemSettings", table: .settings), action: model.openAccessibilitySettings)
                 }
             } header: {
-                Text("运行条件")
+                Text(L10n.string("windows.section.requirements", table: .settings))
             } footer: {
-                Text(model.accessibilityTrusted
-                     ? "窗口管理已具备运行条件。若刚刚完成授权，请重新启动汐以开始观察已有应用。"
-                     : "辅助功能权限用于读取窗口列表、识别最小化状态并将窗口带回前台。")
+                Text(L10n.string(model.accessibilityTrusted ? "windows.footer.granted" : "windows.footer.notGranted", table: .settings))
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("窗口管理")
+        .navigationTitle(L10n.string("page.windows", table: .settings))
     }
 }
 
@@ -864,10 +910,27 @@ private struct AppearancePage: View {
 
     var body: some View {
         Form {
-            PageHeader(title: "外观与交互", description: "调整主题、汐线、展开动画和应用栏的表现。")
+            PageHeader(title: L10n.string("page.appearance", table: .settings),
+                       description: L10n.string("appearance.header.description", table: .settings))
 
             Section {
-                Picker("主题", selection: Binding(
+                Picker(L10n.string("appearance.language", table: .settings), selection: Binding(
+                    get: { L10nManager.shared.language },
+                    set: { L10nManager.shared.setLanguage($0) }
+                )) {
+                    ForEach(AppLanguage.allCases) { language in
+                        Text(language.displayName).tag(language)
+                    }
+                }
+                .pickerStyle(.menu)
+            } header: {
+                Text(L10n.string("appearance.section.language", table: .settings))
+            } footer: {
+                Text(L10n.string("appearance.language.footer", table: .settings))
+            }
+
+            Section {
+                Picker(L10n.string("appearance.theme", table: .settings), selection: Binding(
                     get: { model.applicationTheme },
                     set: { model.setApplicationTheme($0) }
                 )) {
@@ -877,13 +940,13 @@ private struct AppearancePage: View {
                 }
                 .pickerStyle(.segmented)
             } header: {
-                Text("外观")
+                Text(L10n.string("appearance.section.theme", table: .settings))
             } footer: {
-                Text("所选主题会应用到设置窗口、汐线、潮涌和应用菜单。")
+                Text(L10n.string("appearance.theme.footer", table: .settings))
             }
 
             Section {
-                Picker("应用图标大小", selection: Binding(
+                Picker(L10n.string("appearance.iconSize", table: .settings), selection: Binding(
                     get: { model.iconSize },
                     set: { model.setIconSize($0) }
                 )) {
@@ -893,7 +956,7 @@ private struct AppearancePage: View {
                 }
                 .pickerStyle(.segmented)
 
-                Picker("汐线亮度", selection: Binding(
+                Picker(L10n.string("appearance.brightness", table: .settings), selection: Binding(
                     get: { model.tidelineBrightness },
                     set: { model.setTidelineBrightness($0) }
                 )) {
@@ -903,13 +966,13 @@ private struct AppearancePage: View {
                 }
                 .pickerStyle(.segmented)
             } header: {
-                Text("汐线与应用栏")
+                Text(L10n.string("appearance.section.tideline", table: .settings))
             } footer: {
-                Text("图标大小会同时调整图标槽位；汐线亮度只影响收起态视觉，不改变接近热区。")
+                Text(L10n.string("appearance.tideline.footer", table: .settings))
             }
 
             Section {
-                Picker("展开动画", selection: Binding(
+                Picker(L10n.string("appearance.animation", table: .settings), selection: Binding(
                     get: { model.animation },
                     set: { model.setAnimation($0) }
                 )) {
@@ -919,7 +982,7 @@ private struct AppearancePage: View {
                 }
                 .pickerStyle(.segmented)
 
-                Picker("减少动态效果", selection: Binding(
+                Picker(L10n.string("appearance.reducedMotion", table: .settings), selection: Binding(
                     get: { model.reducedMotion },
                     set: { model.setReducedMotion($0) }
                 )) {
@@ -929,13 +992,13 @@ private struct AppearancePage: View {
                 }
                 .pickerStyle(.segmented)
             } header: {
-                Text("动画")
+                Text(L10n.string("appearance.section.animation", table: .settings))
             } footer: {
-                Text("减少动态效果会覆盖系统设置；始终关闭会保留弹簧与位移动效。")
+                Text(L10n.string("appearance.animation.footer", table: .settings))
             }
 
             Section {
-                Picker("全屏应用中的显示行为", selection: Binding(
+                Picker(L10n.string("appearance.fullscreen", table: .settings), selection: Binding(
                     get: { model.fullscreenBehavior },
                     set: { model.setFullscreenBehavior($0) }
                 )) {
@@ -945,13 +1008,13 @@ private struct AppearancePage: View {
                 }
                 .pickerStyle(.segmented)
             } header: {
-                Text("全屏空间")
+                Text(L10n.string("appearance.section.fullscreen", table: .settings))
             } footer: {
-                Text("仅显示汐线不会在全屏空间展开；完全隐藏会暂时移除汐线并停止命中检测。")
+                Text(L10n.string("appearance.fullscreen.footer", table: .settings))
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("外观与交互")
+        .navigationTitle(L10n.string("page.appearance", table: .settings))
     }
 }
 
@@ -962,42 +1025,43 @@ private struct ShortcutsPage: View {
 
     var body: some View {
         Form {
-            PageHeader(title: "快捷键", description: "设置全局快捷键与临时切换的提交等待时间。")
+            PageHeader(title: L10n.string("page.shortcuts", table: .settings),
+                       description: L10n.string("shortcuts.header.description", table: .settings))
 
             Section {
-                KeyboardShortcuts.Recorder("展开/收起汐", name: .toggleTideBar)
-                KeyboardShortcuts.Recorder("临时切换应用", name: .cycleTideBarApplication)
+                KeyboardShortcuts.Recorder(L10n.string("shortcuts.toggle", table: .settings), name: .toggleTideBar)
+                KeyboardShortcuts.Recorder(L10n.string("shortcuts.cycle", table: .settings), name: .cycleTideBarApplication)
             } header: {
-                Text("全局快捷键")
+                Text(L10n.string("shortcuts.section.global", table: .settings))
             } footer: {
-                Text("点击快捷键字段后输入新的组合键。录制期间汐的热键会自动暂停；按 Esc 取消，按 Delete 清除。")
+                Text(L10n.string("shortcuts.global.footer", table: .settings))
             }
 
             Section {
                 HStack {
-                    Text("提交延迟")
+                    Text(L10n.string("shortcuts.commitDelay", table: .settings))
                     Slider(value: Binding(
                         get: { model.switcherCommitDelay },
                         set: { model.setSwitcherCommitDelay($0) }
                     ), in: 0.2...5.0, step: 0.1)
-                    Text(String(format: "%.1f 秒", model.switcherCommitDelay))
+                    Text(String(format: L10n.string("shortcuts.delayValue", table: .settings), model.switcherCommitDelay))
                         .monospacedDigit()
                         .frame(width: 58, alignment: .trailing)
                 }
             } header: {
-                Text("临时切换")
+                Text(L10n.string("shortcuts.section.switcher", table: .settings))
             } footer: {
-                Text("停止操作达到该时间后，汐会提交当前选择并结束临时切换会话。")
+                Text(L10n.string("shortcuts.switcher.footer", table: .settings))
             }
 
             Section {
-                Button("恢复默认快捷键与延迟") {
+                Button(L10n.string("shortcuts.resetDefaults", table: .settings)) {
                     model.restoreDefaultShortcuts()
                 }
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("快捷键")
+        .navigationTitle(L10n.string("page.shortcuts", table: .settings))
     }
 }
 
@@ -1009,28 +1073,29 @@ private struct DockPage: View {
 
     var body: some View {
         Form {
-            PageHeader(title: "Dock 与恢复", description: "查看系统 Dock 的接管配置，并在需要时检查、修复或恢复。")
+            PageHeader(title: L10n.string("page.dock", table: .settings),
+                       description: L10n.string("dock.header.description", table: .settings))
 
             Section {
-                LabeledContent("当前状态") {
+                LabeledContent(L10n.string("dock.currentState", table: .settings)) {
                     Text(statusText).foregroundStyle(statusColor)
                 }
-                Button("立即检查", action: model.checkDock)
+                Button(L10n.string("action.checkNow", table: .settings), action: model.checkDock)
             } header: {
-                Text("系统 Dock")
+                Text(L10n.string("dock.section.dock", table: .settings))
             }
 
             Section {
-                Button("重新应用接管设置", action: model.repairDock)
+                Button(L10n.string("dock.reapply", table: .settings), action: model.repairDock)
                     .disabled(model.dockState != .drifted)
-                Button("关闭汐并恢复 macOS Dock", role: .destructive) {
+                Button(L10n.string("restore.action", table: .settings), role: .destructive) {
                     showRestoreConfirmation = true
                 }
                 .disabled(model.dockState == .notEnabled)
             } header: {
-                Text("维护与恢复")
+                Text(L10n.string("dock.section.maintenance", table: .settings))
             } footer: {
-                Text("重新应用会覆盖汐所需的 Dock 设置并重新启动 Dock。恢复会使用启用前保存的设置。")
+                Text(L10n.string("dock.maintenance.footer", table: .settings))
             }
 
             Section {
@@ -1039,22 +1104,22 @@ private struct DockPage: View {
             .opacity(model.operation == .idle ? 0 : 1)
         }
         .formStyle(.grouped)
-        .navigationTitle("Dock 与恢复")
-        .confirmationDialog("关闭汐并恢复 macOS Dock？", isPresented: $showRestoreConfirmation) {
-            Button("关闭并恢复", role: .destructive, action: model.restoreDock)
-            Button("取消", role: .cancel) {}
+        .navigationTitle(L10n.string("page.dock", table: .settings))
+        .confirmationDialog(L10n.string("restore.confirmTitle", table: .settings), isPresented: $showRestoreConfirmation) {
+            Button(L10n.string("restore.confirmAction", table: .settings), role: .destructive, action: model.restoreDock)
+            Button(L10n.string("action.cancel", table: .settings), role: .cancel) {}
         } message: {
-            Text("汐会恢复启用前保存的 Dock 设置，并停止屏幕底部的汐线。")
+            Text(L10n.string("restore.confirmMessage", table: .settings))
         }
     }
 
     private var statusText: String {
         switch model.dockState {
-        case .notEnabled: return "尚未启用"
-        case .takeover: return "正常运行"
-        case .drifted: return "设置不一致"
-        case .manualRecoveryRequired: return "无法自动恢复"
-        case .failed: return "需要处理"
+        case .notEnabled: L10n.string("dock.status.notEnabled", table: .settings)
+        case .takeover: L10n.string("dock.status.takeover", table: .settings)
+        case .drifted: L10n.string("dock.status.drifted", table: .settings)
+        case .manualRecoveryRequired: L10n.string("dock.status.manualRecovery", table: .settings)
+        case .failed: L10n.string("dock.status.failed", table: .settings)
         }
     }
 
@@ -1076,31 +1141,32 @@ private struct PermissionsPage: View {
 
     var body: some View {
         Form {
-            PageHeader(title: "权限", description: "汐只在需要时请求系统能力，并清楚说明每项权限的用途。")
+            PageHeader(title: L10n.string("page.permissions", table: .settings),
+                       description: L10n.string("permissions.header.description", table: .settings))
 
             Section {
-                LabeledContent("辅助功能") {
-                    Text(model.accessibilityTrusted ? "已授权" : "未授权")
+                LabeledContent(L10n.string("permissions.accessibility", table: .settings)) {
+                    Text(L10n.string(model.accessibilityTrusted ? "state.granted" : "state.notGranted", table: .settings))
                         .foregroundStyle(model.accessibilityTrusted ? .green : .orange)
                 }
                 if !model.accessibilityTrusted {
-                    Button("打开系统设置", action: model.openAccessibilitySettings)
+                    Button(L10n.string("action.openSystemSettings", table: .settings), action: model.openAccessibilitySettings)
                 }
             } header: {
-                Text("窗口管理")
+                Text(L10n.string("permissions.section.windows", table: .settings))
             } footer: {
-                Text("用于读取窗口列表、识别最小化状态，并将选中的窗口带回前台。")
+                Text(L10n.string("permissions.windows.footer", table: .settings))
             }
 
             Section {
-                Text("汐不会请求屏幕录制权限。窗口预览功能开放后，会在启用前单独说明用途。")
+                Text(L10n.string("permissions.privacy.note", table: .settings))
                     .foregroundStyle(.secondary)
             } header: {
-                Text("隐私")
+                Text(L10n.string("permissions.section.privacy", table: .settings))
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("权限")
+        .navigationTitle(L10n.string("page.permissions", table: .settings))
     }
 }
 
@@ -1108,7 +1174,8 @@ private struct PermissionsPage: View {
 
 private struct AboutPage: View {
     private var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "开发版本"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+            ?? L10n.string("about.devVersion", table: .settings)
     }
 
     private var build: String {
@@ -1121,7 +1188,8 @@ private struct AboutPage: View {
 
     var body: some View {
         Form {
-            PageHeader(title: "关于汐", description: "平时是一条线，需要时是一片海。")
+            PageHeader(title: L10n.string("about.header.title", table: .settings),
+                       description: L10n.string("about.header.description", table: .settings))
 
             Section {
                 HStack(spacing: 14) {
@@ -1130,11 +1198,11 @@ private struct AboutPage: View {
                         .foregroundStyle(.tint)
                         .frame(width: 48, height: 48)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("汐 TideBar").font(.headline)
-                        Text("零占用窗口任务栏")
+                        Text(L10n.string("about.name", table: .settings)).font(.headline)
+                        Text(L10n.string("about.tagline", table: .settings))
                             .font(.callout)
                             .foregroundStyle(.secondary)
-                        Text("版本 \(version)（Build \(build)）")
+                        Text(L10n.string("about.version", table: .settings, arguments: version, build))
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
@@ -1142,14 +1210,15 @@ private struct AboutPage: View {
             }
 
             Section {
-                LabeledContent("系统要求", value: "macOS 26 或更高版本")
-                LabeledContent("版权", value: "© 2026 Chien Zhang")
-                LabeledContent("反馈") {
+                LabeledContent(L10n.string("about.systemRequirements", table: .settings),
+                               value: L10n.string("about.requirementsValue", table: .settings))
+                LabeledContent(L10n.string("about.copyright", table: .settings), value: "© 2026 Chien Zhang")
+                LabeledContent(L10n.string("about.feedback", table: .settings)) {
                     Link("GitHub Issues", destination: feedbackURL)
                 }
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("关于")
+        .navigationTitle(L10n.string("page.about", table: .settings))
     }
 }
