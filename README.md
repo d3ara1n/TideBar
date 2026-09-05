@@ -1,63 +1,68 @@
 <div align="center">
 
-# 汐 TideBar
+# TideBar 汐
 
-**平时是一条线，需要时是一片海。**
+**A hairline at rest, a sea of windows at hand.**
 
-汐是一款 macOS 零占用窗口任务栏。平时，它只是屏幕底部一条若隐若现的细线；鼠标靠近，便如潮汐般展开为应用栏——每个窗口的状态点点可见，点击即达。长按任意图标，「潮涌」展开该应用的全部窗口，连最小化的也能一键还原。开启接管，系统 Dock 隐去，屏幕底部只剩这条线，小屏 MacBook 也能多出一整行空间。
+TideBar (汐) is a zero-footprint window taskbar for macOS. At rest, it is a hairline tucked against the bottom edge of the screen; move the cursor close and it tides up into an app bar — every window's state visible as a dot, one click away. Press and hold any icon and the Surge list lays out all of that app's windows, minimized ones included, each a click from restoration. Turn on takeover and the system Dock steps aside, leaving nothing on screen but the line — a whole row back on small MacBook displays. One permission (Accessibility), no screen recording, no network.
 
-[下载（GitHub Releases）](../../releases) · [官网](https://tidebar.dearain.dev) · [问题反馈](../../issues)
+English · [简体中文](README.zh-CN.md)
+
+[Download (GitHub Releases)](../../releases) · [Website](https://tidebar.dearain.dev) · [Feedback](../../issues)
 
 </div>
 
-<!-- 演示素材产出后（plans/todo-2026-09-06-branding.md），删除下方占位行，启用上行图片 -->
+<!-- Once demo assets are produced (plans/todo-2026-09-06-branding.md), remove the placeholder below and enable the image:
+<img src="docs/images/demo.gif" alt="Tide line → app bar → Surge" width="720"> -->
 
-> 🎬 **演示占位**：汐线 → 应用栏 → 潮涌（演示动画与接管前后对比图待产出）
+> 🎬 **Demo placeholder**: tide line → app bar → Surge (animation and before/after screenshots to come)
 
-## 核心功能
+## Features
 
-### 汐线 · 零占用
+### Tide Line · Zero footprint
 
-空闲时是贴着屏幕底边的一条 2~3pt 细线，随亮暗模式自适应，几乎不可见；鼠标靠近即潮汐般展开，离开即收。
+At rest, a 2–3 pt hairline hugs the bottom edge, adapting to light and dark mode — nearly invisible. Approach and it rises like a tide; move away and it settles.
 
-### 点点 · 窗口状态可见
+### Dots · Window state, visible
 
-图标下的小点如实反映窗口：实心是活跃窗口，空心是最小化。回答的不是「哪些 app 在运行」，而是「每个窗口都在哪」。
+Small dots under each icon mirror your windows: filled for the active window, hollow for minimized. They answer not "which apps are running" but "where every window is".
 
-### 潮涌 · 直达任意窗口
+### Surge · Reach any window
 
-长按（或 ⌥+点击）图标展开窗口列表，按窗口标题直达，最小化的点击即还原。隐藏 Dock 后无处安放的最小化窗口，在这里有了落点。
+Press and hold (or ⌥-click) an icon to fan out its window list; jump straight to any window by title, minimized ones restore on a click. When the Dock hides, minimized windows finally have a home.
 
-### 涟漪 · 克制的通知
+### Ripple · Considerate notifications
 
-新角标到达时细线轻涌一次；未被查看就持续微微荡漾，展开即确认。不靠抢占注意力说「有事」，靠持续在场说「还没被知道」。
+A new badge nudges the line once; unread, it keeps gently rippling; opening the bar settles it. It doesn't shout "you have unread things" — it quietly says "not yet seen".
 
-## 权限与隐私
+## Permissions & Privacy
 
-- **只要一项权限**：辅助功能——用于列出与还原窗口。
-- **不请求屏幕录制**：汐不显示窗口缩略图，不读屏幕内容。
-- **零网络**：不联网、无遥测、无账号。
+- **One permission only**: Accessibility — used to list and restore windows.
+- **No screen recording**: TideBar shows no window thumbnails and never reads your screen.
+- **No network**: no tracking, no telemetry, no account.
 
-## 安装
+## Install
 
-从 [Releases](../../releases) 下载最新的 `TideBar.app`，拖入「应用程序」即可。要求 **macOS 26** 或更高版本。
+Download the latest `TideBar.app` from [Releases](../../releases) and drag it into Applications. Requires **macOS 26** or later.
 
-### 从源码构建
+### Build from source
 
 ```bash
-swift build    # 编译
-swift run      # 本地运行（占用终端，Ctrl-C 退出）
+swift build    # compile
+swift run      # run locally (occupies the terminal, Ctrl-C to quit)
 ```
 
-需要 Swift 6.2 及以上工具链，最低支持 macOS 26。
+Requires a Swift 6.2+ toolchain; macOS 26 minimum.
 
-## 文档
+## Documentation
 
-- [产品定位与灵魂交互](docs/product.md)
-- [架构决策与技术约定](docs/decisions.md)
-- [对外话术](docs/copy.md)
-- [已知问题](docs/known-issues.md)
+Project docs are written in Chinese:
 
-## 许可证
+- [Product positioning & core interactions](docs/product.md)
+- [Architecture decisions & conventions](docs/decisions.md)
+- [External copy source (bilingual)](docs/copy.md)
+- [Known issues](docs/known-issues.md)
+
+## License
 
 [MIT](LICENSE)

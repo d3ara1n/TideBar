@@ -25,6 +25,7 @@ macOS Dock 替代品：平时缩成屏幕底部一条细线，鼠标靠近时如
 | 文档 | 内容 | 生命周期 |
 |---|---|---|
 | `docs/product.md` | 产品定位、灵魂交互、命名、对标 | 极稳定 |
+| `docs/copy.md` | 对外话术双语源头（品牌物料，非开发文档） | 随载体演进，先改源头再同步 |
 | `docs/decisions.md` | 已定架构决策、可行性边界、权限策略 | 只增不改 |
 | `docs/known-issues.md` | 会随时间消灭的问题 | 条目解决即删 |
 | `plans/` | 立案任务（当前要做什么的唯一真值） | 见下 |
@@ -43,7 +44,11 @@ macOS Dock 替代品：平时缩成屏幕底部一条细线，鼠标靠近时如
 
 ## 约定
 
-- 文档、注释、提交信息用中文；运行时日志（NSLog）用正式英文，保证可 grep。
+### 语言规范
+
+- **品牌物料双语，英文为主**：README、官网、软件 UI 以英文为第一语言、中文（zh-Hans）为第二语言；话术源头是 `docs/copy.md`（双语并排），各载体从它派生。
+- **开发文档随开发者语言，用中文**：docs/、plans/、代码注释、提交信息主题——它们是开发者写给自己看的。`docs/copy.md` 名义在 docs/ 下，实为品牌话术源，双语。
+- 运行时日志（NSLog）用正式英文，保证可 grep。
 - 提交信息用 Conventional Commits 格式（type 英文小写：feat/fix/docs/chore/refactor…，主题中文）。
 - AI 辅助的提交加 `Co-Authored-By: <模型名> <邮箱>` trailer；模型身份查 `PI_*` 环境变量，无对应邮箱用 `noreply@pi.dev`，不得伪造 provider 域名。
 - 代码与文档不留「原来是 A 改成 B」的历史痕迹，追溯看 git log。

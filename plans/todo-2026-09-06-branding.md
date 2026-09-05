@@ -1,10 +1,10 @@
 # 品牌与文档
 
-> 状态：话术源、README、LICENSE、命名统一、关于页已完成；品牌资产改由用户自行准备；演示素材待录屏；建仓前 branding 不留其它未完成项（图标/菜单栏图标/演示 GIF 由用户交付后接入）。
+> 状态：话术源（双语）、README（双语）、LICENSE、命名统一、关于页已完成；本地化升格为发布前置（App UI 层由 todo-2026-09-05-localization.md 承接）；品牌资产改由用户自行准备；演示素材待录屏。
 
 ## 背景
 
-发布渠道已定（2026-09-06）：开源 GitHub、下载走 GitHub Releases，另建介绍性官网落地页。仓库已建：github.com/d3ara1n/TideBar（**private**，待品牌资产与演示素材就绪后再转 public）。官网方案已定（同日拍板）：GitHub Pages，站点放仓库 `website/` 目录经 Actions 发布，域名 `tidebar.dearain.dev`（DNS 侧加 CNAME → `d3ara1n.github.io`）；不用 Vercel。发布产物（`.app` 打包）在品牌素材与 README 占位就绪后再开工。
+发布渠道已定（2026-09-06）：开源 GitHub、下载走 GitHub Releases，另建介绍性官网落地页。仓库已建：github.com/d3ara1n/TideBar（**private**，待品牌资产与演示素材就绪后再转 public）。**本地化为 branding 前置（同日拍板）：对外物料英文为主、中文为第二语言**——话术源已双语化，README 拆为 README.md（EN 主）+ README.zh-CN.md；App UI 的 en/zh-Hans 本地化由 todo-2026-09-05-localization.md 承接，转 public 前完成。官网方案已定（同日拍板）：GitHub Pages，站点放仓库 `website/` 目录经 Actions 发布，域名 `tidebar.dearain.dev`（DNS 侧加 CNAME → `d3ara1n.github.io`），双语 EN 主 + zh 切换；不用 Vercel。发布产物（`.app` 打包）在品牌素材与 README 占位就绪后再开工。
 
 品牌信息目前零散且占位：README 只是开发者骨架（构建命令 + 文档链接）；设置「关于」页仅有版本号与一句话定位；应用图标、菜单栏图标、关于页形象全部使用 SF Symbol `water.waves` 占位；「汐」「TideBar」「汐 TideBar」三种叫法在 UI 与文档中并存，未统一。
 
