@@ -5,6 +5,7 @@ private func revision(processIdentifier: Int32 = 10,
                       isPinned: Bool = false,
                       isHidden: Bool = false,
                       canTerminate: Bool = true,
+                      badge: BadgeValue? = nil,
                       windows: WindowKnowledge<WindowContentRevision> = .known([])) -> AppContentRevision {
     AppContentRevision(identity: AppIdentity("com.example.app"),
                        name: "Example",
@@ -14,6 +15,7 @@ private func revision(processIdentifier: Int32 = 10,
                        processIdentifiers: [processIdentifier],
                        isHidden: isHidden,
                        canTerminate: canTerminate,
+                       badge: badge,
                        windows: windows)
 }
 
@@ -31,6 +33,12 @@ private func revision(processIdentifier: Int32 = 10,
 
 @Test func capabilityChangeChangesAppContentRevision() {
     #expect(revision(canTerminate: true) != revision(canTerminate: false))
+}
+
+@Test func badgeChangeChangesAppContentRevision() {
+    #expect(revision(badge: nil) != revision(badge: .count(3)))
+    #expect(revision(badge: .count(3)) != revision(badge: .count(4)))
+    #expect(revision(badge: .count(3)) != revision(badge: .dot))
 }
 
 @Test func windowContentChangeChangesAppContentRevision() {
@@ -65,6 +73,7 @@ private func revision(processIdentifier: Int32 = 10,
                                    processIdentifiers: [10, 11],
                                    isHidden: false,
                                    canTerminate: true,
+                                   badge: nil,
                                    windows: .known([]))
     let second = AppContentRevision(identity: AppIdentity("com.example.app"),
                                     name: "Example",
@@ -74,6 +83,7 @@ private func revision(processIdentifier: Int32 = 10,
                                     processIdentifiers: [11, 10],
                                     isHidden: false,
                                     canTerminate: true,
+                                    badge: nil,
                                     windows: .known([]))
 
     #expect(first == second)

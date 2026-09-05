@@ -74,6 +74,36 @@ enum Motion {
     static var statusDamping: CGFloat { springDamping(30) }
     static var reducedMotionFadeDuration: TimeInterval { time(0.10) }
 
+    // MARK: 通知角标（图标右上角）
+
+    /// 出现/变化弹性轻弹（与状态点数字同律）
+    static var badgePopDuration: TimeInterval { time(0.22) }
+    static var badgeStiffness: CGFloat { springStiffness(460) }
+    static var badgeDamping: CGFloat { springDamping(30) }
+    static let badgeAppearScale: CGFloat = 0.6
+    static var badgeFadeDuration: TimeInterval { time(0.18) }
+
+    // MARK: 汐线脉冲与波纹（收起态新角标提醒）
+
+    /// 一次性涌落：前段涌起占比，余下回落；从当前 presentation 起跳，重触发自然合并
+    static var pulseDuration: TimeInterval { time(0.6) }
+    static let pulseGrowFraction: Double = 0.32
+    static let pulseScalePeakY: CGFloat = 1.8
+    static let pulseScalePeakX: CGFloat = 1.04
+    /// 减少动态效果：脉冲退化为短促淡化，且不做常驻波纹循环
+    static let pulseReducePeak: Float = 0.5
+    static var pulseReduceDuration: TimeInterval { time(0.32) }
+
+    /// 未确认通知的持久波纹：细线持续涟漪发散，展开（用户已知）即止。
+    /// 双环错相循环，单环自线宽扩散至终态波高后淡出。
+    /// 形态：线源涟漪天然为扁椭圆；纵向受屏幕底边裁切，主要向上半扩散。
+    static var tidelineRippleDuration: TimeInterval { time(1.9) }
+    static let tidelineRippleRingCount = 2
+    static let tidelineRippleScaleX: CGFloat = 1.3
+    static let tidelineRippleEndHeight: CGFloat = 14
+    static let tidelineRipplePeakOpacity: Float = 0.38
+    static let tidelineRippleBorderWidth: CGFloat = 1
+
     // MARK: 图标轻浮潮（悬停与按压）
 
     /// hover 在独立视觉层完成，不占用图标按钮根层的整栏波浪 transform。
@@ -155,6 +185,22 @@ enum Motion {
         animation.timingFunction = CAMediaTimingFunction(name: curve)
         animation.fillMode = .backwards
         layer.setValue(to, forKeyPath: keyPath)
+        layer.add(animation, forKey: "motion.\(keyPath)")
+    }
+
+    /// 单属性涌落脉冲：从当前 presentation 涌起至峰值再回落终态。
+    /// 关键帧一体（模型恒置终态），重触发从当前 presentation 重新起跳，天然合并。
+    static func keyframePulse(_ layer: CALayer, keyPath: String, peak: Any, rest: Any,
+                              duration: TimeInterval, growFraction: Double) {
+        let animation = CAKeyframeAnimation(keyPath: keyPath)
+        let current = layer.presentation()?.value(forKeyPath: keyPath)
+            ?? layer.value(forKeyPath: keyPath) ?? rest
+        animation.values = [current, peak, rest]
+        animation.keyTimes = [0, NSNumber(value: growFraction), 1]
+        animation.timingFunctions = [CAMediaTimingFunction(name: .easeOut),
+                                     CAMediaTimingFunction(name: .easeInEaseOut)]
+        animation.duration = duration
+        layer.setValue(rest, forKeyPath: keyPath)
         layer.add(animation, forKey: "motion.\(keyPath)")
     }
 }

@@ -68,6 +68,101 @@ private final class HoverHaloView: PassthroughView {
     }
 }
 
+/// 图标右上角通知角标：数字胶囊 / 小圆点。出现与变化弹性轻弹，消失淡出。
+/// 寄居 visualContainer，随悬停/按压的图标形变一起缩放（对齐 Dock 放大带角标的行为）。
+@MainActor
+private final class BadgeOverlayView: PassthroughView {
+    private let capsule = CALayer()
+    private let label = CATextLayer()
+    private var value: BadgeValue?
+
+    init(value: BadgeValue?) {
+        self.value = value
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.masksToBounds = false
+        capsule.backgroundColor = NSColor.systemRed.cgColor
+        capsule.cornerCurve = .continuous
+        capsule.opacity = value == nil ? 0 : 1
+        label.alignmentMode = .center
+        label.foregroundColor = NSColor.white.cgColor
+        label.font = NSFont.systemFont(ofSize: Layout.badgeFontSize, weight: .semibold)
+        label.fontSize = Layout.badgeFontSize
+        label.contentsScale = NSScreen.main?.backingScaleFactor ?? 2
+        label.opacity = 0
+        capsule.addSublayer(label)
+        layer?.addSublayer(capsule)
+        applyLayout()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("not supported") }
+
+    override func layout() {
+        super.layout()
+        applyLayout()
+    }
+
+    func update(_ newValue: BadgeValue?, animated: Bool) {
+        guard newValue != value else { return }
+        let removed = newValue == nil
+        value = newValue
+        applyLayout()
+        guard animated else {
+            setCapsuleOpacity(removed ? 0 : 1)
+            return
+        }
+        if removed {
+            Motion.basic(capsule, keyPath: "opacity", to: Float(0),
+                         duration: Motion.badgeFadeDuration)
+        } else {
+            // 出现/变化弹性轻弹（与状态点数字同律）
+            Motion.basic(capsule, keyPath: "opacity", from: Float(0), to: Float(1),
+                         duration: Motion.badgePopDuration)
+            Motion.spring(capsule, keyPath: "transform.scale", from: Motion.badgeAppearScale, to: CGFloat(1),
+                          stiffness: Motion.badgeStiffness, damping: Motion.badgeDamping,
+                          minDuration: Motion.badgePopDuration)
+        }
+    }
+
+    /// 依当前值布置胶囊几何（数字宽度自适应；小圆点隐藏文字）
+    private func applyLayout() {
+        guard let value else { return }
+        switch value {
+        case .dot:
+            let side = Layout.badgeDotSize
+            label.opacity = 0
+            capsule.frame = CGRect(x: bounds.width - side, y: bounds.height - side,
+                                   width: side, height: side)
+            capsule.cornerRadius = side / 2
+        case .count(let count):
+            let text = count > Layout.badgeCountCap ? "\(Layout.badgeCountCap)+" : "\(count)"
+            label.string = text
+            label.opacity = 1
+            let width = max(Layout.badgeCapsuleMinWidth,
+                            ceil(textWidth(for: text)) + Layout.badgeTextHInset * 2)
+            capsule.frame = CGRect(x: bounds.width - width,
+                                   y: bounds.height - Layout.badgeCapsuleHeight,
+                                   width: width, height: Layout.badgeCapsuleHeight)
+            capsule.cornerRadius = Layout.badgeCapsuleHeight / 2
+            label.frame = capsule.bounds.insetBy(dx: 0, dy: 0.5)
+        }
+    }
+
+    private func textWidth(for text: String) -> CGFloat {
+        let font = NSFont.systemFont(ofSize: Layout.badgeFontSize, weight: .semibold)
+        let attributed = NSAttributedString(string: text, attributes: [.font: font])
+        return attributed.size().width
+    }
+
+    private func setCapsuleOpacity(_ opacity: Float) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        capsule.opacity = opacity
+        CATransaction.commit()
+    }
+}
+
 /// 展开态的单个 app 图标：悬停高亮 + 点点（窗口状态）+ 点击启动/切换/还原
 @MainActor
 final class AppIconButton: NSView {
@@ -91,6 +186,7 @@ final class AppIconButton: NSView {
     private let haloView = HoverHaloView(frame: .zero)
     private let artworkView: IconArtworkView
     private let statusIndicatorView: AppStatusIndicatorView
+    private let badgeView: BadgeOverlayView
     private var hovering = false
     private var keyboardSelected = false
     private var pressed = false
@@ -103,6 +199,7 @@ final class AppIconButton: NSView {
         self.entry = entry
         self.artworkView = IconArtworkView(icon: entry.icon)
         self.statusIndicatorView = AppStatusIndicatorView(entry: entry)
+        self.badgeView = BadgeOverlayView(value: entry.badge)
         super.init(frame: NSRect(x: 0, y: 0, width: Layout.iconSlot, height: Layout.expandedHeight))
         wantsLayer = true   // 根层只承担整栏错峰升降，hover 使用独立视觉层避免 transform 争用
         motionPivot.wantsLayer = true
@@ -111,6 +208,7 @@ final class AppIconButton: NSView {
         artworkView.wantsLayer = true
         visualContainer.addSubview(haloView)
         visualContainer.addSubview(artworkView)
+        visualContainer.addSubview(badgeView)
         motionPivot.addSubview(visualContainer)
         addSubview(statusIndicatorView)
         addSubview(motionPivot)
@@ -120,15 +218,17 @@ final class AppIconButton: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not supported") }
 
-    /// 就地刷新条目（运行状态、图标、点点变化），不动视图身份与交互状态
+    /// 就地刷新条目（运行状态、图标、点点、角标变化），不动视图身份与交互状态
     func update(entry newEntry: AppEntry) {
         guard newEntry.id == entry.id else { return }
         let iconChanged = !newEntry.icon.isEqual(entry.icon)
         let statusChanged = newEntry.isRunning != entry.isRunning
             || newEntry.dotSignature != entry.dotSignature
+        let badgeChanged = newEntry.badge != entry.badge
         entry = newEntry
         if iconChanged { artworkView.icon = newEntry.icon }
         statusIndicatorView.update(entry: newEntry, animated: statusChanged)
+        if badgeChanged { badgeView.update(newEntry.badge, animated: true) }
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -155,6 +255,7 @@ final class AppIconButton: NSView {
                                        height: side)
         haloView.frame = visualContainer.bounds
         artworkView.frame = visualContainer.bounds
+        badgeView.frame = visualContainer.bounds
     }
 
     /// 悬停态由控制器鼠标采样轮询驱动：非激活悬浮窗上 tracking area 的

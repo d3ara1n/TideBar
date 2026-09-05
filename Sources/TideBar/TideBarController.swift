@@ -2,7 +2,7 @@ import AppKit
 import CoreGraphics
 import TideBarCore
 
-/// 编排者：每屏一个 panel；接近检测三重兜底（全局 monitor + local monitor + 低频轮询）；
+/// 编排者：每屏一个 panel；接近检测三重兜底（全局 monitor + local monitor + 统一调度器轮询）；
 /// 展开/收起状态机与 300ms 防抖；全屏 Space 抑制展开
 @MainActor
 final class TideBarController {
@@ -29,9 +29,9 @@ final class TideBarController {
 
     private var screens: [CGDirectDisplayID: ScreenState] = [:]
     private let registry = AppRegistry()
+    private static let mouseDemand = "mouse.proximity"
     private var globalMonitor: Any?
     private var localMonitor: Any?
-    private var pollTimer: Timer?
     private var keyboardMonitor: Any?
     private var barSession: BarSessionState?
     private var switcherCommitWork: DispatchWorkItem?
@@ -48,6 +48,7 @@ final class TideBarController {
 
     func start() {
         registry.onChange = { [weak self] in self?.appsDidChange() }
+        registry.onBadgePulse = { [weak self] in self?.badgePulse() }
         registry.start()
         if AppConfiguration.shared.isTakeoverEnabled {
             rebuildPanels()
@@ -64,7 +65,7 @@ final class TideBarController {
             movementSample()
             return event
         }
-        pollTimer = Timer.scheduledTimer(withTimeInterval: Layout.pollInterval, repeats: true) { _ in
+        PollScheduler.shared.register(Self.mouseDemand, interval: Layout.pollInterval) {
             pollSample()
         }
         keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
@@ -90,11 +91,10 @@ final class TideBarController {
         if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }
         if let keyboardMonitor { NSEvent.removeMonitor(keyboardMonitor) }
-        pollTimer?.invalidate()
+        PollScheduler.shared.unregister(Self.mouseDemand)
         globalMonitor = nil
         localMonitor = nil
         keyboardMonitor = nil
-        pollTimer = nil
         endBarSession(collapse: false, suppressMouse: false)
     }
 
@@ -552,6 +552,7 @@ final class TideBarController {
         state.panel.makeKey()
         // 挂起期间积压的终止通知可能尚未消费；展开即用户可见时刻，先同步对账
         registry.refresh()
+        syncBadgeCadence()
         state.view.setExpanded(true, apps: registry.entries)
         NSLog("TideBar expanded on screen %u", displayID(of: state.screen) ?? 0)
     }
@@ -566,6 +567,23 @@ final class TideBarController {
         }
         state.panel.ignoresMouseEvents = true
         state.view.setExpanded(false, immediate: !animated)
+        syncBadgeCadence()
+    }
+
+    // MARK: 角标节奏与汐线脉冲
+
+    /// 任一屏展开即加速角标轮询；全部收起则降频（足迹最小）
+    private func syncBadgeCadence() {
+        registry.setBadgeCadence(expanded: screens.values.contains { $0.isExpanded })
+    }
+
+    /// 新角标事件：收起态的汐线轻涌一次并启动持久波纹（展开即确认停住）。
+    /// 展开态不脉冲，角标本身即反馈。
+    private func badgePulse() {
+        for state in screens.values where !state.isExpanded && !state.hiddenForFullscreen {
+            state.view.pulseTideline()
+            state.view.startTidelineRipple()
+        }
     }
 
     /// 收起防抖：mouse exited 后延迟收起，期间 re-enter 取消
@@ -678,6 +696,12 @@ final class TideBarController {
     // MARK: - 数据与屏幕变更
 
     private func appsDidChange() {
+        // 全部角标消失（如从横幅点开读完）：未确认提醒失去载体，波纹停住
+        if !registry.entries.contains(where: { $0.badge != nil }) {
+            for state in screens.values {
+                state.view.stopTidelineRipple()
+            }
+        }
         // 条目消失、窗口知识降级或任意窗口内容变化时，现有潮涌模型即过期。
         if let surgeIdentity {
             let currentRevision = registry.entries.first(where: { $0.id == surgeIdentity })?.windowRevision

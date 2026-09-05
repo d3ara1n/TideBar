@@ -22,6 +22,18 @@ enum Layout {
     static let runningDashWidth: CGFloat = 10
     static let runningDashHeight: CGFloat = 3
 
+    // 角标（通知数）：图标右上角红色胶囊 / 小圆点，计数上限显示为 99+
+    static let badgeDotSize: CGFloat = 8
+    static let badgeCapsuleHeight: CGFloat = 13
+    static let badgeCapsuleMinWidth: CGFloat = 13
+    static let badgeTextHInset: CGFloat = 5
+    static let badgeFontSize: CGFloat = 9.5
+    static let badgeCountCap = 99
+
+    // 角标轮询：展开态加速（盯着看要新鲜），收起态降频（脉冲均值延迟 2s）
+    static let badgePollExpanded: TimeInterval = 1
+    static let badgePollCollapsed: TimeInterval = 4
+
     // 潮涌（二级展开）
     static let surgePressDelay: TimeInterval = 0.4
     static let surgeWidth: CGFloat = 260

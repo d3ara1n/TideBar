@@ -19,6 +19,8 @@ struct AppEntry: Identifiable {
     let windowKnowledge: WindowKnowledge<WindowSnapshot>
     let isHidden: Bool
     let canTerminate: Bool
+    /// Dock 角标镜像值（nil = 无角标）；随模型真值 diff 驱动 UI 与汐线脉冲
+    let badge: BadgeValue?
 
     var id: AppIdentity { identity }
     /// Finder 的常驻桌面进程不计运行；只有收录到资源管理窗口才算逻辑运行。
@@ -51,6 +53,7 @@ struct AppEntry: Identifiable {
                            processIdentifiers: Array(runningAppsByPID.keys),
                            isHidden: isHidden,
                            canTerminate: canTerminate,
+                           badge: badge,
                            windows: windowRevision)
     }
 
@@ -133,6 +136,9 @@ final class AppRegistry {
     var onChange: (() -> Void)?
 
     private let windowStore = WindowStore()
+    private let badgeStore = BadgeStore()
+    /// 新角标出现/增长（收起态由控制器消费为汐线脉冲）
+    var onBadgePulse: (() -> Void)?
     private var refreshDebounce: DispatchWorkItem?
     private var observers: [NSObjectProtocol] = []
 
@@ -155,7 +161,15 @@ final class AppRegistry {
         })
         windowStore.onUpdate = { [weak self] _ in self?.refreshSoon() }
         windowStore.start()
+        badgeStore.onUpdate = { [weak self] in self?.refreshSoon() }
+        badgeStore.onPulse = { [weak self] in self?.onBadgePulse?() }
+        badgeStore.start()
         refresh()
+    }
+
+    /// 展开/收起切换角标轮询节奏（展开加速 + 立即全量读）
+    func setBadgeCadence(expanded: Bool) {
+        badgeStore.setExpanded(expanded)
     }
 
     /// 250ms 去抖，合并应用启停风暴
@@ -251,17 +265,19 @@ final class AppRegistry {
                 ?? workspace.urlForApplication(withBundleIdentifier: locator)
             guard app != nil || applicationURL != nil else { continue }
 
+            let displayName = name(locator: locator, app: app, applicationURL: applicationURL)
             let entry = AppEntry(identity: description.identity,
                                  bundleIdentifier: locator,
                                  applicationURL: applicationURL,
-                                 name: name(locator: locator, app: app, applicationURL: applicationURL),
+                                 name: displayName,
                                  icon: icon(app: app, applicationURL: applicationURL),
                                  isPinned: description.isPinned,
                                  preferredProcessIdentifier: app?.processIdentifier,
                                  runningAppsByPID: appsByPID,
                                  windowKnowledge: windowKnowledge,
                                  isHidden: !apps.isEmpty && apps.allSatisfy(\.isHidden),
-                                 canTerminate: description.behavior.canTerminate)
+                                 canTerminate: description.behavior.canTerminate,
+                                 badge: badgeStore.value(named: displayName))
             if description.isPinned {
                 pinnedEntries.append(entry)
             } else {

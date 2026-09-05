@@ -328,6 +328,92 @@ final class TideBarView: NSView {
     }
     /// 展开代数：状态切换即递增，使未决的延迟隐藏失效（防误杀下一次展开的潮体）
     private var expandGeneration = 0
+    /// 未确认通知的持久波纹环（细线涟漪发散，展开即止）
+    private var rippleRings: [CALayer] = []
+
+    /// 汐线脉冲：新角标出现时细线一次轻涌（仅收起态；进行中重触发从当前
+    /// presentation 重新起跳，天然合并为一次）。展开态不脉冲——角标本身即反馈。
+    func pulseTideline() {
+        guard !isExpandedState else { return }
+        if Motion.shouldReduceMotion {
+            Motion.keyframePulse(tideline, keyPath: "opacity",
+                                 peak: Motion.pulseReducePeak, rest: Float(1),
+                                 duration: Motion.pulseReduceDuration, growFraction: 0.5)
+            return
+        }
+        Motion.keyframePulse(tideline, keyPath: "transform.scale.y",
+                             peak: Motion.pulseScalePeakY, rest: CGFloat(1),
+                             duration: Motion.pulseDuration, growFraction: Motion.pulseGrowFraction)
+        Motion.keyframePulse(tideline, keyPath: "transform.scale.x",
+                             peak: Motion.pulseScalePeakX, rest: CGFloat(1),
+                             duration: Motion.pulseDuration, growFraction: Motion.pulseGrowFraction)
+    }
+
+    /// 汐线波纹：未被展开确认的新角标期间，细线持续涟漪发散。
+    /// 展开即用户已知（setExpanded 里停），全部角标消失也停（控制器清）。
+    /// 减少动态效果时不做常驻循环（一次性脉冲已足够，且循环动画正是该人群忌讳）。
+    func startTidelineRipple() {
+        guard !isExpandedState, rippleRings.isEmpty, !Motion.shouldReduceMotion else { return }
+        let stagger = Motion.tidelineRippleDuration / Double(Motion.tidelineRippleRingCount)
+        for index in 0..<Motion.tidelineRippleRingCount {
+            let ring = CALayer()
+            ring.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+            ring.bounds = CGRect(origin: .zero,
+                                 size: CGSize(width: Layout.capsuleWidth, height: Layout.capsuleHeight))
+            ring.position = tideline.position
+            ring.cornerRadius = Layout.capsuleHeight / 2
+            ring.borderWidth = Motion.tidelineRippleBorderWidth
+            ring.borderColor = rippleColor
+            ring.opacity = 0
+            layer?.addSublayer(ring)
+            attachRippleAnimation(to: ring, delay: Double(index) * stagger)
+            rippleRings.append(ring)
+        }
+    }
+
+    func stopTidelineRipple() {
+        for ring in rippleRings {
+            ring.removeAllAnimations()
+            ring.removeFromSuperlayer()
+        }
+        rippleRings.removeAll()
+    }
+
+    private var rippleColor: CGColor {
+        AppearanceColors.cgColor(.labelColor, alpha: 0.5, for: effectiveAppearance)
+    }
+
+    /// 单环循环：自线宽扩散（横向 2.3 倍、纵向到终态波高），淡入快淡出慢
+    private func attachRippleAnimation(to ring: CALayer, delay: TimeInterval) {
+        let duration = Motion.tidelineRippleDuration
+        let begin = CACurrentMediaTime() + delay
+
+        let scaleX = CABasicAnimation(keyPath: "transform.scale.x")
+        scaleX.fromValue = 1
+        scaleX.toValue = Motion.tidelineRippleScaleX
+        scaleX.duration = duration
+        scaleX.beginTime = begin
+        scaleX.repeatCount = .infinity
+        ring.add(scaleX, forKey: "ripple.scale.x")
+
+        let scaleY = CABasicAnimation(keyPath: "transform.scale.y")
+        scaleY.fromValue = 1
+        scaleY.toValue = Motion.tidelineRippleEndHeight / Layout.capsuleHeight
+        scaleY.duration = duration
+        scaleY.beginTime = begin
+        scaleY.repeatCount = .infinity
+        ring.add(scaleY, forKey: "ripple.scale.y")
+
+        let opacity = CAKeyframeAnimation(keyPath: "opacity")
+        opacity.values = [Float(0), Motion.tidelineRipplePeakOpacity, Float(0)]
+        opacity.keyTimes = [0, 0.3, 1]
+        opacity.timingFunctions = [CAMediaTimingFunction(name: .easeOut),
+                                   CAMediaTimingFunction(name: .easeIn)]
+        opacity.duration = duration
+        opacity.beginTime = begin
+        opacity.repeatCount = .infinity
+        ring.add(opacity, forKey: "ripple.opacity")
+    }
 
     /// 水体基色（起潮深水，也是旧系统回退胶囊的背景色）
     private static let waterColor = NSColor.black.withAlphaComponent(0.45).cgColor
@@ -400,6 +486,9 @@ final class TideBarView: NSView {
                                                               height: Layout.capsuleHeight))
         tideline.position = CGPoint(x: bounds.midX, y: 2 + Layout.capsuleHeight / 2)
         tideline.cornerRadius = Layout.capsuleHeight / 2
+        for ring in rippleRings {
+            ring.position = tideline.position
+        }
         // 潮体几何恒为全幅胶囊，形变只在 transform——几何设置不会打断动画；
         // 锚点在底边中心（汐线上沿），收起态缩放后正落在汐线位置
         silhouette.bounds = CGRect(origin: .zero, size: bounds.size)
@@ -422,6 +511,10 @@ final class TideBarView: NSView {
             .labelColor, alpha: CGFloat(opacity), for: effectiveAppearance
         )
         tideline.shadowColor = AppearanceColors.cgColor(.labelColor, for: effectiveAppearance)
+        let ripple = rippleColor
+        for ring in rippleRings {
+            ring.borderColor = ripple
+        }
     }
 
     // MARK: 状态切换
@@ -429,6 +522,8 @@ final class TideBarView: NSView {
     func setExpanded(_ expanded: Bool, apps: [AppEntry] = [], immediate: Bool = false) {
         expandGeneration += 1
         if expanded {
+            // 展开即确认：未读提醒的波纹停住（角标本身接管展示）
+            stopTidelineRipple()
             guard !isExpandedState else { return }
             isExpandedState = true
             iconRow.update(apps: apps, rebuildAll: true)

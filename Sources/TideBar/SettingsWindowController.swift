@@ -20,18 +20,37 @@ final class SettingsWindowController: NSWindowController {
         window.isReleasedWhenClosed = false
         window.setFrameAutosaveName("TideBar.SettingsWindow")
         self.init(window: window)
+        window.delegate = self
     }
 
+    private static let permissionDemand = "settings.permission"
+
     override func showWindow(_ sender: Any?) {
+        // AX 授权没有通知渠道：窗口可见期间注册轮询需求（关窗即注销），
+        // 经通知送达状态模型；开窗先送一拍，展示不等人
+        PollScheduler.shared.register(Self.permissionDemand, interval: 1) {
+            NotificationCenter.default.post(name: .settingsPermissionTick, object: nil)
+        }
+        NotificationCenter.default.post(name: .settingsPermissionTick, object: nil)
         DockController.shared.checkStatus()
         super.showWindow(sender)
         window?.makeKeyAndOrderFront(sender)
         NSApp.activate(ignoringOtherApps: true)
     }
+
+    @objc func windowWillClose(_ notification: Notification) {
+        PollScheduler.shared.unregister(Self.permissionDemand)
+    }
+}
+
+extension SettingsWindowController: NSWindowDelegate {}
+
+private extension Notification.Name {
+    /// 设置窗口可见期间的 AX 授权状态刷新节拍（PollScheduler 需求驱动）
+    static let settingsPermissionTick = Notification.Name("TideBar.settingsPermissionTick")
 }
 
 // MARK: - 状态模型
-
 @MainActor
 private final class SettingsModel: ObservableObject {
     enum Operation: Equatable {
@@ -54,7 +73,6 @@ private final class SettingsModel: ObservableObject {
     @Published private(set) var switcherCommitDelay: Double = 0.9
 
     private var observers: [NSObjectProtocol] = []
-    private var permissionTimer: Timer?
 
     init() {
         refresh()
@@ -81,10 +99,11 @@ private final class SettingsModel: ObservableObject {
             forName: AppConfiguration.behaviorDidChange, object: nil, queue: .main
         ) { _ in configBridge() })
 
-        // AX 授权没有通知渠道，只在设置窗口存活期间低频刷新展示状态。
-        permissionTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            MainThreadBridge { self?.refreshPermission() }()
-        }
+        // AX 授权没有通知渠道：控制器在窗口可见期间驱动的权限刷新经通知送达
+        let permissionBridge = MainThreadBridge { [weak self] in self?.refreshPermission() }
+        observers.append(NotificationCenter.default.addObserver(
+            forName: .settingsPermissionTick, object: nil, queue: .main
+        ) { _ in permissionBridge() })
     }
 
     func refresh() {
