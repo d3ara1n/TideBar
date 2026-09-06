@@ -91,7 +91,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func configureStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = item.button {
-            button.image = NSImage(systemSymbolName: "water.waves", accessibilityDescription: nil)
+            button.image = BrandAssets.menuBarImage()
+                ?? NSImage(systemSymbolName: "circle", accessibilityDescription: nil)
         }
         statusItem = item
         rebuildStatusItemText()

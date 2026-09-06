@@ -5,7 +5,7 @@
       <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
     </clipPath>
   </defs>
-  <g id="orb" fill="currentColor" color="#F2AE49">
+  <g id="orb" fill="currentColor" color="#D6786B">
     <circle cx="128" cy="72" r="40"/>
   </g>
 </svg>

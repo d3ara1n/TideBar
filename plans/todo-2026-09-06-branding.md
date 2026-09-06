@@ -21,20 +21,20 @@
 - 构图：三条独立绘制的波浪配日月圆盘；圆盘位于波浪上方，呈升起意象，外围透明留白截断第一条波浪，下两条波浪完整。实心版为主标记，空心版为正式备选，两版及单色预览均保留。
 - 正式素材与使用说明：`brand/ASSETS.md`。唯一设计源为 `brand/sources/` 的实心／空心／菜单栏三份 SVG 与 `palettes.json`。`mono/` 提供单色 SVG / PNG / PDF；`color/` 提供配色表驱动的 Light／Dark 实心版，均为透明纯色，不含光影或背景。
 - `menubar/` 提供光学校正后的 18pt 模板 PDF、18/36px PNG 与 SVG；接入时显式设置 `isTemplate = true`，由系统适配颜色。
-- `composer/light/`、`composer/dark/` 提供对齐的波浪／圆盘两层 SVG 与透明 PNG；完整 Dock 图标由用户通过 Icon Composer 制作，打包由 app-bundle 任务承接。
+- `composer/light/`、`composer/dark/` 提供对齐的波浪／圆盘两层 SVG 与透明 PNG；完整 Dock 图标先由 Icon Composer 导出一份真实 `.icon` 作为格式基线，后续接入脚本生成与回归校验，打包由 app-bundle 任务承接。
 - `node tools/export-brand.mjs` 一键生成全部成品及两张预览 SVG／PNG；使用系统 XML 变换与 librsvg，不在脚本中维护图形坐标。`previews/` 保留实心／空心对照布局，并提供彩色与菜单栏对照。
 - 验证：一键命令检查 12 份素材 PNG、7 份 PDF、2 张 PNG 预览的尺寸、透明背景、模板纯黑、主题几何及 Composer 分层合成；回归测试覆盖重复导出、配色／几何替换、错误输入保护和旧产物清理。实际菜单栏显示与 Icon Composer 导入待用户确认。
-- 待接入：菜单栏（AppDelegate `configureStatusItem`）、关于页与引导页的 `water.waves` 占位，以及 README／网站标记。本轮不改应用代码。
+- 应用内 PDF 已接入：菜单栏使用 `menubar/TideBarTemplate.pdf` 模板，关于页与引导页按外观加载 `color/light.pdf`／`color/dark.pdf`；README／网站标记与正式 `.app` 图标仍待处理。
 
 ### 2. README 重写（已完成）
 
 - 面向使用者的完整介绍：slogan、pitch、核心功能四条、权限与隐私、安装、文档、许可证，全部从 docs/copy.md 派生。
 - 演示素材位已留占位（`docs/images/demo.gif`），素材产出后替换（复用 onboarding 演示动画产出，与向导演示同源）。
 
-### 3. 设置「关于」页（已完成，图标待品牌资产替换）
+### 3. 设置「关于」页（已完成）
 
 - slogan（PageHeader 描述）、产品定位副标、版权（© 2026 Chien Zhang）、反馈渠道（GitHub Issues 链接）已补齐。
-- 版本与构建号（已有）保留；图标仍为 `water.waves` 占位，品牌资产交付后替换。
+- 版本与构建号（已有）保留；品牌标记使用资源 bundle 中的浅色／深色 PDF。
 
 ### 4. 命名统一（已完成）
 

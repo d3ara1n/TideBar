@@ -80,6 +80,14 @@ node tools/export-brand.mjs
 
 同一次执行生成全部 SVG、12 份素材 PNG、7 份矢量 PDF，以及两张预览的 SVG／PNG，并自动验证后替换成品。临时文件和 Swift 模块缓存位于项目 `.build/`；生成或验证失败不覆盖已有成品，普通发布错误会恢复已有目录。它不是进程中断／断电下的整树原子事务，勿并发导出。
 
+应用内资源同步单独执行，不由品牌生成脚本隐式触发：
+
+```sh
+node tools/sync-brand-resources.mjs
+```
+
+该命令只将已生成的菜单栏、浅色和深色 PDF 同步到 `Sources/TideBar/Resources/Brand/`，不修改其他品牌成品或预览。
+
 工具分工：
 
 - `export-brand.mjs`：读取母版和配色，编排 XSLT、librsvg、预览与验证。

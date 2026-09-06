@@ -1196,9 +1196,7 @@ private struct AboutPage: View {
 
             Section {
                 HStack(spacing: 14) {
-                    Image(systemName: "water.waves")
-                        .font(.system(size: 36, weight: .medium))
-                        .foregroundStyle(.tint)
+                    BrandMark()
                         .frame(width: 48, height: 48)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(l10n.string("about.name", table: .settings)).font(.headline)

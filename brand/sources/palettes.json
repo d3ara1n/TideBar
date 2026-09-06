@@ -5,12 +5,12 @@
   },
   "themes": {
     "light": {
-      "waves": "#167D9A",
-      "orb": "#F2AE49"
+      "waves": "#276C78",
+      "orb": "#D6786B"
     },
     "dark": {
-      "waves": "#65CADD",
-      "orb": "#F5D69A"
+      "waves": "#72C6D0",
+      "orb": "#E7A09A"
     }
   }
 }

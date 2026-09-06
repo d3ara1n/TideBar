@@ -198,9 +198,8 @@ private struct IntroStep: View {
     var body: some View {
         VStack(spacing: 18) {
             VStack(spacing: 8) {
-                Image(systemName: "water.waves")
-                    .font(.system(size: 42, weight: .medium))
-                    .foregroundStyle(.tint)
+                BrandMark()
+                    .frame(width: 52, height: 52)
                     .accessibilityHidden(true)
                 Text(l10n.string("intro.title", table: .onboarding))
                     .font(.title.weight(.semibold))
