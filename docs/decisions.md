@@ -190,3 +190,18 @@ defaults delete com.apple.dock autohide-delay && killall Dock
 2. **应用内切换 = 自定义 lproj bundle 查找**：`L10nManager` 按用户偏好从 Bundle.module 加载对应 lproj 子 bundle，全部文案查找显式指定该 bundle，不依赖系统 preferred localization；「跟随系统」按系统语言 zh 前缀归 zh-Hans，其余归 en。SwiftUI 根视图持 observable 对象整树刷新，AppKit 处（状态栏菜单、设置窗标题）订阅语言通知重建；系统错误描述（`error.localizedDescription`）保持系统本地化直通，不经词条。
 3. **SPM 把 lproj 目录名规范化为小写（zh-Hans.lproj → zh-hans.lproj），而 `path(forResource:)` 按精确名匹配**——自定义加载必须精确名查不到时按小写回查，否则非英文 bundle 加载失败静默回退、界面恒为英文（首次实现即踩此坑，GUI 验收暴露）。
 4. **UI 标签不进 TideBarCore**：偏好枚举的界面标签位于 TideBar 层 extension 查词条，调用点用同名 API 无感；`DockError` 的用户可见描述走词条，NSLog 描述保持英文可 grep。
+
+## 2026-09 本地化依赖与展示状态
+
+细化并取代「本地化与应用内语言切换」条目 2 的 SwiftUI 刷新约定与条目 4 的标签查找约定；资源格式、语言解析规则和 Core/UI 分层保持不变。
+
+1. **语言以不可变快照接入依赖图**：`@Observable L10nManager` 原子替换包含偏好、实际语言和 bundle 的 `Localization`。每个 hosting root 通过 `LocalizedContent` 注入快照和 locale，消费视图声明 `@Environment(\.l10n)`；根视图观察不等于子树全部重算。不用语言作为 `.id`，语言变化不能重置 UI 状态。
+2. **枚举标签持 key，不隐式查全局语言**：UI 层 extension 提供 `titleKey`，`ForEach` 内由独立读取环境的 `LocalizedText` 解析。两个语言选择器共用组件与状态写入路径；“跟随系统”与显式选择即使解析到同一语言，也必须更新选中项。
+3. **状态保存语义，展示时翻译**：自有 Dock 错误以 `DockFailure` 保留错误类型与参数；向导和设置页展示时解析词条，只有外部系统错误才保存系统描述。AppKit 监听状态提交后的语言通知，刷新菜单、窗口标题与已展开潮涌的回退文案。
+4. **验收必须覆盖原生控件与独立子视图**：资源和状态单测不能替代 GUI 验收。权限轮询仅在权限值变化时发布，语言刷新不能依赖不相关的轮询或用户操作。
+
+来源：
+- Apple，SwiftUI 依赖图与视图值比较：https://developer.apple.com/videos/play/wwdc2021/10022/
+- Apple，Environment 消费者更新：https://developer.apple.com/documentation/swiftui/environment
+- Apple，Observation 与模型读取：https://developer.apple.com/documentation/swiftui/managing-model-data-in-your-app
+- Apple，`id(_:)` 的状态重置语义：https://developer.apple.com/documentation/swiftui/view/id(_:)

@@ -1,6 +1,6 @@
 # 本地化（国际化）
 
-**状态**：已激活（2026-09-06 拍板）——对外发布的**前置项**；英文为主、中文（zh-Hans）为自带第二语言。
+**状态**：App UI 本地化已完成，用户确认可用；应用显示名本地化待 app-bundle 打包完成。本地化是对外发布的**前置项**，英文为主、中文（zh-Hans）为自带第二语言。
 
 ## 背景
 
@@ -10,15 +10,15 @@
 
 ### 1. 物料层（已完成）
 
-- [docs/copy.md](../docs/copy.md) 改为双语话术源头：EN 主、zh 并排定稿。
+- [docs/copy.md](../docs/copy.md) 提供双语话术参考：EN 主、zh 并排定稿。
 - README 双文件：`README.md`（EN 主文档）+ `README.zh-CN.md`，顶部互链。
 - 官网按 EN 主 + zh 切换设计（随 branding 立案产出）。
 
-### 2. App UI 层（未开工，转 public 前必须完成）
+### 2. App UI 层（已完成；应用显示名待打包）
 
-- UI 文案全面 i18n：设置中心、onboarding、菜单栏菜单、图标右键菜单、工具提示、确认弹窗、通知类状态文案。
-- 基建选型开工时定（倾向 String Catalog）；开发语言 en，第二语言 zh-Hans。
-- 硬编码文案分布（立案快照）：`SettingsWindowController.swift`（大头）、`OnboardingView.swift`、`AppConfiguration.swift`、`SurgePanel.swift` 等。
+- 实现与回归检查参考见 [软件本地化与应用内语言切换](archived/todo-2026-09-06-localization.md)。
+- UI 文案覆盖设置中心、onboarding、菜单栏菜单、图标右键菜单、工具提示、确认弹窗、状态文案。
+- 经典 `.strings` 配合显式语言快照与 SwiftUI 环境依赖；开发语言 en，第二语言 zh-Hans。
 - NSLog 运行时日志保持英文，不进字符串表。
 - App 显示名本地化（`CFBundleDisplayName`：en "TideBar" / zh-Hans "汐 TideBar"）随 app-bundle 打包一并处理。
 
@@ -28,4 +28,4 @@
 
 ## 排序
 
-建议窗口：品牌资产交付后、app-bundle 打包开工前——文案从此冻结在字符串表里，打包与官网直接受益。
+应用显示名与资源包交付由 app-bundle 计划承接，完成后归档本计划。

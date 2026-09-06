@@ -48,7 +48,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         languageObserver = NotificationCenter.default.addObserver(
             forName: L10nManager.languageDidChange, object: nil, queue: .main
         ) { [weak self] _ in
-            MainThreadBridge { [weak self] in self?.rebuildStatusItemText() }.call()
+            MainThreadBridge { [weak self] in
+                self?.rebuildStatusItemText()
+                self?.controller.languageDidChange()
+            }.call()
         }
 
         if !AppConfiguration.shared.onboardingCompleted {
@@ -98,19 +101,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func rebuildStatusItemText() {
         guard let item = statusItem else { return }
         if let button = item.button {
-            let name = L10n.string("statusBar.name", table: .menus)
+            let name = L10nManager.shared.current.string("statusBar.name", table: .menus)
             button.setAccessibilityLabel(name)
             button.toolTip = name
         }
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: L10n.string("statusBar.openSettings", table: .menus),
+        menu.addItem(NSMenuItem(title: L10nManager.shared.current.string("statusBar.openSettings", table: .menus),
                                 action: #selector(openSettings), keyEquivalent: ","))
-        menu.addItem(NSMenuItem(title: L10n.string("statusBar.replayOnboarding", table: .menus),
+        menu.addItem(NSMenuItem(title: L10nManager.shared.current.string("statusBar.replayOnboarding", table: .menus),
                                 action: #selector(showOnboarding), keyEquivalent: ""))
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: L10n.string("statusBar.checkStatus", table: .menus),
+        menu.addItem(NSMenuItem(title: L10nManager.shared.current.string("statusBar.checkStatus", table: .menus),
                                 action: #selector(checkDock), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: L10n.string("statusBar.quit", table: .menus),
+        menu.addItem(NSMenuItem(title: L10nManager.shared.current.string("statusBar.quit", table: .menus),
                                 action: #selector(terminate), keyEquivalent: "q"))
         for menuItem in menu.items { menuItem.target = self }
         item.menu = menu

@@ -13,7 +13,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
     init() {
         let model = OnboardingModel()
-        let hosting = NSHostingController(rootView: OnboardingRootView(model: model))
+        let hosting = NSHostingController(rootView: LocalizedContent { OnboardingRootView(model: model) })
         let window = NSWindow(contentViewController: hosting)
         window.styleMask = [.titled, .closable, .fullSizeContentView]
         // 全幅内容 + 隐藏标题：保留关闭按钮，观感向系统安装器靠拢
@@ -74,9 +74,9 @@ final class OnboardingModel: ObservableObject {
         case working
         case success
 
-        /// 失败原因：系统错误描述（系统本地化，不经词条）或未知失败（走词条）。
+        /// 保留 Dock 失败语义；未知失败由向导单独提供文案。
         enum FailureReason: Equatable {
-            case system(String)
+            case dock(DockFailure)
             case generic
         }
 
@@ -148,8 +148,8 @@ final class OnboardingModel: ObservableObject {
             switch dockState {
             case .takeover:
                 dockOperation = .success
-            case .failed(let message):
-                dockOperation = .failure(.system(message))
+            case .failed(let failure):
+                dockOperation = .failure(.dock(failure))
             default:
                 dockOperation = .failure(.generic)
             }
@@ -164,7 +164,9 @@ final class OnboardingModel: ObservableObject {
     }
 
     private func refreshPermission() {
-        accessibilityTrusted = AXIsProcessTrusted()
+        let trusted = AXIsProcessTrusted()
+        guard trusted != accessibilityTrusted else { return }
+        accessibilityTrusted = trusted
     }
 
     private func refreshDock() {

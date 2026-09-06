@@ -9,7 +9,9 @@ import ApplicationServices
 final class SurgeRowView: NSView {
     private let snapshot: WindowSnapshot
     private let icon: NSImage
-    private let title: String
+    private var title: String {
+        snapshot.title ?? L10nManager.shared.current.string("window.fallbackTitle", table: .runtime)
+    }
     private var hovering = false
     private var keyboardSelected = false
 
@@ -17,7 +19,6 @@ final class SurgeRowView: NSView {
 
     init(snapshot: WindowSnapshot, appIcon: NSImage, dimmed: Bool) {
         self.snapshot = snapshot
-        self.title = snapshot.title ?? L10n.string("window.fallbackTitle", table: .runtime)
         self.icon = Self.icon(for: snapshot.document, appIcon: appIcon)
         super.init(frame: NSRect(x: 0, y: 0, width: Layout.surgeWidth, height: Layout.surgeRowHeight))
         wantsLayer = true
@@ -162,6 +163,12 @@ final class SurgeView: NSView {
     func setKeyboardSelection(_ identifier: Int?) {
         for case let row as SurgeRowView in subviews {
             row.setKeyboardSelected(row.windowIdentifier == identifier)
+        }
+    }
+
+    func refreshLocalizedText() {
+        for case let row as SurgeRowView in subviews {
+            row.needsDisplay = true
         }
     }
 

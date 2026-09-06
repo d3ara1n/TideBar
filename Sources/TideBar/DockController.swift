@@ -8,7 +8,7 @@ final class DockController {
         case takeover
         case drifted
         case manualRecoveryRequired
-        case failed(String)
+        case failed(DockFailure)
     }
 
     private enum Key: String, CaseIterable {
@@ -164,42 +164,14 @@ final class DockController {
 
     func snapshotExists() -> Bool { snapshotData() != nil }
 
-    /// Dock 配置操作错误。用户可见文案走词条，日志描述保持英文可 grep。
-    private enum DockError: Error {
-        case unsupportedValue(String)
-        case synchronizeFailed
-        case verificationFailed
-        case restartFailed
-
-        /// 面向用户的本地化描述。
-        @MainActor var localizedMessage: String {
-            switch self {
-            case .unsupportedValue(let key): return L10n.string("dock.error.unsupportedValue", table: .runtime, arguments: key)
-            case .synchronizeFailed: return L10n.string("dock.error.synchronizeFailed", table: .runtime)
-            case .verificationFailed: return L10n.string("dock.error.verificationFailed", table: .runtime)
-            case .restartFailed: return L10n.string("dock.error.restartFailed", table: .runtime)
-            }
-        }
-
-        /// 日志用英文描述。
-        var logDescription: String {
-            switch self {
-            case .unsupportedValue(let key): return "unsupported value for key \(key)"
-            case .synchronizeFailed: return "failed to synchronize Dock preferences"
-            case .verificationFailed: return "failed to verify Dock configuration"
-            case .restartFailed: return "failed to restart Dock"
-            }
-        }
-    }
-
-    /// 统一 Dock 操作失败的入态与日志：用户可见文案走词条，日志保持英文。
-    private func dockFailure(_ error: Error, log context: String) -> String {
+    /// 统一失败入态与日志；不在操作阶段固化用户界面的语言。
+    private func dockFailure(_ error: Error, log context: String) -> DockFailure {
         if let dockError = error as? DockError {
             NSLog("%@: %@", context, dockError.logDescription)
-            return dockError.localizedMessage
+            return .configuration(dockError)
         }
         NSLog("%@: %@", context, String(describing: error))
-        return error.localizedDescription
+        return .system(error.localizedDescription)
     }
 
     private var appID: CFString { Self.domain as CFString }

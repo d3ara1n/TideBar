@@ -1,33 +1,26 @@
 import TideBarCore
 
-/// 偏好枚举的界面标签。标签属 UI 概念，统一走词条；
-/// Settings 界面的 `Text(value.title)` 调用点因此无需感知语言切换机制。
-@MainActor
+/// 偏好枚举只提供稳定词条 key；消费标签的视图负责读取语言环境。
 extension IconSizePreset {
-    var title: String { L10n.string("iconSize.\(rawValue)", table: .labels) }
+    var titleKey: String { "iconSize.\(rawValue)" }
 }
 
-@MainActor
 extension TideLineBrightness {
-    var title: String { L10n.string("brightness.\(rawValue)", table: .labels) }
+    var titleKey: String { "brightness.\(rawValue)" }
 }
 
-@MainActor
 extension AnimationPreset {
-    var title: String { L10n.string("animation.\(rawValue)", table: .labels) }
+    var titleKey: String { "animation.\(rawValue)" }
 }
 
-@MainActor
 extension ReducedMotionPreference {
-    var title: String { L10n.string("reducedMotion.\(rawValue)", table: .labels) }
+    var titleKey: String { "reducedMotion.\(rawValue)" }
 }
 
-@MainActor
 extension FullscreenBehavior {
-    var title: String { L10n.string("fullscreen.\(rawValue)", table: .labels) }
+    var titleKey: String { "fullscreen.\(rawValue)" }
 }
 
-@MainActor
 extension ApplicationTheme {
-    var title: String { L10n.string("theme.\(rawValue)", table: .labels) }
+    var titleKey: String { "theme.\(rawValue)" }
 }

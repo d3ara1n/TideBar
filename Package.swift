@@ -20,5 +20,6 @@ let package = Package(
             resources: [.process("Resources")]
         ),
         .testTarget(name: "TideBarCoreTests", dependencies: ["TideBarCore"]),
+        .testTarget(name: "TideBarTests", dependencies: ["TideBar", "TideBarCore"]),
     ]
 )

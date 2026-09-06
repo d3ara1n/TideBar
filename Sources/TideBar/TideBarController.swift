@@ -687,6 +687,10 @@ final class TideBarController {
         }
     }
 
+    func languageDidChange() {
+        (surgePanel?.contentView as? SurgeView)?.refreshLocalizedText()
+    }
+
     func appearanceDidChange() {
         for state in screens.values {
             state.view.refreshAppearance()
