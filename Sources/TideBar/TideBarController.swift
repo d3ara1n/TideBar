@@ -738,7 +738,7 @@ final class TideBarController {
                     animatePanel(state.panel, to: target)
                 }
             } else {
-                // 收起态窗口透明，宽度变化无声跟随
+                // TidePanel 同步窗口与内容布局，收起态汐线保持屏幕居中。
                 state.panel.setFrame(target, display: true)
             }
         }

@@ -478,6 +478,11 @@ final class TideBarView: NSView {
     }
 
     override func layout() {
+        // 裸图层的几何立即跟随窗口；动效只由显式编舞驱动。
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+
         super.layout()
         glass?.frame = bounds
         iconRow.frame = bounds
