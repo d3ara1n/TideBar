@@ -9,7 +9,7 @@
 "appMenu.pin" = "固定到汐";
 "appMenu.unpin" = "取消在汐中固定";
 "appMenu.revealInFinder" = "在 Finder 中显示";
-"appMenu.hide" = "隐藏";
-"appMenu.show" = "显示";
+"appMenu.hide" = "隐藏窗口";
+"appMenu.show" = "显示窗口";
 "appMenu.open" = "打开";
 "appMenu.quit" = "退出";

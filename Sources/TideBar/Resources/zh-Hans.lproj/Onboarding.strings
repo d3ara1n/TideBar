@@ -69,5 +69,5 @@
 "finish.gesture.optionClickTitle" = "⌥+点击";
 "finish.gesture.optionClickDetail" = "直接弹出潮涌";
 "finish.gesture.rightClickTitle" = "右键";
-"finish.gesture.rightClickDetail" = "固定、隐藏与退出";
+"finish.gesture.rightClickDetail" = "固定、窗口显隐与退出";
 "finish.settingsNote" = "外观、全屏行为与快捷键都可在设置中心调整；菜单栏的汐图标随时可以打开设置。";
