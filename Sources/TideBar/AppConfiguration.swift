@@ -110,7 +110,7 @@ final class AppConfiguration {
     }
 
     var fullscreenBehavior: FullscreenBehavior {
-        get { stored(fullscreenBehaviorKey, default: .lineOnly) }
+        get { stored(fullscreenBehaviorKey, default: .clickToExpand) }
         set {
             guard fullscreenBehavior != newValue else { return }
             defaults.set(newValue.rawValue, forKey: fullscreenBehaviorKey)

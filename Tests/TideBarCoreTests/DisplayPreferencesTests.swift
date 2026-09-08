@@ -20,6 +20,25 @@ import Testing
     #expect(AnimationPreset.standard.speedFactor < AnimationPreset.fast.speedFactor)
 }
 
+@Test func fullscreenClickModeRequiresATidelineClickToOpen() {
+    #expect(!FullscreenBehavior.clickToExpand.allowsExpansion(isExpanded: false))
+    #expect(FullscreenBehavior.clickToExpand.allowsExpansion(isExpanded: false, clickedTideline: true))
+}
+
+@Test func fullscreenClickModeKeepsAnOpenedBarInteractive() {
+    #expect(FullscreenBehavior.clickToExpand.allowsExpansion(isExpanded: true))
+    #expect(!FullscreenBehavior.clickToExpand.allowsExpansion(isExpanded: false))
+}
+
+@Test func fullscreenNormalAndHiddenIgnoreTheExpansionTrigger() {
+    for expanded in [true, false] {
+        for clicked in [true, false] {
+            #expect(FullscreenBehavior.normal.allowsExpansion(isExpanded: expanded, clickedTideline: clicked))
+            #expect(!FullscreenBehavior.hidden.allowsExpansion(isExpanded: expanded, clickedTideline: clicked))
+        }
+    }
+}
+
 @Test func reducedMotionPreferenceCanOverrideSystemValue() {
     #expect(ReducedMotionPreference.automatic.isEnabled(systemValue: true))
     #expect(!ReducedMotionPreference.automatic.isEnabled(systemValue: false))

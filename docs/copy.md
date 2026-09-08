@@ -46,8 +46,8 @@
 
 ## 五、权限与隐私（标准话术）
 
-- **EN**：One permission only: Accessibility — used to list and restore windows. ／ No screen recording: TideBar shows no window thumbnails and never reads your screen. ／ No network: no tracking, no telemetry, no account.
-- **zh**：只要一项权限：辅助功能——用于列出与还原窗口。／ 不请求屏幕录制：汐不显示窗口缩略图，不读屏幕内容。／ 零网络：不联网、无遥测、无账号。
+- **EN**：One permission only: Accessibility — used to list and restore windows and detect fullscreen state. ／ No screen recording: TideBar shows no window thumbnails and never reads your screen. ／ No network: no tracking, no telemetry, no account.
+- **zh**：只要一项权限：辅助功能——用于列出与还原窗口，以及识别全屏状态。／ 不请求屏幕录制：汐不显示窗口缩略图，不读屏幕内容。／ 零网络：不联网、无遥测、无账号。
 
 > 发布前整体复核一次：新增功能若改变上述承诺，先改这里再对外。
 
@@ -63,17 +63,17 @@
 **EN**
 - *How does TideBar relate to the macOS Dock?* A replacement, not an add-on. With takeover on, TideBar hides the Dock's visible entry and takes its place; without it, the two coexist.
 - *Where did my minimized windows go?* In the hollow dot under the app icon. Press and hold (or ⌥-click) the icon for the Surge list; click to restore.
-- *Why the Accessibility permission?* Listing and restoring windows relies on the macOS Accessibility API — the only permission TideBar asks for.
+- *Why the Accessibility permission?* Listing and restoring windows and detecting fullscreen state rely on the macOS Accessibility API — the only permission TideBar asks for.
 - *Does it show window thumbnails?* No. TideBar never reads your screen, so it never needs Screen Recording.
-- *Does it get in the way in fullscreen?* Fullscreen behavior is configurable in Settings.
+- *Does it get in the way in fullscreen?* By default, click the tide line to expand; moving nearby does not open it. Settings also lets you keep normal hover behavior or hide it completely.
 - *Is TideBar free?* Yes — open source under the MIT License (see LICENSE).
 
 **zh**
 - **汐和系统 Dock 什么关系？** 替代而非增强。开启「接管」后，汐隐藏系统 Dock 的可见入口并接替它；不开启也可以共存使用。
 - **最小化的窗口去哪了？** 图标下的空心点就是。长按或 ⌥+点击图标展开潮涌列表，点击即还原。
-- **为什么要辅助功能权限？** 列出与还原窗口依赖 macOS 辅助功能 API。这是汐请求的唯一权限。
+- **为什么要辅助功能权限？** 列出与还原窗口、识别全屏状态依赖 macOS 辅助功能 API。这是汐请求的唯一权限。
 - **会显示窗口缩略图吗？** 不会。汐不读屏幕内容，因此永远不需要屏幕录制权限。
-- **全屏应用下会打扰吗？** 全屏行为可在设置中心调整。
+- **全屏应用下会打扰吗？** 默认需点击汐线才展开，鼠标靠近不会打开。也可在设置中选择正常悬停展开或完全隐藏。
 - **汐收费吗？** 开源软件，MIT 许可证，免费使用；见仓库 LICENSE。
 
 ## 八、对比（官网/README 备用）

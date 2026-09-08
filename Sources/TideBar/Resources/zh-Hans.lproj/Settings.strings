@@ -85,7 +85,7 @@
 "windows.section.requirements" = "运行条件";
 "windows.accessibilityLabel" = "辅助功能权限";
 "windows.footer.granted" = "窗口管理已具备运行条件。若刚刚完成授权，请重新启动汐以开始观察已有应用。";
-"windows.footer.notGranted" = "辅助功能权限用于读取窗口列表、识别最小化状态并将窗口带回前台。";
+"windows.footer.notGranted" = "辅助功能权限用于读取窗口列表、识别最小化与全屏状态，并将窗口带回前台。";
 
 // 外观与交互
 "appearance.header.description" = "调整主题、汐线、展开动画和应用栏的表现。";
@@ -102,7 +102,7 @@
 "appearance.animation.footer" = "减少动态效果会覆盖系统设置；始终关闭会保留弹簧与位移动效。";
 "appearance.fullscreen" = "全屏应用中的显示行为";
 "appearance.section.fullscreen" = "全屏空间";
-"appearance.fullscreen.footer" = "仅显示汐线不会在全屏空间展开；完全隐藏会暂时移除汐线并停止命中检测。";
+"appearance.fullscreen.footer" = "全屏检测需要辅助功能权限。点击展开需点击汐线，鼠标靠近不会展开；完全隐藏会移除汐线。无法确认全屏状态时，仍可正常展开和操作。";
 
 // 快捷键
 "shortcuts.header.description" = "设置全局快捷键与临时切换的提交等待时间。";

@@ -6,6 +6,9 @@ enum Layout {
     // 汐线（收起态随亮暗模式自适应的胶囊）
     static let capsuleWidth: CGFloat = 160
     static let capsuleHeight: CGFloat = 3
+    /// 全屏点击入口：只在汐线周围提供少量容错，窗口底边贴屏幕底边。
+    static let tidelineClickWidth: CGFloat = capsuleWidth + 24
+    static let tidelineClickHeight: CGFloat = 16
 
     // 图标栏（窗口恒为展开尺寸，收起态透明且点击穿透）
     static var expandedHeight: CGFloat { CGFloat(AppConfiguration.shared.iconSize.expandedHeight) }
@@ -66,5 +69,6 @@ enum Layout {
     // 采样与兜底
     static let mouseSampleThrottle: TimeInterval = 0.04
     static let pollInterval: TimeInterval = 0.25
-    static let fullscreenCacheTTL: TimeInterval = 0.5
+    static let fullscreenPollInterval: TimeInterval = 0.5
+    static let fullscreenFailureGracePeriod: TimeInterval = 2
 }

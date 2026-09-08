@@ -10,6 +10,7 @@ final class TideBarController {
     private final class ScreenState {
         let screen: NSScreen
         let panel: TidePanel
+        let clickPanel: TidelineClickPanel
         let view: TideBarView
         var isExpanded = false
         var collapseDebounce: DispatchWorkItem?
@@ -19,10 +20,12 @@ final class TideBarController {
         /// 使延迟的面板缩宽在后续应用变化后自动失效。
         var appTransitionGeneration = 0
         var hiddenForFullscreen = false
+        var effectiveFullscreenBehavior: FullscreenBehavior = .normal
 
-        init(screen: NSScreen, panel: TidePanel, view: TideBarView) {
+        init(screen: NSScreen, panel: TidePanel, clickPanel: TidelineClickPanel, view: TideBarView) {
             self.screen = screen
             self.panel = panel
+            self.clickPanel = clickPanel
             self.view = view
         }
     }
@@ -37,7 +40,8 @@ final class TideBarController {
     private var switcherCommitWork: DispatchWorkItem?
     private var observers: [NSObjectProtocol] = []
     private var lastSampleTime: CFTimeInterval = 0
-    private var fullscreenCache: [CGDirectDisplayID: (time: CFTimeInterval, value: Bool)] = [:]
+    private let fullscreenDetector = FullscreenDetector()
+    private var fullscreenStates: [CGDirectDisplayID: FullscreenState] = [:]
 
     // 潮涌：同一时刻只存在一个，归属于触发它的屏
     private var surgePanel: SurgePanel?
@@ -47,6 +51,7 @@ final class TideBarController {
     private var surgeDismissWork: DispatchWorkItem?
 
     func start() {
+        fullscreenDetector.onChange = { [weak self] in self?.applyFullscreenStates() }
         registry.onChange = { [weak self] in self?.appsDidChange() }
         registry.onBadgePulse = { [weak self] in self?.badgePulse() }
         registry.onApplicationsStarted = { [weak self] in self?.applicationsStarted() }
@@ -84,6 +89,11 @@ final class TideBarController {
             forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { _ in
             spaceBridge()
         })
+        let activationBridge = MainThreadBridge { [weak self] in self?.behaviorDidChange() }
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { _ in
+            activationBridge()
+        })
 
         NSLog("TideBar started: screens=%d", screens.count)
     }
@@ -93,6 +103,14 @@ final class TideBarController {
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }
         if let keyboardMonitor { NSEvent.removeMonitor(keyboardMonitor) }
         PollScheduler.shared.unregister(Self.mouseDemand)
+        fullscreenDetector.reset()
+        fullscreenDetector.onChange = nil
+        for state in screens.values { state.clickPanel.setEnabled(false, above: state.panel) }
+        for observer in observers {
+            NotificationCenter.default.removeObserver(observer)
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+        observers.removeAll()
         globalMonitor = nil
         localMonitor = nil
         keyboardMonitor = nil
@@ -173,7 +191,7 @@ final class TideBarController {
     private func togglePersistentSession() {
         guard AppConfiguration.shared.isTakeoverEnabled,
               let state = targetScreenState(),
-              !state.hiddenForFullscreen else { return }
+              allowsExpansion(state) else { return }
         if let session = barSession {
             guard session.displayID == displayID(of: state.screen) else { return }
             cancelBarSession()
@@ -182,7 +200,7 @@ final class TideBarController {
         // 必须在展开面板前读取，避免 key 面板改变 frontmostApplication。
         let initialApplication = preferredInitialApplication()
         let openedBySession = !state.isExpanded
-        if !state.isExpanded { expand(state) }
+        if !state.isExpanded, !expand(state) { return }
         beginSession(mode: .persistent, on: state, openedBySession: openedBySession,
                      initialApplication: initialApplication)
     }
@@ -195,7 +213,7 @@ final class TideBarController {
         } else {
             state = targetScreenState()
         }
-        guard let state, !state.hiddenForFullscreen else { return }
+        guard let state, allowsExpansion(state) else { return }
 
         if let session = barSession, session.isPersistent {
             moveApplication(by: 1)
@@ -205,7 +223,7 @@ final class TideBarController {
             // 必须在展开面板前读取，避免 key 面板改变 frontmostApplication。
             let initialApplication = preferredInitialApplication()
             let openedBySession = !state.isExpanded
-            if !state.isExpanded { expand(state) }
+            if !state.isExpanded, !expand(state) { return }
             beginSession(mode: .switcher, on: state, openedBySession: openedBySession,
                          initialApplication: initialApplication)
         } else {
@@ -393,10 +411,14 @@ final class TideBarController {
             dismissSurge(animated: false)
             for state in screens.values {
                 state.collapseDebounce?.cancel()
+                state.clickPanel.setEnabled(false, above: state.panel)
+                state.clickPanel.close()
                 state.panel.orderOut(nil)
                 state.panel.close()
             }
             screens.removeAll()
+            fullscreenDetector.reset()
+            fullscreenStates.removeAll()
             return
         }
         registry.refresh()
@@ -409,6 +431,8 @@ final class TideBarController {
         dismissSurge(animated: false)
         for state in screens.values {
             state.collapseDebounce?.cancel()
+            state.clickPanel.setEnabled(false, above: state.panel)
+            state.clickPanel.close()
             state.panel.orderOut(nil)
             state.panel.close()
         }
@@ -420,7 +444,12 @@ final class TideBarController {
             let panel = TidePanel(contentRect: frame)
             let view = TideBarView(frame: NSRect(origin: .zero, size: frame.size))
             panel.contentView = view
-            let state = ScreenState(screen: screen, panel: panel, view: view)
+            let clickPanel = TidelineClickPanel(contentRect: tidelineClickFrame(for: screen))
+            let state = ScreenState(screen: screen, panel: panel, clickPanel: clickPanel, view: view)
+            clickPanel.onClick = { [weak self, weak state] in
+                guard let self, let state, !state.isExpanded else { return }
+                self.expand(state, clickedTideline: true)
+            }
             view.onUserLaunch = { [weak self] in
                 guard let self, self.barSession != nil else { return }
                 self.cancelBarSession()
@@ -470,6 +499,13 @@ final class TideBarController {
                       height: Layout.expandedHeight)
     }
 
+    private func tidelineClickFrame(for screen: NSScreen) -> NSRect {
+        NSRect(x: screen.frame.midX - Layout.tidelineClickWidth / 2,
+               y: barBottom(for: screen),
+               width: Layout.tidelineClickWidth,
+               height: Layout.tidelineClickHeight)
+    }
+
     /// 收起态接近热区：胶囊外扩
     private func hotZone(for screen: NSScreen) -> NSRect {
         let capsule = NSRect(x: screen.frame.midX - Layout.capsuleWidth / 2,
@@ -497,8 +533,9 @@ final class TideBarController {
         lastSampleTime = now
 
         let location = NSEvent.mouseLocation
+        fullscreenDetector.refresh(screens: screens.values.map(\.screen))
         for state in screens.values {
-            let fullscreen = isFullscreenNow(state.screen)
+            let fullscreen = fullscreenState(state.screen)
             if applyFullscreenBehavior(state, fullscreen: fullscreen) {
                 continue
             }
@@ -519,7 +556,8 @@ final class TideBarController {
                     scheduleCollapse(state)
                 }
                 state.view.updateHover(atScreen: location)
-            } else if !state.suppressExpandUntilMouseMove,
+            } else if state.effectiveFullscreenBehavior == .normal,
+                      !state.suppressExpandUntilMouseMove,
                       hotZone(for: state.screen).contains(location) {
                 expand(state)
             }
@@ -542,10 +580,12 @@ final class TideBarController {
         }
     }
 
-    private func expand(_ state: ScreenState) {
-        guard !state.hiddenForFullscreen else { return }
+    @discardableResult
+    private func expand(_ state: ScreenState, clickedTideline: Bool = false) -> Bool {
+        guard allowsExpansion(state, clickedTideline: clickedTideline) else { return false }
         state.suppressExpandUntilMouseMove = false
         state.isExpanded = true
+        syncTidelineClickTarget(state)
         cancelCollapse(state)
         state.panel.ignoresMouseEvents = false
         // WindowServer 对非 key 窗口会降级玻璃的背景采样（退化为纯模糊）——
@@ -556,6 +596,7 @@ final class TideBarController {
         syncBadgeCadence()
         state.view.setExpanded(true, apps: registry.entries)
         NSLog("TideBar expanded on screen %u", displayID(of: state.screen) ?? 0)
+        return true
     }
 
     private func collapse(_ state: ScreenState, animated: Bool, suppressReexpand: Bool = false) {
@@ -568,6 +609,7 @@ final class TideBarController {
         }
         state.panel.ignoresMouseEvents = true
         state.view.setExpanded(false, immediate: !animated)
+        syncTidelineClickTarget(state)
         syncBadgeCadence()
     }
 
@@ -617,75 +659,78 @@ final class TideBarController {
     // MARK: - 全屏
 
     func behaviorDidChange() {
-        fullscreenCache.removeAll()
+        fullscreenDetector.refresh(screens: screens.values.map(\.screen), force: true)
+        applyFullscreenStates()
+    }
+
+    private func applyFullscreenStates() {
         for state in screens.values {
-            _ = applyFullscreenBehavior(state, fullscreen: isFullscreenNow(state.screen))
+            _ = applyFullscreenBehavior(state, fullscreen: fullscreenState(state.screen))
         }
     }
 
-    private func applyFullscreenBehavior(_ state: ScreenState, fullscreen: Bool) -> Bool {
-        if fullscreen {
-            switch AppConfiguration.shared.fullscreenBehavior {
-            case .normal:
-                if state.hiddenForFullscreen {
-                    state.hiddenForFullscreen = false
-                    state.panel.orderFrontRegardless()
-                    state.panel.ignoresMouseEvents = !state.isExpanded
-                }
-                return false
-            case .lineOnly:
-                if state.hiddenForFullscreen {
-                    state.hiddenForFullscreen = false
-                    state.panel.orderFrontRegardless()
-                    state.panel.ignoresMouseEvents = !state.isExpanded
-                }
+    private func allowsExpansion(_ state: ScreenState, clickedTideline: Bool = false) -> Bool {
+        fullscreenDetector.refresh(screens: screens.values.map(\.screen))
+        _ = applyFullscreenBehavior(state, fullscreen: fullscreenState(state.screen))
+        return state.effectiveFullscreenBehavior.allowsExpansion(isExpanded: state.isExpanded,
+                                                                 clickedTideline: clickedTideline)
+    }
+
+    /// 返回 true 表示整屏面板隐藏，不参与鼠标采样；点击模式展开后仍走正常离场收起。
+    private func applyFullscreenBehavior(_ state: ScreenState, fullscreen: FullscreenState) -> Bool {
+        // 持续未知时保持普通交互可用；检测真值仍为 unknown。
+        let behavior = fullscreen == .fullscreen ? AppConfiguration.shared.fullscreenBehavior : .normal
+        let previous = state.effectiveFullscreenBehavior
+        state.effectiveFullscreenBehavior = behavior
+
+        if behavior == .hidden {
+            if state.isExpanded { collapse(state, animated: false) }
+            if barSession?.displayID == displayID(of: state.screen) {
+                endBarSession(collapse: false, suppressMouse: false)
+            }
+            state.panel.ignoresMouseEvents = true
+            if !state.hiddenForFullscreen {
+                state.hiddenForFullscreen = true
+                state.view.cancelApplicationIntake()
+                state.panel.orderOut(nil)
+            }
+        } else {
+            if state.hiddenForFullscreen {
+                state.hiddenForFullscreen = false
+                state.panel.orderFrontRegardless()
+                state.panel.ignoresMouseEvents = !state.isExpanded
+            }
+            // 只在进入点击模式时收起；成功点击后的展开不能被后续全屏轮询撤销。
+            if behavior == .clickToExpand, previous != .clickToExpand {
                 if state.isExpanded { collapse(state, animated: false) }
                 if barSession?.displayID == displayID(of: state.screen) {
                     endBarSession(collapse: false, suppressMouse: false)
                 }
-                return true
-            case .hidden:
-                if state.isExpanded { collapse(state, animated: false) }
-                if barSession?.displayID == displayID(of: state.screen) {
-                    endBarSession(collapse: false, suppressMouse: false)
-                }
-                state.panel.ignoresMouseEvents = true
-                if !state.hiddenForFullscreen {
-                    state.hiddenForFullscreen = true
-                    state.view.cancelApplicationIntake()
-                    state.panel.orderOut(nil)
-                }
-                return true
             }
         }
-
-        if state.hiddenForFullscreen {
-            state.hiddenForFullscreen = false
-            state.panel.orderFrontRegardless()
-            state.panel.ignoresMouseEvents = !state.isExpanded
-        }
-        return false
+        syncTidelineClickTarget(state)
+        return behavior == .hidden
     }
 
-    private func isFullscreenNow(_ screen: NSScreen) -> Bool {
-        guard let key = displayID(of: screen) else { return false }
-        let now = CACurrentMediaTime()
-        if let cached = fullscreenCache[key], now - cached.time < Layout.fullscreenCacheTTL {
-            return cached.value
+    private func syncTidelineClickTarget(_ state: ScreenState) {
+        state.clickPanel.setEnabled(state.effectiveFullscreenBehavior == .clickToExpand
+                                    && !state.isExpanded && !state.hiddenForFullscreen,
+                                    above: state.panel)
+    }
+
+    private func fullscreenState(_ screen: NSScreen) -> FullscreenState {
+        guard let key = displayID(of: screen) else { return .unknown }
+        let value = fullscreenDetector.state(on: key)
+        if fullscreenStates[key] != value {
+            NSLog("TideBar fullscreen state on screen %u -> %@", key, value.rawValue)
+            fullscreenStates[key] = value
         }
-        let value = FullscreenDetector.isFullscreen(screen: screen)
-        if fullscreenCache[key]?.value != value {
-            NSLog("TideBar fullscreen state on screen %u -> %d", key, value ? 1 : 0)
-        }
-        fullscreenCache[key] = (now, value)
         return value
     }
 
     private func activeSpaceChanged() {
-        fullscreenCache.removeAll()
-        for state in screens.values {
-            _ = applyFullscreenBehavior(state, fullscreen: isFullscreenNow(state.screen))
-        }
+        fullscreenDetector.invalidateContext()
+        behaviorDidChange()
     }
 
     func layoutDidChange() {
@@ -790,7 +835,8 @@ final class TideBarController {
     }
 
     private func screensChanged() {
-        fullscreenCache.removeAll()
+        fullscreenDetector.reset()
+        fullscreenStates.removeAll()
         rebuildPanels()
     }
 
@@ -798,7 +844,8 @@ final class TideBarController {
 
     private func showSurge(entry: AppEntry, state: ScreenState, iconFrame: NSRect,
                            fromKeyboard: Bool = false) {
-        guard let windows = entry.windows, !windows.isEmpty else { return }
+        guard allowsExpansion(state),
+              let windows = entry.windows, !windows.isEmpty else { return }
         dismissSurge(animated: false)
 
         let list = SurgeView(windows: windows, screen: state.screen, appIcon: entry.icon)

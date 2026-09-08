@@ -21,6 +21,6 @@
 "reducedMotion.alwaysOff" = "始终关闭";
 "reducedMotion.alwaysOn" = "始终开启";
 
-"fullscreen.lineOnly" = "仅显示汐线";
+"fullscreen.clickToExpand" = "点击展开";
 "fullscreen.normal" = "正常显示";
 "fullscreen.hidden" = "完全隐藏";

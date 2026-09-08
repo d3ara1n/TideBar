@@ -79,9 +79,17 @@ public enum ReducedMotionPreference: String, CaseIterable, Identifiable, Sendabl
 }
 
 public enum FullscreenBehavior: String, CaseIterable, Identifiable, Sendable {
-    case lineOnly
+    case clickToExpand
     case normal
     case hidden
 
     public var id: String { rawValue }
+
+    public func allowsExpansion(isExpanded: Bool, clickedTideline: Bool = false) -> Bool {
+        switch self {
+        case .clickToExpand: return isExpanded || clickedTideline
+        case .normal: return true
+        case .hidden: return false
+        }
+    }
 }

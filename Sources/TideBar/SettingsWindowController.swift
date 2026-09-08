@@ -98,7 +98,7 @@ private final class SettingsModel: ObservableObject {
     @Published private(set) var tidelineBrightness: TideLineBrightness = .automatic
     @Published private(set) var animation: AnimationPreset = .standard
     @Published private(set) var reducedMotion: ReducedMotionPreference = .automatic
-    @Published private(set) var fullscreenBehavior: FullscreenBehavior = .lineOnly
+    @Published private(set) var fullscreenBehavior: FullscreenBehavior = .clickToExpand
     @Published private(set) var switcherCommitDelay: Double = 0.9
 
     private var observers: [NSObjectProtocol] = []

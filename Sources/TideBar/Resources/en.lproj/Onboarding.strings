@@ -15,7 +15,7 @@
 
 // 第 2 步：窗口管理权限
 "permission.title" = "Window Management Access";
-"permission.message" = "Accessibility access is used to read the window list, tell minimized windows apart, and bring the window you pick back to the front.";
+"permission.message" = "Accessibility access is used to list windows, identify minimized and fullscreen states, and bring the window you pick back to the front.";
 "permission.grantedTitle" = "Access granted";
 "permission.grantedMessage" = "Window management is ready to run. If you just approved access, restart TideBar to manage your open apps.";
 "permission.deniedTitle" = "Not enabled";

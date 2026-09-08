@@ -21,6 +21,6 @@
 "reducedMotion.alwaysOff" = "Always Off";
 "reducedMotion.alwaysOn" = "Always On";
 
-"fullscreen.lineOnly" = "Tide Line Only";
+"fullscreen.clickToExpand" = "Click to Expand";
 "fullscreen.normal" = "Normal";
 "fullscreen.hidden" = "Fully Hidden";

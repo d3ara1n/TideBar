@@ -37,7 +37,7 @@ A new badge nudges the line once; unread, it keeps gently rippling; opening the 
 
 ## Permissions & Privacy
 
-- **One permission only**: Accessibility — used to list and restore windows.
+- **One permission only**: Accessibility — used to list and restore windows and detect fullscreen state.
 - **No screen recording**: TideBar shows no window thumbnails and never reads your screen.
 - **No network**: no tracking, no telemetry, no account.
 

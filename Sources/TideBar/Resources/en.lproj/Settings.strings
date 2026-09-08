@@ -85,7 +85,7 @@
 "windows.section.requirements" = "Requirements";
 "windows.accessibilityLabel" = "Accessibility access";
 "windows.footer.granted" = "Window management is ready to run. If you just approved access, restart TideBar to start watching apps that are already open.";
-"windows.footer.notGranted" = "Accessibility access is used to read the window list, tell minimized windows apart, and bring windows back to the front.";
+"windows.footer.notGranted" = "Accessibility access is used to list windows, identify minimized and fullscreen states, and bring windows back to the front.";
 
 // 外观与交互
 "appearance.header.description" = "Tune the theme, the tide line, expansion animation, and the app bar.";
@@ -102,7 +102,7 @@
 "appearance.animation.footer" = "Reduce motion overrides the system setting; Always Off keeps the spring and movement effects.";
 "appearance.fullscreen" = "Behavior in fullscreen apps";
 "appearance.section.fullscreen" = "Fullscreen Spaces";
-"appearance.fullscreen.footer" = "Tide Line Only never expands in fullscreen spaces; Fully Hidden temporarily removes the tide line and stops hit testing.";
+"appearance.fullscreen.footer" = "Fullscreen detection requires Accessibility access. Click to Expand opens the bar when you click the tide line; moving nearby does not open it. Fully Hidden removes the tide line. If fullscreen status cannot be determined, normal interaction remains available.";
 
 // 快捷键
 "shortcuts.header.description" = "Set global shortcuts and the commit delay for quick switching.";

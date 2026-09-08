@@ -15,7 +15,7 @@
 
 // 第 2 步：窗口管理权限
 "permission.title" = "窗口管理权限";
-"permission.message" = "辅助功能权限用于读取窗口列表、识别最小化状态，并把选中的窗口还原置前。";
+"permission.message" = "辅助功能权限用于读取窗口列表、识别最小化与全屏状态，并把选中的窗口还原置前。";
 "permission.grantedTitle" = "已授权";
 "permission.grantedMessage" = "窗口管理已具备运行条件。若刚刚完成授权，重启汐后即可管理已打开的应用。";
 "permission.deniedTitle" = "未授权";
