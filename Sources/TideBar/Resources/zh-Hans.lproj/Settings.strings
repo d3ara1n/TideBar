@@ -145,7 +145,7 @@
 "about.version" = "版本 %@（Build %@）";
 "about.devVersion" = "开发版本";
 "about.systemRequirements" = "系统要求";
-"about.requirementsValue" = "macOS 26 或更高版本";
+"about.requirementsValue" = "macOS 14 或更高版本";
 "about.copyright" = "版权";
 "about.feedback" = "反馈";
 

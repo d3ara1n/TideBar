@@ -135,7 +135,7 @@ final class SurgeRowView: NSView {
 // MARK: - 列表
 
 /// 潮涌窗口列表：本屏正常 → 他屏暗显 → 最小化暗显＋「已最小化」标签；行自图标侧（下）错峰升起。
-/// macOS 26 用液态玻璃底（与图标栏同材质），旧系统回退深色胶囊卡。
+/// 磨砂玻璃底，与图标栏同材质。
 @MainActor
 final class SurgeView: NSView {
     var onPick: ((WindowSnapshot) -> Void)?

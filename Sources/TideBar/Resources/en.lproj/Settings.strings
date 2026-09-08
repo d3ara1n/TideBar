@@ -145,7 +145,7 @@
 "about.version" = "Version %@ (Build %@)";
 "about.devVersion" = "development build";
 "about.systemRequirements" = "Requirements";
-"about.requirementsValue" = "macOS 26 or later";
+"about.requirementsValue" = "macOS 14 or later";
 "about.copyright" = "Copyright";
 "about.feedback" = "Feedback";
 

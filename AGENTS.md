@@ -11,7 +11,7 @@ macOS Dock 替代品：平时缩成屏幕底部一条细线，鼠标靠近时如
 ## 环境
 
 - 开发机：macOS 26（Tahoe）、Apple Silicon；Xcode 26 + Swift 6.3.3
-- 技术栈：Swift 6 + SPM（swift-tools 6.2，最低 macOS 26），**轻第三方依赖**（只收少而精的单用途小库，不引重型框架），不用 Xcode 工程
+- 技术栈：Swift 6 + SPM（swift-tools 6.2，最低 macOS 14），**轻第三方依赖**（只收少而精的单用途小库，不引重型框架），不用 Xcode 工程
 - bundle id `dev.dearain.TideBar`
 
 ## 构建与验证

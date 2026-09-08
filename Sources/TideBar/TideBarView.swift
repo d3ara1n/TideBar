@@ -15,7 +15,7 @@ final class StableBlurBackgroundView: NSView {
         super.init(frame: .zero)
         effect.material = .hudWindow
         effect.blendingMode = .behindWindow
-        // NSGlassEffectView 会随宿主窗口 key 状态切换外观；固定 active 避免失焦变色。
+        // 效果视图默认随宿主窗口 key 状态切换外观；固定 active 避免失焦变色。
         effect.state = .active
         effect.wantsLayer = true
         effect.layer?.masksToBounds = true

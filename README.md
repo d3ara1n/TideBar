@@ -43,7 +43,7 @@ A new badge nudges the line once; unread, it keeps gently rippling; opening the 
 
 ## Install
 
-Download the latest `TideBar.app` from [Releases](../../releases) and drag it into Applications. Requires **macOS 26** or later.
+Download the latest `TideBar.app` from [Releases](../../releases) and drag it into Applications. Requires **macOS 14** or later.
 
 ### Build from source
 
@@ -52,7 +52,7 @@ swift build    # compile
 swift run      # run locally (occupies the terminal, Ctrl-C to quit)
 ```
 
-Requires a Swift 6.2+ toolchain; macOS 26 minimum.
+Requires a Swift 6.2+ toolchain; macOS 14 minimum.
 
 ## Documentation
 

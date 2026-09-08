@@ -10,7 +10,7 @@ final class SettingsWindowController: NSWindowController {
         let window = NSWindow(contentViewController: hosting)
         window.title = L10nManager.shared.current.string("window.title", table: .settings)
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
-        // unified 标题栏与内容区融合，保留 macOS 26 的玻璃窗口观感。
+        // unified 标题栏与内容区融合，保留玻璃窗口观感。
         window.toolbar = NSToolbar(identifier: "TideBar.settings")
         window.toolbarStyle = .unified
         window.titleVisibility = .hidden

@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "TideBar",
     defaultLocalization: "en",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS(.v14)],
     dependencies: [
         .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "3.0.1"),
     ],
