@@ -61,7 +61,6 @@ Project docs are written in Chinese:
 - [Product positioning & core interactions](docs/product.md)
 - [Architecture decisions & conventions](docs/decisions.md)
 - [External copy source (bilingual)](docs/copy.md)
-- [Known issues](docs/known-issues.md)
 
 ## License
 

@@ -58,7 +58,6 @@ swift run      # 本地运行（占用终端，Ctrl-C 退出）
 - [产品定位与灵魂交互](docs/product.md)
 - [架构决策与技术约定](docs/decisions.md)
 - [对外话术（双语源头）](docs/copy.md)
-- [已知问题](docs/known-issues.md)
 
 ## 许可证
 

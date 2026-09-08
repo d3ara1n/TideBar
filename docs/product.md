@@ -23,7 +23,7 @@ macOS 零占用窗口任务栏：平时缩成屏幕底部一条细线，鼠标�
 
 ## 边界
 
-- 不做 dock 杂务：废纸篓、拖拽管理、Widget 不做；窗口预览延后
+- 不做 dock 杂务：废纸篓、拖拽管理、Widget 不做；窗口预览不做（决策见 [decisions.md](decisions.md)）
 - 通知角标是例外：经 Dock AX 镜像提供（路线与成本见 [decisions.md](decisions.md)），配合汐线涟漪形成自有通知语言
 - 系统级功能不自绘（依据见 [decisions.md](decisions.md)），精力全部花在差异化交互与窗口体验上
 
