@@ -330,11 +330,79 @@ final class TideBarView: NSView {
     private var expandGeneration = 0
     /// 未确认通知的持久波纹环（细线涟漪发散，展开即止）
     private var rippleRings: [CALayer] = []
+    private var applicationIntakeWork: DispatchWorkItem?
+    private var applicationIntakeUntil: CFTimeInterval = 0
+    private var notificationPulseUntil: CFTimeInterval = 0
+
+    /// 收纳只形变汐线，不改窗口或图层几何；同一动作期间的新启动合并消化。
+    func intakeApplications() {
+        let now = CACurrentMediaTime()
+        guard !isExpandedState, window?.isVisible == true, !Motion.shouldReduceMotion,
+              now >= notificationPulseUntil, now >= applicationIntakeUntil else { return }
+
+        // 收起的回归轻弹尚未结束时，等它落定；展开或隐藏会撤销这次请求。
+        let remaining = ["transform.scale.x", "transform.scale.y", "opacity"].compactMap {
+            tideline.animation(forKey: "motion.\($0)")
+        }.map { max(0, $0.beginTime + $0.duration - now) }.max() ?? 0
+        applicationIntakeUntil = now + remaining + Motion.intakeDuration
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.applicationIntakeWork = nil
+                guard !self.isExpandedState, self.window?.isVisible == true,
+                      !Motion.shouldReduceMotion,
+                      CACurrentMediaTime() >= self.notificationPulseUntil else {
+                    self.applicationIntakeUntil = 0
+                    return
+                }
+                self.applicationIntakeUntil = CACurrentMediaTime() + Motion.intakeDuration
+                Motion.keyframePulse(self.tideline, keyPath: "transform.scale.x",
+                                     peak: Motion.intakeScaleX, rest: CGFloat(1),
+                                     duration: Motion.intakeDuration,
+                                     growFraction: Motion.intakeGatherFraction)
+                Motion.keyframePulse(self.tideline, keyPath: "transform.scale.y",
+                                     peak: Motion.intakeScaleY, rest: CGFloat(1),
+                                     duration: Motion.intakeDuration,
+                                     growFraction: Motion.intakeGatherFraction)
+            }
+        }
+        applicationIntakeWork = work
+        if remaining > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + remaining, execute: work)
+        } else {
+            work.perform()
+        }
+    }
+
+    private func clearApplicationIntakeRequest() {
+        applicationIntakeWork?.cancel()
+        applicationIntakeWork = nil
+        applicationIntakeUntil = 0
+    }
+
+    /// 隐藏时撤销待播及正在播放的收纳，不影响独立的通知涟漪。
+    func cancelApplicationIntake() {
+        let wasActive = applicationIntakeWork == nil && CACurrentMediaTime() < applicationIntakeUntil
+        clearApplicationIntakeRequest()
+        guard wasActive else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for axis in ["x", "y"] {
+            let keyPath = "transform.scale.\(axis)"
+            tideline.removeAnimation(forKey: "motion.\(keyPath)")
+            tideline.setValue(CGFloat(1), forKeyPath: keyPath)
+        }
+        CATransaction.commit()
+    }
 
     /// 汐线脉冲：新角标出现时细线一次轻涌（仅收起态；进行中重触发从当前
     /// presentation 重新起跳，天然合并为一次）。展开态不脉冲——角标本身即反馈。
     func pulseTideline() {
         guard !isExpandedState else { return }
+        // 通知优先：接续收纳当前形态，撤销尚未播放的收纳。
+        clearApplicationIntakeRequest()
+        notificationPulseUntil = CACurrentMediaTime()
+            + (Motion.shouldReduceMotion ? Motion.pulseReduceDuration : Motion.pulseDuration)
         if Motion.shouldReduceMotion {
             Motion.keyframePulse(tideline, keyPath: "opacity",
                                  peak: Motion.pulseReducePeak, rest: Float(1),
@@ -525,6 +593,8 @@ final class TideBarView: NSView {
     // MARK: 状态切换
 
     func setExpanded(_ expanded: Bool, apps: [AppEntry] = [], immediate: Bool = false) {
+        clearApplicationIntakeRequest()
+        notificationPulseUntil = 0
         expandGeneration += 1
         if expanded {
             // 展开即确认：未读提醒的波纹停住（角标本身接管展示）
@@ -544,11 +614,11 @@ final class TideBarView: NSView {
                 return
             }
             // 1) 汐线感应：增厚预告（裸层中心锚点，对称膨胀）
-            Motion.basic(tideline, keyPath: "transform.scale.x", from: 1.0, to: 1.12,
+            Motion.basic(tideline, keyPath: "transform.scale.x", to: 1.12,
                          duration: Motion.senseDuration)
-            Motion.basic(tideline, keyPath: "transform.scale.y", from: 1.0, to: 1.5,
+            Motion.basic(tideline, keyPath: "transform.scale.y", to: 1.5,
                          duration: Motion.senseDuration)
-            Motion.basic(tideline, keyPath: "opacity", from: 1.0, to: 0.0,
+            Motion.basic(tideline, keyPath: "opacity", to: 0.0,
                          duration: Motion.tidelineFadeDuration, delay: Motion.glassFadeDelay)
             // 2) 潮体显形并弹性胀开：胶囊 → bar（transform 缩放，中心对称）
             let peak: Float = glass != nil ? Motion.swellPeakOpacity : 1.0
@@ -620,9 +690,13 @@ final class TideBarView: NSView {
             // 汐线回归 + 轻弹（潮合上的一下）
             Motion.basic(tideline, keyPath: "opacity", from: 0.0, to: 1.0,
                          duration: Motion.tidelineReturnDuration, delay: tail)
-            Motion.spring(tideline, keyPath: "transform.scale", from: Motion.capsulePopScale, to: 1.0,
-                          stiffness: Motion.capsulePopStiffness, damping: Motion.capsulePopDamping,
-                          minDuration: Motion.capsulePopDuration, delay: tail)
+            // 与感应、通知、收纳共用轴向动画键，后来的动作可从当前形态接管。
+            for axis in ["x", "y"] {
+                Motion.spring(tideline, keyPath: "transform.scale.\(axis)",
+                              from: Motion.capsulePopScale, to: 1.0,
+                              stiffness: Motion.capsulePopStiffness, damping: Motion.capsulePopDamping,
+                              minDuration: Motion.capsulePopDuration, delay: tail)
+            }
         }
     }
 
@@ -665,8 +739,9 @@ final class TideBarView: NSView {
     }
 
     private func fade(_ view: NSView, to: CGFloat, delay: TimeInterval, duration: TimeInterval) {
-        let bridge = MainThreadBridge { [weak view] in
-            guard let view else { return }
+        let generation = expandGeneration
+        let bridge = MainThreadBridge { [weak self, weak view] in
+            guard let self, let view, self.expandGeneration == generation else { return }
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = duration
                 context.timingFunction = CAMediaTimingFunction(name: .easeOut)

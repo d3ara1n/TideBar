@@ -83,6 +83,13 @@ enum Motion {
     static let badgeAppearScale: CGFloat = 0.6
     static var badgeFadeDuration: TimeInterval { time(0.18) }
 
+    // MARK: 汐线收纳（应用进入逻辑运行态）
+
+    static var intakeDuration: TimeInterval { time(0.36) }
+    static let intakeGatherFraction: Double = 0.38
+    static let intakeScaleX: CGFloat = 0.90
+    static let intakeScaleY: CGFloat = 1.45
+
     // MARK: 汐线脉冲与波纹（收起态新角标提醒）
 
     /// 一次性涌落：前段涌起占比，余下回落；从当前 presentation 起跳，重触发自然合并

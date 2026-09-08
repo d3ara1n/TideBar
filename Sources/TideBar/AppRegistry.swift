@@ -135,6 +135,10 @@ final class AppRegistry {
 
     private(set) var entries: [AppEntry] = []
     var onChange: (() -> Void)?
+    /// 本轮确认的逻辑启动合并为一次收纳事件，初始快照只建立基线。
+    var onApplicationsStarted: (() -> Void)?
+    private var hasRunningBaseline = false
+    private var lastKnownRunning: [AppIdentity: Bool] = [:]
 
     private let windowStore = WindowStore()
     private let badgeStore = BadgeStore()
@@ -252,6 +256,8 @@ final class AppRegistry {
 
         var pinnedEntries: [AppEntry] = []
         var runningEntries: [AppEntry] = []
+        var knownRunning: [AppIdentity: Bool] = [:]
+        var applicationsStarted = false
         for description in composed {
             let apps = description.runningInstances.compactMap {
                 runningByPID[pid_t($0.processIdentifier)]
@@ -262,6 +268,24 @@ final class AppRegistry {
             let windowKnowledge = WindowKnowledge.aggregate(apps.map {
                 windowStore.knowledge(for: $0.processIdentifier)
             })
+            // 在可见性过滤前记录运行状态：未固定且没有窗口的 Finder 也需保留基线。
+            let requiresWindows = description.behavior.visibility == .whenHasKnownWindows
+            if requiresWindows, !apps.isEmpty, windowKnowledge.elements == nil {
+                // 未知不是退出；恢复读取时沿用上次已确认状态。
+                knownRunning[description.identity] = lastKnownRunning[description.identity]
+            } else {
+                let isRunning = description.behavior.logicalIsRunning(
+                    processIsRunning: !apps.isEmpty,
+                    knownWindowCount: windowKnowledge.elements?.count
+                )
+                let previous = lastKnownRunning[description.identity]
+                knownRunning[description.identity] = isRunning
+                // 窗口驱动的应用首次获得知识只建基线，不把 AX 就绪当作启动。
+                if hasRunningBaseline, isRunning, previous != true,
+                   !requiresWindows || previous != nil {
+                    applicationsStarted = true
+                }
+            }
             guard description.behavior.isVisible(
                 isPinned: description.isPinned,
                 processIsRunning: !apps.isEmpty,
@@ -304,8 +328,12 @@ final class AppRegistry {
         let iconChanged = entries.count == newEntries.count
             && zip(entries, newEntries).contains { !$0.icon.isEqual($1.icon) }
         entries = newEntries
+        lastKnownRunning = knownRunning
+        hasRunningBaseline = true
         if oldRevision != newRevision || iconChanged {
             onChange?()
         }
+        // 先提交模型与几何，再发送视觉反馈。
+        if applicationsStarted { onApplicationsStarted?() }
     }
 }

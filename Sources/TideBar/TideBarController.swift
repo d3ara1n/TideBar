@@ -49,6 +49,7 @@ final class TideBarController {
     func start() {
         registry.onChange = { [weak self] in self?.appsDidChange() }
         registry.onBadgePulse = { [weak self] in self?.badgePulse() }
+        registry.onApplicationsStarted = { [weak self] in self?.applicationsStarted() }
         registry.start()
         if AppConfiguration.shared.isTakeoverEnabled {
             rebuildPanels()
@@ -577,6 +578,13 @@ final class TideBarController {
         registry.setBadgeCadence(expanded: screens.values.contains { $0.isExpanded })
     }
 
+    /// 逻辑启动只在当前可见的折叠汐线上反馈，不积压到下次折叠或显示。
+    private func applicationsStarted() {
+        for state in screens.values where !state.isExpanded && !state.hiddenForFullscreen {
+            state.view.intakeApplications()
+        }
+    }
+
     /// 新角标事件：收起态的汐线轻涌一次并启动持久波纹（展开即确认停住）。
     /// 展开态不脉冲，角标本身即反馈。
     private func badgePulse() {
@@ -644,6 +652,7 @@ final class TideBarController {
                 state.panel.ignoresMouseEvents = true
                 if !state.hiddenForFullscreen {
                     state.hiddenForFullscreen = true
+                    state.view.cancelApplicationIntake()
                     state.panel.orderOut(nil)
                 }
                 return true

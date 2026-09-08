@@ -205,3 +205,12 @@ defaults delete com.apple.dock autohide-delay && killall Dock
 - Apple，Environment 消费者更新：https://developer.apple.com/documentation/swiftui/environment
 - Apple，Observation 与模型读取：https://developer.apple.com/documentation/swiftui/managing-model-data-in-your-app
 - Apple，`id(_:)` 的状态重置语义：https://developer.apple.com/documentation/swiftui/view/id(_:)
+
+## 2026-09 汐线应用收纳反馈
+
+细化「应用状态与列表动画」的收起态反馈约定；收起期间仍不积压逐项图标动画。
+
+1. **逻辑运行状态驱动**：Registry 确认应用从未运行进入运行态后发送一次合并事件，覆盖已固定应用；固定操作、普通窗口内容刷新、初始快照不触发。窗口驱动的应用首次获得窗口知识只建立基线，读取降级保留上次已知运行状态，避免把 AX 就绪或恢复当作启动。
+2. **中心固定、向内收纳**：可见折叠汐线一次轻微收窄、增厚后恢复，默认约 360ms，只改变显式 transform，不改变窗口或图层几何。Registry 去抖合并同轮启动，待播或动作进行中的后续启动合并消化。
+3. **衔接与优先级**：收起回归动作结束后再收纳；中途展开取消待播并从当前形态接续；全屏隐藏撤销待播与正在播放的收纳。通知脉冲优先接管，脉冲期间不追加收纳，独立的持久涟漪照常运行。
+4. **反馈不积压**：展开态、隐藏态、减少动态效果开启时不播放收纳，也不补播到下次折叠或显示。
