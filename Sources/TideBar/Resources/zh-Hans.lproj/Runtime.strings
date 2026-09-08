@@ -1,4 +1,5 @@
 "window.fallbackTitle" = "窗口";
+"window.minimizedBadge" = "已最小化";
 "dock.error.unsupportedValue" = "Dock 配置项无法保存：%@";
 "dock.error.synchronizeFailed" = "Dock 偏好设置同步失败";
 "dock.error.verificationFailed" = "Dock 配置验证失败";

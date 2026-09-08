@@ -1,4 +1,5 @@
 "window.fallbackTitle" = "Window";
+"window.minimizedBadge" = "Minimized";
 "dock.error.unsupportedValue" = "Couldn't save Dock preference: %@";
 "dock.error.synchronizeFailed" = "Couldn't synchronize Dock preferences";
 "dock.error.verificationFailed" = "Couldn't verify Dock configuration";

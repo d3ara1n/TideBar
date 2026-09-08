@@ -40,6 +40,13 @@ enum Layout {
     static let surgeRowHeight: CGFloat = 28
     static let surgeVPadding: CGFloat = 6
     static let surgeGap: CGFloat = 8
+    // 最小化行尾「已最小化」圆角标签：字号、标签高、水平内边、圆角、标题间隙与右缘留白
+    static let surgeMinimizedBadgeFontSize: CGFloat = 10.5
+    static let surgeMinimizedBadgeHeight: CGFloat = 16
+    static let surgeMinimizedBadgePaddingX: CGFloat = 7
+    static let surgeMinimizedBadgeCornerRadius: CGFloat = 5
+    static let surgeMinimizedBadgeGap: CGFloat = 8
+    static let surgeMinimizedBadgeTrailing: CGFloat = 12
     static var surgeStaggerStep: TimeInterval {
         0.025 / AppConfiguration.shared.animation.speedFactor
     }

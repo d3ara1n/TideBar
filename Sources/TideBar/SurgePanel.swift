@@ -3,7 +3,8 @@ import ApplicationServices
 
 // MARK: - 行
 
-/// 潮涌列表项：窗口标题 + 文档图标（回退 app 图标）；最小化/他屏暗显。
+/// 潮涌列表项：窗口标题 + 文档图标（回退 app 图标）；最小化/他屏暗显，
+/// 最小化行尾另加「已最小化」标签与他屏窗口区分。
 /// 悬停态由控制器鼠标采样轮询驱动（tracking area 在非激活悬浮窗上不可靠）。
 @MainActor
 final class SurgeRowView: NSView {
@@ -81,9 +82,47 @@ final class SurgeRowView: NSView {
             .foregroundColor: titleColor,
             .paragraphStyle: paragraph,
         ]
+        // 最小化标签：宽度按文字实测，仅在最小化行占用行尾空间
+        let badgeText = snapshot.isMinimized
+            ? L10nManager.shared.current.string("window.minimizedBadge", table: .runtime)
+            : nil
+        let badgeAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: Layout.surgeMinimizedBadgeFontSize, weight: .medium),
+            .foregroundColor: titleColor,
+        ]
+        var badgeWidth: CGFloat = 0
+        var textSize = NSSize.zero
+        if let badgeText {
+            textSize = (badgeText as NSString).size(withAttributes: badgeAttributes)
+            badgeWidth = textSize.width + Layout.surgeMinimizedBadgePaddingX * 2
+        }
+        let badgeReserve = badgeText == nil ? 0 : badgeWidth + Layout.surgeMinimizedBadgeGap
         let titleRect = NSRect(x: iconRect.maxX + 10, y: (bounds.height - 17) / 2,
-                               width: bounds.width - iconRect.maxX - 24, height: 17)
+                               width: bounds.width - iconRect.maxX - 24 - badgeReserve, height: 17)
         (title as NSString).draw(in: titleRect, withAttributes: attributes)
+
+        if let badgeText {
+            let badgeRect = NSRect(x: bounds.width - Layout.surgeMinimizedBadgeTrailing - badgeWidth,
+                                   y: (bounds.height - Layout.surgeMinimizedBadgeHeight) / 2,
+                                   width: badgeWidth, height: Layout.surgeMinimizedBadgeHeight)
+            let background = NSBezierPath(roundedRect: badgeRect,
+                                            xRadius: Layout.surgeMinimizedBadgeCornerRadius,
+                                            yRadius: Layout.surgeMinimizedBadgeCornerRadius)
+            let fill: NSColor
+            if onGlass {
+                fill = NSColor(cgColor: AppearanceColors.cgColor(.labelColor, alpha: 0.14,
+                                                                 for: effectiveAppearance)) ?? .labelColor
+            } else {
+                fill = NSColor.white.withAlphaComponent(0.18)
+            }
+            fill.setFill()
+            background.fill()
+            // draw(in:) 水平自然对齐且贴顶，用恰好包裹文字的 rect 以标签中心手动居中
+            let textRect = NSRect(x: badgeRect.midX - textSize.width / 2,
+                                  y: badgeRect.midY - textSize.height / 2,
+                                  width: textSize.width, height: textSize.height)
+            (badgeText as NSString).draw(in: textRect, withAttributes: badgeAttributes)
+        }
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -95,7 +134,7 @@ final class SurgeRowView: NSView {
 
 // MARK: - 列表
 
-/// 潮涌窗口列表：本屏正常 → 他屏暗显 → 最小化暗显；行自图标侧（下）错峰升起。
+/// 潮涌窗口列表：本屏正常 → 他屏暗显 → 最小化暗显＋「已最小化」标签；行自图标侧（下）错峰升起。
 /// macOS 26 用液态玻璃底（与图标栏同材质），旧系统回退深色胶囊卡。
 @MainActor
 final class SurgeView: NSView {
