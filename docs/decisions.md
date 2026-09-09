@@ -191,7 +191,7 @@ killall Dock
 ## 窗口画面与 ScreenCaptureKit
 
 1. **不做悬停窗口实时预览**：ScreenCaptureKit 逐窗抓图的成本高于收益；可行性表相关行仅作技术路线留档。
-2. **ScreenCaptureKit 永不引入**：任何窗口画面能力不走 SCK，权限面永久收敛到辅助功能一项，与对外权限话术（[copy.md](copy.md) §五）一致。缩略图类能力若立项，走私有 CGS（SkyLight）抓图——不触发 TCC、可截最小化窗口；调研文档 §四留有同类应用现状（纯 SCK 在 macOS 14/15 有崩溃/bug，AltTab 至 macOS 26 才全量 SCK；逐窗抓图主流是私有 `CGSHWCaptureWindowList`）。
+2. **ScreenCaptureKit 永不引入**：任何窗口画面能力不走 SCK，权限面永久收敛到辅助功能一项；对外话术源 [copy.md](copy.md) §五 现为占位稿，定稿时须与本决策一致。缩略图类能力若立项，走私有 CGS（SkyLight）抓图——不触发 TCC、可截最小化窗口；调研文档 §四留有同类应用现状（纯 SCK 在 macOS 14/15 有崩溃/bug，AltTab 至 macOS 26 才全量 SCK；逐窗抓图主流是私有 `CGSHWCaptureWindowList`）。
 3. **隐私话术受益**：不显示缩略图坐实「不读屏幕内容、永远不请求屏幕录制权限」的对外承诺。
 
 ## 部署基线
