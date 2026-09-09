@@ -125,21 +125,25 @@ final class WindowStore {
     private var watches: [pid_t: Watch] = [:]
     private var observers: [NSObjectProtocol] = []
     private var loggedNoPermission = false
+    /// 已激活观测（幂等重入的恢复入口用）
+    private var activated = false
     /// 展开态才响应 title 通知（见 setExpanded）
     private var maintainsTitles = false
     /// 快照集合变化（应用身份粒度）
     var onUpdate: ((AppIdentity) -> Void)?
 
     func start() {
+        guard !activated else { return }
         let trusted = AXIsProcessTrusted()
         guard trusted else {
-            // 零权限安全态：不注册任何观测，交互退化为纯图标 + 激活（授权入口在设置界面）
+            // 主功能不空等授权：失败即停，恢复由设置/引导窗口的授权边沿广播驱动
             if !loggedNoPermission {
                 NSLog("TideBar WindowStore inactive: accessibility not granted")
                 loggedNoPermission = true
             }
             return
         }
+        activated = true
         let center = NSWorkspace.shared.notificationCenter
         observers.append(center.addObserver(forName: NSWorkspace.didLaunchApplicationNotification,
                                             object: nil, queue: .main) { [weak self] note in

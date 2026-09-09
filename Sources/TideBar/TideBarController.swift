@@ -2,6 +2,12 @@ import AppKit
 import CoreGraphics
 import TideBarCore
 
+extension Notification.Name {
+    /// AX 授权到位（设置/引导窗口的权限轮询在 false→true 边沿广播）：
+    /// 主功能侧无权限即停摆不空等，靠此信号恢复观测
+    static let axPermissionGranted = Notification.Name("TideBar.axPermissionGranted")
+}
+
 /// 编排者：每屏一个 panel；接近检测三重兜底（全局 monitor + local monitor + 统一调度器轮询）；
 /// 展开/收起状态机与 300ms 防抖；全屏 Space 抑制展开
 @MainActor
@@ -53,7 +59,7 @@ final class TideBarController {
     func start() {
         fullscreenDetector.onChange = { [weak self] in self?.applyFullscreenStates() }
         registry.onChange = { [weak self] in self?.appsDidChange() }
-        registry.onBadgePulse = { [weak self] in self?.badgePulse() }
+        registry.onBadgePulse = { [weak self] name in self?.badgePulse(named: name) }
         registry.onApplicationsStarted = { [weak self] in self?.applicationsStarted() }
         registry.start()
         if AppConfiguration.shared.isTakeoverEnabled {
@@ -95,10 +101,25 @@ final class TideBarController {
             activationBridge()
         })
 
+        let permissionBridge = MainThreadBridge { [weak self] in self?.axPermissionRestored() }
+        observers.append(NotificationCenter.default.addObserver(
+            forName: .axPermissionGranted, object: nil, queue: .main) { _ in
+                permissionBridge()
+            })
+
         NSLog("TideBar started: screens=%d", screens.count)
     }
 
+    /// AX 授权到位（设置/引导窗口广播）：主功能无权限时停摆，这里一次性恢复。
+    /// 重复广播无害——各 start 幂等，detector 已在跑则直接短路。
+    private func axPermissionRestored() {
+        NSLog("TideBar AX permission granted: window knowledge resuming")
+        registry.activateWindowKnowledge()
+        fullscreenDetector.permissionRestored()
+    }
+
     func stop() {
+        NSLog("TideBar stopped")
         if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }
         if let keyboardMonitor { NSEvent.removeMonitor(keyboardMonitor) }
@@ -257,6 +278,8 @@ final class TideBarController {
                                      timeout: switcherTimeout)
         state.view.setKeyboardSelection(barSession?.selectedApplication)
         if mode == .switcher { armSwitcherTimeout() }
+        NSLog("TideBar keyboard session began (mode: %@, screen %u)",
+              mode == .switcher ? "switcher" : "persistent", displayID)
     }
 
     private func isKeyboardHolding(_ state: ScreenState) -> Bool {
@@ -332,15 +355,18 @@ final class TideBarController {
         cancelSwitcherTimeout()
         switch session.level {
         case .inactive:
+            NSLog("TideBar keyboard session committed (level: inactive)")
             endBarSession(collapse: true, suppressMouse: true)
         case .applications:
             if let identity = session.selectedApplication,
                let entry = registry.entries.first(where: { $0.identity == identity }) {
+                NSLog("TideBar keyboard session committed (application: %@)", identity.bundleIdentifier)
                 entry.primaryClick()
             }
             endBarSession(collapse: session.isPersistent || session.openedBySession,
                           suppressMouse: session.openedBySession)
         case .windows(let identity):
+            NSLog("TideBar keyboard session committed (windows: %@)", identity.bundleIdentifier)
             if let entry = registry.entries.first(where: { $0.identity == identity }),
                let identifier = session.selectedWindowIdentifier,
                let window = entry.windows?.first(where: { $0.elementIdentifier == identifier }),
@@ -360,6 +386,7 @@ final class TideBarController {
             dismissSurge(animated: true)
             return
         }
+        NSLog("TideBar keyboard session cancelled")
         endBarSession(collapse: session.isPersistent || session.openedBySession,
                       suppressMouse: session.openedBySession)
     }
@@ -419,6 +446,7 @@ final class TideBarController {
             screens.removeAll()
             fullscreenDetector.reset()
             fullscreenStates.removeAll()
+            NSLog("TideBar takeover disabled: panels closed")
             return
         }
         registry.refresh()
@@ -613,6 +641,7 @@ final class TideBarController {
         state.view.setExpanded(false, immediate: !animated)
         syncTidelineClickTarget(state)
         syncBadgeCadence()
+        NSLog("TideBar collapsed on screen %u (animated: %d)", displayID(of: state.screen) ?? 0, animated)
     }
 
     // MARK: 展开态节奏与汐线脉冲
@@ -627,14 +656,19 @@ final class TideBarController {
 
     /// 逻辑启动只在当前可见的折叠汐线上反馈，不积压到下次折叠或显示。
     private func applicationsStarted() {
-        for state in screens.values where !state.isExpanded && !state.hiddenForFullscreen {
+        let targets = screens.values.filter { !$0.isExpanded && !$0.hiddenForFullscreen }
+        if !targets.isEmpty {
+            NSLog("TideBar applications started: intake wave on %d screen(s)", targets.count)
+        }
+        for state in targets {
             state.view.intakeApplications()
         }
     }
 
     /// 新角标事件：收起态的汐线轻涌一次并启动持久波纹（展开即确认停住）。
     /// 展开态不脉冲，角标本身即反馈。
-    private func badgePulse() {
+    private func badgePulse(named name: String) {
+        NSLog("TideBar badge pulse: %@", name)
         for state in screens.values where !state.isExpanded && !state.hiddenForFullscreen {
             state.view.pulseTideline()
             state.view.startTidelineRipple()
@@ -843,6 +877,7 @@ final class TideBarController {
         fullscreenDetector.reset()
         fullscreenStates.removeAll()
         rebuildPanels()
+        NSLog("TideBar screens changed: %d screen(s)", screens.count)
     }
 
     // MARK: - 潮涌

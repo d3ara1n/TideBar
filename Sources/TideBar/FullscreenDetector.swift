@@ -11,6 +11,8 @@ final class FullscreenDetector {
     private var lastRequest: CFTimeInterval?
     private var busy = false
     private var samplingOffset = 0
+    /// 权限丢失后停摆：无权限不再逐 tick 清理与广播，恢复靠授权边沿广播
+    private var permissionLost = false
     var onChange: (() -> Void)?
 
     func state(on displayID: CGDirectDisplayID) -> FullscreenState {
@@ -36,9 +38,14 @@ final class FullscreenDetector {
         if let lastRequest, now - lastRequest < Layout.fullscreenPollInterval { return }
         lastRequest = now
         guard AXIsProcessTrusted() else {
-            // 权限撤销立即清空确认值；不触发授权提示，下轮仍会检查权限恢复。
-            observations.invalidate(clearConfirmed: true)
-            onChange?()
+            // 主功能不空等授权：丢失瞬间清理一次并停摆，不逐 tick 空转；
+            // 恢复由设置/引导窗口的授权边沿广播驱动（permissionRestored）
+            if !permissionLost {
+                permissionLost = true
+                observations.invalidate(clearConfirmed: true)
+                onChange?()
+                NSLog("TideBar fullscreen detection paused: accessibility not granted")
+            }
             return
         }
         let excludedPIDs = Set([ProcessInfo.processInfo.processIdentifier]
@@ -66,6 +73,13 @@ final class FullscreenDetector {
 
     func invalidateContext() {
         observations.invalidate(clearConfirmed: true)
+        lastRequest = nil
+    }
+
+    /// 授权恢复（设置/引导窗口广播）：解除停摆，清节流让下一拍立即重读
+    func permissionRestored() {
+        guard permissionLost else { return }
+        permissionLost = false
         lastRequest = nil
     }
 

@@ -23,18 +23,23 @@ final class BadgeStore {
     private var dockPID: pid_t?
     private var busy = false
     private var consecutiveFailures = 0
+    /// 已激活轮询（幂等重入的恢复入口用）
+    private var started = false
     private let readQueue = DispatchQueue(label: "dev.dearain.TideBar.badges", qos: .utility)
 
     /// 角标集合变化（Registry 去抖后刷新模型）
     var onUpdate: (() -> Void)?
-    /// 新角标出现或计数增长（合并为一次事件；仅收起态消费）
-    var onPulse: (() -> Void)?
+    /// 新角标出现或计数增长（合并为一次事件，携带显示名；仅收起态消费）
+    var onPulse: ((String) -> Void)?
 
     func start() {
+        guard !started else { return }
         guard AXIsProcessTrusted() else {
+            // 主功能不空等授权：失败即停，恢复由设置/引导窗口的授权边沿广播驱动
             NSLog("TideBar BadgeStore inactive: accessibility not granted")
             return
         }
+        started = true
         PollScheduler.shared.register(Self.badgeDemand, interval: Layout.badgePollCollapsed) { [weak self] in
             self?.poll()
         }
@@ -95,26 +100,27 @@ final class BadgeStore {
         }
         let baselineJustEstablished = !hasBaseline
         hasBaseline = true
-        let pulsed = !baselineJustEstablished && Self.detectPulse(old: values, new: parsed)
+        let pulsedName = baselineJustEstablished ? nil : Self.detectPulse(old: values, new: parsed)
         guard parsed != values else { return }
         values = parsed
         onUpdate?()
-        if pulsed { onPulse?() }
+        if let pulsedName { onPulse?(pulsedName) }
     }
 
     /// 脉冲判定：出现（无→有）或计数增长。数值回落、形态切换不脉冲。
-    private static func detectPulse(old: [String: BadgeValue], new: [String: BadgeValue]) -> Bool {
+    /// 返回首个触发脉冲的显示名（供脉冲事件定位来源 app）。
+    private static func detectPulse(old: [String: BadgeValue], new: [String: BadgeValue]) -> String? {
         for (name, value) in new {
             switch (old[name], value) {
             case (nil, _):
-                return true
+                return name
             case (.count(let previous), .count(let current)) where current > previous:
-                return true
+                return name
             default:
                 continue
             }
         }
-        return false
+        return nil
     }
 
     // MARK: AX 读取（后台队列；纯 C API，不触主线程状态）

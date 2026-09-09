@@ -145,8 +145,8 @@ final class AppRegistry {
 
     private let windowStore = WindowStore()
     private let badgeStore = BadgeStore()
-    /// 新角标出现/增长（收起态由控制器消费为汐线脉冲）
-    var onBadgePulse: (() -> Void)?
+    /// 新角标出现/增长（携带显示名；收起态由控制器消费为汐线脉冲）
+    var onBadgePulse: ((String) -> Void)?
     private var refreshDebounce: DispatchWorkItem?
     private var observers: [NSObjectProtocol] = []
 
@@ -170,7 +170,7 @@ final class AppRegistry {
         windowStore.onUpdate = { [weak self] _ in self?.refreshSoon() }
         windowStore.start()
         badgeStore.onUpdate = { [weak self] in self?.refreshSoon() }
-        badgeStore.onPulse = { [weak self] in self?.onBadgePulse?() }
+        badgeStore.onPulse = { [weak self] name in self?.onBadgePulse?(name) }
         badgeStore.start()
         refresh()
     }
@@ -183,6 +183,13 @@ final class AppRegistry {
     /// 重读全部窗口知识（frame→屏归属）；展开时消费，保证点色反映最新窗口位置
     func refreshWindows() {
         windowStore.refreshAll()
+    }
+
+    /// AX 授权到位后的（重）启动入口：幂等，已激活的 store 短路；
+    /// 消费方为授权恢复广播，与启动时的 start 同一入口
+    func activateWindowKnowledge() {
+        windowStore.start()
+        badgeStore.start()
     }
 
     /// 展开/收起切换窗口内容维护范围（title/document 停更/恢复），与角标节奏同源切换

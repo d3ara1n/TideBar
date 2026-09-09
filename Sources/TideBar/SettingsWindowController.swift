@@ -157,6 +157,10 @@ private final class SettingsModel: ObservableObject {
         let trusted = AXIsProcessTrusted()
         guard trusted != accessibilityTrusted else { return }
         accessibilityTrusted = trusted
+        // 授权边沿顺便驱动主功能恢复：UI 轮询已在跑，零新增轮询
+        if trusted {
+            NotificationCenter.default.post(name: .axPermissionGranted, object: nil)
+        }
     }
 
     func setApplicationTheme(_ theme: ApplicationTheme) {

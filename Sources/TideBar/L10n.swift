@@ -59,7 +59,7 @@ struct Localization: Equatable, Sendable {
         guard let path = Bundle.module.path(forResource: code, ofType: "lproj")
                 ?? Bundle.module.path(forResource: code.lowercased(), ofType: "lproj"),
               let bundle = Bundle(path: path) else {
-            NSLog("L10n: missing localization %@ in module bundle", code)
+            NSLog("TideBar L10n missing localization %@ in module bundle", code)
             return Bundle.module
         }
         return bundle
