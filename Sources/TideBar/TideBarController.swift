@@ -218,12 +218,9 @@ final class TideBarController {
             cancelBarSession()
             return
         }
-        // 必须在展开面板前读取，避免 key 面板改变 frontmostApplication。
-        let initialApplication = preferredInitialApplication()
         let openedBySession = !state.isExpanded
         if !state.isExpanded, !expand(state) { return }
-        beginSession(mode: .persistent, on: state, openedBySession: openedBySession,
-                     initialApplication: initialApplication)
+        beginSession(mode: .persistent, on: state, openedBySession: openedBySession)
     }
 
     private func cycleSwitcherSession() {
@@ -241,12 +238,9 @@ final class TideBarController {
             return
         }
         if barSession == nil {
-            // 必须在展开面板前读取，避免 key 面板改变 frontmostApplication。
-            let initialApplication = preferredInitialApplication()
             let openedBySession = !state.isExpanded
             if !state.isExpanded, !expand(state) { return }
-            beginSession(mode: .switcher, on: state, openedBySession: openedBySession,
-                         initialApplication: initialApplication)
+            beginSession(mode: .switcher, on: state, openedBySession: openedBySession)
         } else {
             moveApplication(by: 1)
             armSwitcherTimeout()
@@ -267,9 +261,12 @@ final class TideBarController {
     }
 
     private func beginSession(mode: BarSessionMode, on state: ScreenState,
-                              openedBySession: Bool,
-                              initialApplication: AppIdentity?) {
+                              openedBySession: Bool) {
         guard let displayID = displayID(of: state.screen) else { return }
+        // frontmost 需在 makeKey 前读取：面板成为 key 后 TideBar 即为 frontmost
+        let initialApplication = preferredInitialApplication()
+        // 键盘会话拥有键盘：面板成为 key，方向键/回车才经 local monitor 进入本 app
+        state.panel.makeKey()
         barSession = BarSessionState(mode: mode,
                                      displayID: displayID,
                                      openedBySession: openedBySession,
@@ -616,9 +613,6 @@ final class TideBarController {
         syncTidelineClickTarget(state)
         cancelCollapse(state)
         state.panel.ignoresMouseEvents = false
-        // WindowServer 对非 key 窗口会降级玻璃的背景采样（退化为纯模糊）——
-        // 展开期间保持 key，材质层全质量常驻；nonactivating 面板不夺取系统焦点
-        state.panel.makeKey()
         // 挂起期间积压的终止通知可能尚未消费；展开即用户可见时刻，先同步对账
         registry.refresh()
         // 重读窗口 frame→屏归属：跨屏移动发生在收起期无通知，展开时拉一次新鲜值
@@ -912,7 +906,6 @@ final class TideBarController {
                                                    height: min(height, visible.maxY - y)))
         panel.contentView = list
         panel.orderFrontRegardless()
-        panel.makeKey()   // 玻璃采样需要 key（同汐线展开的理由）
         surgePanel = panel
         surgeIdentity = entry.id
         surgeWindowRevision = entry.windowRevision
@@ -930,15 +923,10 @@ final class TideBarController {
     private func dismissSurge(animated: Bool) {
         cancelSurgeDismiss()
         guard let panel = surgePanel else { return }
-        let originDisplayID = surgeOriginDisplayID
         surgePanel = nil
         surgeIdentity = nil
         surgeWindowRevision = nil
         surgeOriginDisplayID = nil
-        // key 还给原屏的汐线面板（玻璃采样），若它仍展开
-        if let id = originDisplayID, let state = screens[id], state.isExpanded {
-            state.panel.makeKey()
-        }
         if animated, let list = panel.contentView as? SurgeView {
             let total = list.dropRows()
             NSAnimationContext.runAnimationGroup({ context in

@@ -271,7 +271,7 @@ final class SurgeView: NSView {
 // MARK: - 面板
 
 /// 潮涌宿主窗口：非激活、悬浮于图标栏之上（TidePanel 同款约束 + 高一级）。
-/// 可成为 key：玻璃背景采样需要（非 key 窗口的采样层被 WindowServer 降级）。
+/// 无需成为 key：方向键由 app 级 local monitor 拦截，不依赖潮涌面板的 key 状态。
 @MainActor
 final class SurgePanel: NSPanel {
     init(contentRect: NSRect) {
@@ -290,5 +290,5 @@ final class SurgePanel: NSPanel {
         ignoresMouseEvents = false
     }
 
-    override var canBecomeKey: Bool { true }
+    override var canBecomeKey: Bool { false }
 }
