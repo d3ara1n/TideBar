@@ -53,6 +53,7 @@ killall Dock
 | 右键菜单（退出/Finder 显示） | NSMenu + `NSRunningApplication.terminate()` | ⭐ |
 | 最小化窗口枚举/还原 | 无公开 API；AX 路线（`kAXMinimized` 置 false + `kAXRaiseAction`）已由潮涌落地 | ⭐⭐ |
 | 图标角标 | Dock AX 镜像（`com.apple.dock` 的 `AXStatusLabel`）已落地，见「通知角标」 | ⭐⭐ |
+| App 任务进度反馈 | 不做；macOS 无公开跨 App 统一进度 API，且 TideBar 不读取 App 内部信息、不要求第三方适配 | — |
 | 放大效果/启动弹跳 | 自绘动画 | ⭐ |
 | 最小化动画本身 | 不可接管（Dock+WindowServer 私有管线）；藏 Dock 架构下系统动画照常，观感 = 窗口缩向底边，可接受 | — |
 | Mission Control 按钮 | `open -a "Mission Control"` | ⭐ |
@@ -61,6 +62,7 @@ killall Dock
 
 - 废纸篓：不做。若将来重启，kqueue（`DispatchSourceFileSystemObject` + `O_EVTONLY`）是同类项目验证过的更轻事件驱动路线，无项目用 FSEvents；「放回原处」无公开 API，需解析 `.DS_Store` 私有 `ptbN`/`ptbL` 记录。
 - 窗口实时预览：不做，见「窗口画面与 ScreenCaptureKit」。
+- App 任务进度反馈：不做。TideBar 不读取 App 内部 UI、通知内容或进程内 `NSProgress`，也不要求第三方 App 提供适配；macOS 没有公开的跨 App 统一进度 API。现有 Dock AX 镜像仅限 `AXStatusLabel` 角标，不扩展为进度扫描。
 
 来源：
 - DockDoor（AX + 抓图参考实现）：https://github.com/ejbills/DockDoor
@@ -189,6 +191,13 @@ killall Dock
 3. **BadgeStore 落地**：后台读 Dock AX 树，展开 1s/收起 4s 自适应、展开瞬间立即全量读、接管关闭时不轮询（系统 Dock 可见时镜像无意义）；badge 进 AppEntry 模型真值，不触发潮涌失效；Dock 标题与应用显示名小写规范化对位，匹配不到静默忽略。
 4. **汐线通知语言：轻涌 + 持久涟漪，展开即确认**：新角标一次轻涌，未确认期间双环错相涟漪循环（线源扁椭圆形态，横向 1.3 倍线宽、终态波高 14pt）；停止条件 = 任意一次展开（用户已知）或全部角标消失（从横幅读完）；减少动态效果时脉冲退化为短淡化、不做常驻循环。动机：一次性提醒与系统横幅注意力重复，持久动效表达「未被知晓」状态而非「事件发生」瞬间。
 5. **解析与展示约定**：AXStatusLabel 正整数→计数角标（99+ 封顶）、非空非数字→小圆点、空/零→不显示；连续读取失败 3 轮才清值，Dock 重启期间保留旧值防闪烁。
+
+## App 任务进度反馈
+
+1. **不读取 App 内部信息**：TideBar 不枚举或解析其他 App 窗口中的进度控件，不读取通知中心内容，不查询其他进程的 `NSProgress`，也不通过截图或像素分析推断任务进度。
+2. **不要求第三方适配**：不建设 TideBar 进度上报 SDK、App 插件或协作协议；进度展示不能以修改第三方 App 为前提。
+3. **不提供通用进度条**：由于 macOS 没有公开的跨 App 统一进度 API，无法在不越过上述边界的情况下可靠获得下载、同步、复制或导出进度；该能力不进入产品承诺和实现范围。
+4. **角标例外保持封闭**：通知角标只镜像系统 Dock AX 树已公开的 `AXStatusLabel`，它是系统级展示状态，不等同于读取 App 内部信息；角标路线不延伸为 App 内容或进度探测。
 
 ## 快捷键与开发启动边界
 
