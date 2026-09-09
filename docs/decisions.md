@@ -90,12 +90,35 @@ killall Dock
 - **窗口层组合**：borderless + nonactivating + canJoinAllSpaces + fullScreenAuxiliary；level 见「窗口层级与避让」。收起态靠 `ignoresMouseEvents` 点击穿透，进入交互翻回 false。
 - **鼠标态统一采样器驱动（非激活悬浮窗上 NSTrackingArea 不可靠）**：实测 entered/exited 合成有稳定复现的状态机失步。图标悬停、潮涌行悬停、离场判定全部由接近检测采样器（mouseMoved 事件 + 40ms 节流 + 0.25s 兜底轮询）做命中测试驱动；点击/长按仍走 mouseDown/Up 事件流（该路径可靠）。离场收起防抖 300ms，期间 re-enter 取消。
 - **接近检测主路线**：全局 `NSEvent.addGlobalMonitorForEvents(.mouseMoved)`（鼠标类零权限）+ local monitor 兜底自家激活态 + 低频轮询 `NSEvent.mouseLocation` 兜底。NSTrackingArea 仅用于展开面板内部 hover。
-- **玻璃采样需要 key**：NSGlassEffectView 在非 key 窗口被 WindowServer 降级采样（发黑）。汐线展开时与潮涌显示时均 `makeKey()`，潮涌收起时 key 还给原屏汐线面板。
+- **key 只服务键盘会话**：材质质量与窗口 key 状态无关（NSVisualEffectView 以 `.state = .active` 固定渲染）；`makeKey()` 仅在键盘会话开始时调用（local monitor 只能看到投递给本 app 的键盘事件，潮涌面板自身无需 key），鼠标展开不改变 frontmost。
 - **多显示器**：每屏一个 panel，监听 `NSScreen.didChangeScreenParametersNotification`。
+
+## 条目类型与固定生命周期
+
+1. **类型与保留策略正交**：`item` 是展示与交互单位；类型决定行为，固定关系决定持久保留。固定应用和临时应用不是两种行为类型，不复制应用状态与动作实现。
+2. **固定项 + 临时项组合**：固定项按用户顺序展示；临时项由运行应用产生。应用按既有 AppIdentity 合并，已固定且运行的应用只有一个 item，窗口点、潮涌、角标、激活与退出行为不受固定状态影响。普通应用退出后临时项消失，固定项保留；Finder 沿用「Finder 角色」的逻辑运行规则。
+3. **应用能力不泛化为所有条目的必填字段**：文件、目录通过 NSWorkspace 打开，拥有自身菜单，不提供应用退出、运行短线或潮涌；打开文件不把它合并进默认打开应用。小组件等未来类型可接入自身行为，不要求具备 URL、bundle identifier 或进程。
+4. **身份、定位与展示分离**：通用 item 身份不能复用 AppIdentity 的字符串规范化规则，文件路径须保留真实大小写。固定记录有稳定身份、类型与类型专属持久化内容；文件资源优先以 bookmark 定位，解析失败保留失效项。名称与图标不是身份，资源去重与应用运行身份匹配由各类型负责。
+5. **集中解析与动作分发**：拖入资源识别、固定记录存取与列表组合、类型行为各自收敛到 module；栏、设置页、菜单使用同一套结果与操作入口。应用类型复用现有窗口与进程 module，不建设通用插件框架或提前实现小组件。
+
+## 拖拽会话与展开状态
+
+1. **系统拖拽会话承载事务**：采用 AppKit dragging source/destination；内部移动携带条目身份，外部资源按系统类型识别（应用包优先于普通目录）。排序预览不落库，成功松手才提交，Esc 或系统取消恢复原状态。
+2. **拖出不是删除资源**：仅在内部固定项确认于栏外松手时取消固定；越界、收起、无效 drop 与取消不能混为同一结果。运行中的应用取消固定后仍以临时项存在；未固定临时项拖出不退出应用。
+3. **会话存活不等于保持展开**：不默认引入覆盖整个拖拽过程的展开 hold。正常模式下沿用热区展开与离场收起；源条目身份、拖拽对象及事务由会话保留，不依赖图标视图是否仍显示。回到热区展开后重算落点，不丢失拖拽上下文。
+4. **采样与窗口约束必须验证**：不能假设普通 mouseMoved 在系统拖拽期间持续送达；复用统一采样器与位置轮询，并验收收起穿透、展开后接收 drop、离开再进入和跨屏路径。若现有机制不足，先定位事件或窗口约束，不以永久展开、额外拦截窗口或全局事件转发绕过。
+5. **既有交互规则继续生效**：拖动超过阈值取消长按潮涌，已开始拖拽不再触发点击；全屏 clickToExpand / hidden 不因拖拽绕过展开门槛。需要改变门槛或增加可见性 hold 时，必须先确认具体场景与行为。
+
+## UI 技术栈分工
+
+1. **窗口层恒为 AppKit**：borderless/nonactivating、level、collectionBehavior、makeKey 语义只有 NSPanel/NSWindow 能表达；SwiftUI Window scene 服务常规应用模型，不适用于零存在感悬浮窗（DockDoor 等同类同样只在 NSPanel 内宿主 SwiftUI）。
+2. **画布层（汐线/图标栏/潮涌）用 NSView + CALayer**：编舞需要 keyPath 级控制（anchorPoint 钉底边、同层正交动画、精确 from-value、spring 参数与错峰 delay）；窗口几何由控制器命令式计算；常驻窗口空闲零开销（合成器线程重复动画，无 SwiftUI 宿主 runtime），图标行按 identity 差分复用。
+3. **SwiftUI 用于窗口界面**：设置页、引导页、KeyboardShortcuts 录制器等数据驱动表单，经 `NSHostingController` + `LocalizedContent` 注入语言快照。
+4. **材质直控 NSVisualEffectView**：material/blendingMode/state/appearance 全部可显式钉死（`.active` 固定 + 深浅色覆盖），不套 SwiftUI Material 密封抽象。
 
 ## 潮涌：窗口交互模型
 
-展开态以 app 图标为粒度（不平铺窗口）。AX 能力依据见 [research-dock-alternatives.md](research-dock-alternatives.md) §三坑 3（Focus Dock 源码验证）。
+应用条目以 app 图标为粒度（不平铺窗口）。AX 能力依据见 [research-dock-alternatives.md](research-dock-alternatives.md) §三坑 3（Focus Dock 源码验证）。
 
 1. **点点语义**：图标下方点点 = 窗口状态（实心=活跃数、空心=最小化数，>5 收敛为数字；读不到窗口信息不画）。
 2. **三条到达路径**：点击 = 切换最近非最小化窗口（仅剩最小化则还原最近一个；AX 不可用时退化为 activate）；长按或 ⌥+点击 = 「潮涌」展开该 app 的窗口列表；右键 = 应用管理菜单（见「应用右键菜单」，不列窗口）。
@@ -110,7 +133,7 @@ killall Dock
 
 1. **身份统一**：bundle identifier 以 ASCII 不区分大小写的规范身份参与比较、去重、UI identity 和行为索引；启动、窗口操作与文件定位仍使用采集阶段解析出的 URL、PID 和运行实例，不用规范字符串反查系统对象。
 2. **应用聚合、窗口归属到进程**：同一身份的多个运行实例在图标栏只生成一个条目；窗口知识按 PID 观测并聚合，每个窗口保留 owner PID，窗口动作始终发送给所属实例。任一实例无法完整确认窗口集合或最小化态时，聚合结果为未知，不报告不完整点数。
-3. **裸进程照收**：无 bundle 的 regular GUI 进程（.NET/Avalonia 调试目标、直跑 jar 等）身份由可执行路径派生（`AppIdentity(路径)`，`proc_pidpath` 解析，公升 libproc API），与 bundle 身份天然不碰撞（bundle identifier 不含路径分隔符）。裸进程不支持固定（固定配置按 bundle identifier 存储），右键菜单不提供固定项。
+3. **裸进程照收**：无 bundle 的 regular GUI 进程（.NET/Avalonia 调试目标、直跑 jar 等）身份由可执行路径派生（`AppIdentity(路径)`，`proc_pidpath` 解析，公升 libproc API），与 bundle 身份天然不碰撞（bundle identifier 不含路径分隔符）。裸进程没有可靠的应用启动定位，不支持固定，右键菜单不提供固定项；将可执行文件作为文件资源固定不等于承诺重建其原启动参数与环境。
 4. **身份对账双通道**：动作校验（AppActionDispatcher）与窗口观测（WindowStore）对 bundle 进程按 bundle identifier 比对，对裸进程按可执行路径比对，均归于条目的规范化身份。
 5. **identity 与内容修订分离**：identity 只负责复用视图；进程、能力或可观测窗口模型变化必须替换最新模型。被跟踪条目消失、窗口知识降级或可观测窗口模型变化时，已展开潮涌立即失效并关闭。
 
