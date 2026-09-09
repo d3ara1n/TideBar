@@ -26,7 +26,8 @@ macOS Dock 替代品：平时缩成屏幕底部一条细线，鼠标靠近时如
 |---|---|---|
 | `docs/product.md` | 产品定位、灵魂交互、命名、对标 | 极稳定 |
 | `docs/copy.md` | 对外话术参考（品牌物料，非开发文档） | 随对外话术演进同步 |
-| `docs/decisions.md` | 已定架构决策、可行性边界、权限策略 | 只增不改 |
+| `docs/decisions.md` | 已定架构决策、可行性边界、权限策略 | 最终状态真值，演进看 git log |
+| `docs/research-dock-alternatives.md` | 同类应用调研档案（事实与方案） | 随调研时点固化 |
 | `plans/` | 立案任务（当前要做什么的唯一真值） | 见下 |
 
 ## plans 纪律

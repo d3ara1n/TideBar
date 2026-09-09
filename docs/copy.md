@@ -100,5 +100,5 @@
 ## 十、待定项
 
 - 演示素材：GIF/截图待录屏；如需文字标注，EN 为主、另出 zh 版。
-- App UI 本地化：en 为主、zh-Hans 第二语言，由 [todo-2026-09-05-localization.md](../plans/todo-2026-09-05-localization.md) 承接——**转 public 前必须完成**。
+- App UI 本地化：en + zh-Hans 已完成；应用显示名（`CFBundleDisplayName`）随 app-bundle 打包收尾，由 [todo-2026-09-05-localization.md](../plans/todo-2026-09-05-localization.md) 承接——**转 public 前必须完成**。
 - 官网落地页：双语（EN 主 + zh 切换），随 branding 立案产出。

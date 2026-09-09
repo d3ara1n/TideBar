@@ -2,7 +2,7 @@
 
 调研时间 2026-09。方法：逐仓库克隆读源码（DockDoor master、alt-tab-macos v11.5.0、SketchyBar 2.24.0、Ice v0.11.12、Docky、Focus Dock、Pier、Plank、Latte Dock），其余项目查证 README/issues/发布说明；API 行为经 Apple 官方文档与多来源交叉验证。查证不到的标「未确认」。
 
-本文是调研档案（事实与方案）。据此产生的决策修订见 [decisions.md](decisions.md)；文中与 decisions.md 现有条目的冲突在 §六 单独列出。
+本文是调研档案（事实与方案），记录调研时点的同类应用现状；据此产生的决策以 [decisions.md](decisions.md)（最终状态真值）为准，本文与它不一致处以后者为准。调研启示的采纳去向见 §五。
 
 ## 一、项目全景
 
@@ -79,7 +79,7 @@ Pier、OpenBoringBar、meDock、MultiDock 等完全不动系统 Dock，隐藏留
 4. **窗口不绕开自绘 dock**：macOS 只为自家 Dock 保留 `visibleFrame`。对策三派：uBar/AeroBar 用 AX 主动重排窗口（Java/Carbon 应用失效、与窗口管理器冲突，uBar 有官方冲突名单）；Rectangle Pro 用户以 `screenEdgeGapBottom` 手动垫边；Pier 承认不做。**展开态会被 maximize 窗口压住，汐线收起态被盖概率低。**
 5. **窗口层级 vs IME**：Ghostty PR #5361——窗口 level 提到系统 Dock 之上会破坏日文输入。印证 TideBar `.floating`（低于 Dock）+ 隐藏系统 Dock 的组合。
 6. **通知角标拿不到**：macOS 不向第三方发布 dock 角标计数。Pier 直接不做；Focus Dock 用 AX 轮询系统 Dock 树（`com.apple.dock` 的 `AXStatusLabel`）读角标，需辅助功能权限。
-7. **`~/.Trash` 可读性不一致**：Pier/Docky 能直接 `contentsOfDirectory` 读，Focus Dock 却遇 EPERM(TCC)（ad-hoc 签名下 AppleScript 也被拒），兜底 = 轮询 shell 调 `/usr/bin/osascript "tell application Finder to count items of trash"`（Apple 签名二进制有独立 AppleEvents 授权）。**macOS 26 上需实测 TideBar 场景哪种可行。**
+7. **`~/.Trash` 可读性不一致**：Pier/Docky 能直接 `contentsOfDirectory` 读，Focus Dock 却遇 EPERM(TCC)（ad-hoc 签名下 AppleScript 也被拒），兜底 = 轮询 shell 调 `/usr/bin/osascript "tell application Finder to count items of trash"`（Apple 签名二进制有独立 AppleEvents 授权）。
 
 ## 四、横向技术方案
 
@@ -147,33 +147,25 @@ orderFrontRegardless()                            // 不抢焦点置前
 
 **没有项目用 FSEvents 监控 `~/.Trash`**；kqueue 是已验证的更轻事件驱动路线。
 
-## 五、对 TideBar 的启示
+## 五、调研启示采纳去向
 
-1. **入口替代抄行业方案**：autohide-delay 1000 基础上补 `tilesize=16` + `mineffect=scale` + `no-bouncing`，配快照/恢复/自愈三件套；用户向导内开关
-2. **接近检测走全局 mouseMoved monitor**（零权限、不拦点击），NSTrackingArea 留给展开后的面板内部 hover
-3. **NSPanel 组合照抄已验证配置**（§四），汐线态用 `ignoresMouseEvents=true` 穿透
-4. **枚举/图标用标准链**：KVO runningApplications + NSRunningApplication.icon + 兜底链 + per-bundle 缓存
-5. **窗口预览延后立项**：零权限阶段先做「图标 + 标题」悬停卡片；缩略图二期接受录屏权限 + 重启约束
-6. **两个新决策点需拍板**：① 最小化窗口还原（做完整 Dock 绕不开，参考 Focus Dock）；② 展开态被 maximize 窗口压住是否接受/是否 AX 重排
-7. **差异化确认**：无人做过细线收起态；「SkyLight alpha=0 空间保留者」是潜在差异化路径（高风险，观察 Docky 实验）
+| 调研启示 | 去向 |
+|---|---|
+| 入口替代抄行业方案（delay 1000 + tilesize 16 + mineffect scale，快照/恢复） | 已采纳，参数集与快照/恢复约定见 decisions.md「架构：藏 UI、留进程」 |
+| 接近检测走全局 mouseMoved monitor，NSTrackingArea 留给面板内部 hover | 已采纳，见 decisions.md「交互与鼠标态约定」 |
+| NSPanel 组合照抄已验证配置（§四），收起态 `ignoresMouseEvents` 穿透 | 已采纳；窗口 level 演进为 `.statusBar` 顶置（decisions.md「窗口层级与避让」） |
+| 枚举/图标用标准链（KVO runningApplications + icon 兜底链 + 缓存） | 已采纳 |
+| 最小化窗口还原 | 以潮涌落地：AX 路线（`kAXMinimized` + `kAXRaiseAction`），未引入缩略图与动画拦截 |
+| 展开态被 maximize 窗口压住是否接受 | 已拍板：遮盖是产品特色，一切避让路线不立项（decisions.md「窗口层级与避让」） |
+| 窗口预览延后立项 | 升格为永不引入（含 ScreenCaptureKit 整体排除，decisions.md「窗口画面与 ScreenCaptureKit」） |
+| 「SkyLight alpha=0 空间保留者」差异化路径 | 未采纳：私有 API 不作长期基础设施，且避让路线已随「永不避让」关闭 |
+| 差异化确认：无人做过细线收起态 | 结论持续成立（product.md「对标」） |
 
-## 六、与 decisions.md 现有条目的冲突（待修订）
-
-> decisions.md 只增不改，以下修订需新增条目注明取代关系。
-
-1. **接近检测路线**：decisions.md 权限策略写「hover 检测用不可见热区窗口 + NSTrackingArea」——调研结论 NSTrackingArea 热区会拦截点击、与汐线穿透矛盾，应改为全局 mouseMoved monitor（§四）。NSTrackingArea 降级为展开态面板内部 hover 方案。
-2. **隐藏参数集**：decisions.md 架构条目只有 autohide-delay 1000，缺 Mission Control 强显（tilesize=16）与 genie 指向（mineffect=scale）两项对策（§二）。
-3. **废纸篓方案**：可行性表写 FSEvents——调研未见任何项目用 FSEvents，kqueue 是已验证更轻路线（§四）。
-4. **悬停预览难度评估**：可行性表写「ScreenCaptureKit ⭐⭐⭐」——现实是逐窗抓图仍以私有 CGS API 为主流（能截最小化窗口），纯 SCK 方案在 14/15 有已知崩溃/bug（§四）。
-5. **最小化窗口条目**：「AltTab 2026 已全量转 SkyLight」表述过时——AltTab 现为 macOS 26 用 SCK、旧系统私有 CGS（§四）。
-
-## 七、待核实清单
+## 六、待核实清单
 
 - AltTab 的 macOS 26 图标内边距 84pt：源码实测值，TideBar 需自行复验
 - 鼠标类全局 monitor / NSTrackingArea 在 System Settings 等特定场景是否失效：未找到权威来源（有据可查的只有键盘事件受 Secure Input 屏蔽）
-- `~/.Trash` 在 macOS 26 的 TCC 可读性：三种实现（直接读 / kqueue / osascript）需实测
-- 私有 SkyLight API（CGSHWCaptureWindowList、CGSSetWindowAlpha）走 Developer ID 公证的审核风险：未确认
-- boringBar（闭源）隐藏系统 Dock 的具体机制：未确认（从「Mission Control 仍可见」推断为普通 autohide）
+- 私有 SkyLight API（CGSHWCaptureWindowList、CGSSetWindowAlpha）走 Developer ID 公证的审核风险：未确认（仅缩略图类能力立项时相关，见 decisions.md「窗口画面与 ScreenCaptureKit」）
 - 多显示器系统 Dock 不跟随外接屏的 Tahoe/Sequoia bug：有复现报告与 Feedback ID，影响面待验证
 
 ## 来源

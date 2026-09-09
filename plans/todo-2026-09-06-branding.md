@@ -1,6 +1,6 @@
 # 品牌与文档
 
-> 状态：话术源（双语）、README（双语）、LICENSE、命名统一、关于页已完成；本地化升格为发布前置（App UI 层由 todo-2026-09-05-localization.md 承接）；实心品牌标记已定稿，单色／彩色与菜单栏素材已导出、待接入；Dock 图标由用户通过 Icon Composer 制作；演示素材待录屏。
+> 状态：话术源（双语）、README（双语）、LICENSE、命名统一、关于页已完成；品牌素材已导出，应用内 PDF 已接入（菜单栏／关于页／引导页），README／网站标记与正式 `.app` 图标待接入；Dock 图标由用户通过 Icon Composer 制作；演示素材待录屏。本地化升格为发布前置（App UI 层由 todo-2026-09-05-localization.md 承接）。
 
 ## 背景
 

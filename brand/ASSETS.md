@@ -36,7 +36,7 @@ Light / Dark 指标记所在界面的背景主题。素材本身不包含背景�
 
 ### 应用内
 
-SPM 直接打包 PDF 资源，经 `NSImage` / SwiftUI 展示，无需 SVG 解析依赖。SVG 可经 Xcode asset catalog 编译使用，但不能假定将裸 SVG 复制到 bundle 后，普通 `Image` / `NSImage` 加载接口就会解析它。本次未接入应用代码。
+SPM 直接打包 PDF 资源，经 `NSImage` / SwiftUI 展示，无需 SVG 解析依赖。应用内资源经 `node tools/sync-brand-resources.mjs` 同步到 `Sources/TideBar/Resources/Brand/`：菜单栏使用 `menubar/TideBarTemplate.pdf` 模板，关于页与引导页按外观加载 `color/light.pdf`／`color/dark.pdf`。SVG 可经 Xcode asset catalog 编译使用，但不能假定将裸 SVG 复制到 bundle 后，普通 `Image` / `NSImage` 加载接口就会解析它。
 
 ### 网站与 README
 
