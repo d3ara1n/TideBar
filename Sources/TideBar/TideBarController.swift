@@ -37,7 +37,10 @@ final class TideBarController {
     }
 
     private var screens: [CGDirectDisplayID: ScreenState] = [:]
-    private let registry = AppRegistry()
+    private let items = ItemRegistry()
+    private var registry: AppRegistry { items.applications }
+    private var navigationApplications: [AppEntry] { items.entries.compactMap(\.application) }
+    private lazy var dragCoordinator = ItemDragCoordinator(registry: items)
     private static let mouseDemand = "mouse.proximity"
     private var globalMonitor: Any?
     private var localMonitor: Any?
@@ -46,6 +49,7 @@ final class TideBarController {
     private var switcherCommitWork: DispatchWorkItem?
     private var observers: [NSObjectProtocol] = []
     private var lastSampleTime: CFTimeInterval = 0
+    private var lastSampledMouseLocation: NSPoint?
     private let fullscreenDetector = FullscreenDetector()
     private var fullscreenStates: [CGDirectDisplayID: FullscreenState] = [:]
 
@@ -57,11 +61,26 @@ final class TideBarController {
     private var surgeDismissWork: DispatchWorkItem?
 
     func start() {
+        dragCoordinator.onBegin = { [weak self] in
+            self?.endBarSession(collapse: false, suppressMouse: false)
+        }
+        dragCoordinator.onMovement = { [weak self] in self?.sampleMouse(isMovement: true) }
+        dragCoordinator.onSessionChange = { [weak self] in
+            guard let self else { return }
+            for state in self.screens.values { state.view.syncDragContext() }
+        }
+        dragCoordinator.allowsRemovalAt = { [weak self] point in
+            guard let self, AppConfiguration.shared.isTakeoverEnabled, !self.screens.isEmpty else { return false }
+            return self.screens.values.allSatisfy {
+                !$0.panel.frame.insetBy(dx: -Layout.keepMargin, dy: -Layout.keepMargin).contains(point)
+                    && !self.hotZone(for: $0.screen).contains(point)
+            }
+        }
         fullscreenDetector.onChange = { [weak self] in self?.applyFullscreenStates() }
-        registry.onChange = { [weak self] in self?.appsDidChange() }
+        items.onChange = { [weak self] in self?.appsDidChange() }
         registry.onBadgePulse = { [weak self] name in self?.badgePulse(named: name) }
         registry.onApplicationsStarted = { [weak self] in self?.applicationsStarted() }
-        registry.start()
+        items.start()
         if AppConfiguration.shared.isTakeoverEnabled {
             rebuildPanels()
         }
@@ -70,10 +89,10 @@ final class TideBarController {
         // 真实移动与轮询分流，菜单动作可保持展开直到用户再次移动鼠标。
         let movementSample = MainThreadBridge { [weak self] in self?.sampleMouse(isMovement: true) }
         let pollSample = MainThreadBridge { [weak self] in self?.sampleMouse(isMovement: false) }
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { _ in
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { _ in
             movementSample()
         }
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { event in
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { event in
             movementSample()
             return event
         }
@@ -120,6 +139,7 @@ final class TideBarController {
 
     func stop() {
         NSLog("TideBar stopped")
+        dragCoordinator.invalidate(reason: "controller-stopped")
         if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }
         if let keyboardMonitor { NSEvent.removeMonitor(keyboardMonitor) }
@@ -141,6 +161,7 @@ final class TideBarController {
     // MARK: - 快捷键与键盘导航
 
     func handleShortcut(_ action: ShortcutManager.Action) {
+        guard !dragCoordinator.isDragging else { return }
         switch action {
         case .toggleBar:
             togglePersistentSession()
@@ -150,6 +171,8 @@ final class TideBarController {
     }
 
     private func handleKeyDown(_ event: NSEvent) -> Bool {
+        // 系统拖拽拥有 Esc；不让潮涌或键盘会话抢先吞掉取消事件。
+        guard !dragCoordinator.isDragging else { return false }
         if event.keyCode == 53, surgePanel != nil {
             guard var session = barSession else {
                 dismissSurge(animated: true)
@@ -254,10 +277,10 @@ final class TideBarController {
 
     private func preferredInitialApplication() -> AppIdentity? {
         if let frontmost = frontmostIdentity(),
-           registry.entries.contains(where: { $0.identity == frontmost }) {
+           navigationApplications.contains(where: { $0.identity == frontmost }) {
             return frontmost
         }
-        return registry.entries.first?.identity
+        return navigationApplications.first?.identity
     }
 
     private func beginSession(mode: BarSessionMode, on state: ScreenState,
@@ -304,15 +327,16 @@ final class TideBarController {
     }
 
     private func moveApplication(by offset: Int) {
-        guard !registry.entries.isEmpty, var session = barSession else { return }
+        let applications = navigationApplications
+        guard !applications.isEmpty, var session = barSession else { return }
         if case .windows = session.level {
             _ = session.escape()
             dismissSurge(animated: true)
         }
         let current = session.selectedApplication
-        let index = current.flatMap { identity in registry.entries.firstIndex { $0.identity == identity } } ?? 0
-        let next = (index + offset + registry.entries.count) % registry.entries.count
-        session.selectApplication(registry.entries[next].identity,
+        let index = current.flatMap { identity in applications.firstIndex { $0.identity == identity } } ?? 0
+        let next = (index + offset + applications.count) % applications.count
+        session.selectApplication(applications[next].identity,
                                   now: CACurrentMediaTime(),
                                   timeout: switcherTimeout)
         barSession = session
@@ -326,7 +350,7 @@ final class TideBarController {
         guard let session = barSession,
               let state = screens[session.displayID],
               let identity = session.selectedApplication,
-              let entry = registry.entries.first(where: { $0.identity == identity }),
+              let entry = navigationApplications.first(where: { $0.identity == identity }),
               let iconFrame = state.view.iconFrame(for: identity) else { return }
         showSurge(entry: entry, state: state, iconFrame: iconFrame, fromKeyboard: true)
         cancelSwitcherTimeout()
@@ -335,7 +359,7 @@ final class TideBarController {
     private func moveWindow(by offset: Int) {
         guard let session = barSession,
               case let .windows(identity) = session.level,
-              let entry = registry.entries.first(where: { $0.identity == identity }),
+              let entry = navigationApplications.first(where: { $0.identity == identity }),
               let windows = entry.windows, !windows.isEmpty else { return }
         let ids = windows.map(\.elementIdentifier)
         let index = session.selectedWindowIdentifier.flatMap { ids.firstIndex(of: $0) } ?? 0
@@ -356,7 +380,7 @@ final class TideBarController {
             endBarSession(collapse: true, suppressMouse: true)
         case .applications:
             if let identity = session.selectedApplication,
-               let entry = registry.entries.first(where: { $0.identity == identity }) {
+               let entry = navigationApplications.first(where: { $0.identity == identity }) {
                 NSLog("TideBar keyboard session committed (application: %@)", identity.bundleIdentifier)
                 entry.primaryClick()
             }
@@ -364,12 +388,12 @@ final class TideBarController {
                           suppressMouse: session.openedBySession)
         case .windows(let identity):
             NSLog("TideBar keyboard session committed (windows: %@)", identity.bundleIdentifier)
-            if let entry = registry.entries.first(where: { $0.identity == identity }),
+            if let entry = navigationApplications.first(where: { $0.identity == identity }),
                let identifier = session.selectedWindowIdentifier,
                let window = entry.windows?.first(where: { $0.elementIdentifier == identifier }),
                let app = entry.runningApp(for: window) {
                 AXReader.raise(window, app: app)
-            } else if let entry = registry.entries.first(where: { $0.identity == identity }) {
+            } else if let entry = navigationApplications.first(where: { $0.identity == identity }) {
                 entry.activate()
             }
             endBarSession(collapse: session.isPersistent || session.openedBySession,
@@ -431,6 +455,7 @@ final class TideBarController {
     /// 接管状态变化时启动或停止底部面板；固定列表变化则刷新现有模型。
     func configurationDidChange() {
         guard AppConfiguration.shared.isTakeoverEnabled else {
+            dragCoordinator.invalidate(reason: "takeover-disabled")
             endBarSession(collapse: false, suppressMouse: false)
             dismissSurge(animated: false)
             for state in screens.values {
@@ -446,12 +471,13 @@ final class TideBarController {
             NSLog("TideBar takeover disabled: panels closed")
             return
         }
-        registry.refresh()
+        items.refresh()
         rebuildPanels()
     }
 
     private func rebuildPanels() {
         guard AppConfiguration.shared.isTakeoverEnabled else { return }
+        dragCoordinator.invalidate(reason: "panels-rebuilt")
         endBarSession(collapse: false, suppressMouse: false)
         dismissSurge(animated: false)
         for state in screens.values {
@@ -468,9 +494,16 @@ final class TideBarController {
             let frame = barFrame(for: screen)
             let panel = TidePanel(contentRect: frame)
             let view = TideBarView(frame: NSRect(origin: .zero, size: frame.size))
+            view.dragCoordinator = dragCoordinator
             panel.contentView = view
             let clickPanel = TidelineClickPanel(contentRect: tidelineClickFrame(for: screen))
             let state = ScreenState(screen: screen, panel: panel, clickPanel: clickPanel, view: view)
+            view.onPreviewWidthChange = { [weak self, weak state] in
+                guard let self, let state else { return }
+                state.appTransitionGeneration += 1
+                let target = self.barFrame(for: state.screen, extraSlots: state.view.extraPreviewSlots)
+                self.animatePanel(state.panel, to: target)
+            }
             clickPanel.onClick = { [weak self, weak state] in
                 guard let self, let state, !state.isExpanded else { return }
                 self.expand(state, clickedTideline: true)
@@ -489,7 +522,7 @@ final class TideBarController {
                 guard let self, let state else { return }
                 state.collapseHeldUntilMouseMoves = true
                 self.cancelCollapse(state)
-                self.registry.setPinned(pinned, for: identity)
+                self.items.setPinned(pinned, for: identity)
             }
             view.onSurge = { [weak self, weak state] entry, iconFrame in
                 guard let self, let state else { return }
@@ -514,8 +547,8 @@ final class TideBarController {
         screen.frame.minY
     }
 
-    private func barFrame(for screen: NSScreen) -> NSRect {
-        let count = max(registry.entries.count, 1)
+    private func barFrame(for screen: NSScreen, extraSlots: Int = 0) -> NSRect {
+        let count = max(items.entries.count + extraSlots, 1)
         let width = min(Layout.barHPadding * 2 + CGFloat(count) * Layout.iconSlot,
                         screen.frame.width * 0.9)
         return NSRect(x: screen.frame.midX - width / 2,
@@ -546,7 +579,13 @@ final class TideBarController {
     // MARK: - 鼠标采样与状态机
 
     private func sampleMouse(isMovement: Bool) {
-        if isMovement {
+        let location = NSEvent.mouseLocation
+        // 拖拽追踪不保证 mouseMoved 送达；轮询只在左键按住且位置确实变化时
+        // 补足真实移动语义，静止轮询仍不能解除菜单保持或键盘抑制。
+        let dragMoved = NSEvent.pressedMouseButtons & 1 != 0
+            && lastSampledMouseLocation.map { $0 != location } == true
+        lastSampledMouseLocation = location
+        if isMovement || dragMoved {
             for state in screens.values {
                 state.collapseHeldUntilMouseMoves = false
                 state.suppressExpandUntilMouseMove = false
@@ -557,7 +596,6 @@ final class TideBarController {
         guard now - lastSampleTime >= Layout.mouseSampleThrottle else { return }
         lastSampleTime = now
 
-        let location = NSEvent.mouseLocation
         fullscreenDetector.refresh(screens: screens.values.map(\.screen))
         for state in screens.values {
             let fullscreen = fullscreenState(state.screen)
@@ -614,11 +652,11 @@ final class TideBarController {
         cancelCollapse(state)
         state.panel.ignoresMouseEvents = false
         // 挂起期间积压的终止通知可能尚未消费；展开即用户可见时刻，先同步对账
-        registry.refresh()
+        items.refresh()
         // 重读窗口 frame→屏归属：跨屏移动发生在收起期无通知，展开时拉一次新鲜值
         registry.refreshWindows()
         syncBadgeCadence()
-        state.view.setExpanded(true, apps: registry.entries)
+        state.view.setExpanded(true, apps: items.entries)
         NSLog("TideBar expanded on screen %u", displayID(of: state.screen) ?? 0)
         return true
     }
@@ -715,6 +753,9 @@ final class TideBarController {
         let behavior = fullscreen == .fullscreen ? AppConfiguration.shared.fullscreenBehavior : .normal
         let previous = state.effectiveFullscreenBehavior
         state.effectiveFullscreenBehavior = behavior
+        if behavior != previous, behavior != .normal {
+            dragCoordinator.invalidate(reason: "fullscreen-policy-changed")
+        }
 
         if behavior == .hidden {
             if state.isExpanded { collapse(state, animated: false) }
@@ -762,11 +803,13 @@ final class TideBarController {
     }
 
     private func activeSpaceChanged() {
+        dragCoordinator.invalidate(reason: "space-changed")
         fullscreenDetector.invalidateContext()
         behaviorDidChange()
     }
 
     func layoutDidChange() {
+        dragCoordinator.invalidate(reason: "layout-changed")
         for state in screens.values {
             state.appTransitionGeneration += 1
             state.view.refreshLayout()
@@ -795,7 +838,7 @@ final class TideBarController {
         }
         // 条目消失、窗口知识降级或任意窗口内容变化时，现有潮涌模型即过期。
         if let surgeIdentity {
-            let currentRevision = registry.entries.first(where: { $0.id == surgeIdentity })?.windowRevision
+            let currentRevision = navigationApplications.first(where: { $0.id == surgeIdentity })?.windowRevision
             if currentRevision != surgeWindowRevision {
                 dismissSurge(animated: true)
             }
@@ -803,9 +846,9 @@ final class TideBarController {
         for state in screens.values {
             state.appTransitionGeneration += 1
             let generation = state.appTransitionGeneration
-            let target = barFrame(for: state.screen)
             if state.isExpanded {
-                let transition = state.view.refreshApps(registry.entries)
+                let transition = state.view.refreshApps(items.entries)
+                let target = barFrame(for: state.screen, extraSlots: state.view.extraPreviewSlots)
                 if transition.hasRemovals, target.width < state.panel.frame.width {
                     // 离场项仍位于旧面板边缘；动画结束后再缩宽，避免被窗口边界裁掉。
                     DispatchQueue.main.asyncAfter(deadline: .now() + transition.removalDuration) {
@@ -826,7 +869,7 @@ final class TideBarController {
                 }
             } else {
                 // TidePanel 同步窗口与内容布局，收起态汐线保持屏幕居中。
-                state.panel.setFrame(target, display: true)
+                state.panel.setFrame(barFrame(for: state.screen), display: true)
             }
         }
         syncKeyboardSelection()
@@ -837,10 +880,10 @@ final class TideBarController {
               let state = screens[session.displayID] else {
             return
         }
-        let applications = Set(registry.entries.map(\.identity))
+        let applications = Set(navigationApplications.map(\.identity))
         let windowIDs: Set<Int>?
         if case let .windows(identity) = session.level,
-           let entry = registry.entries.first(where: { $0.identity == identity }),
+           let entry = navigationApplications.first(where: { $0.identity == identity }),
            let windows = entry.windows {
             windowIDs = Set(windows.map(\.elementIdentifier))
         } else {

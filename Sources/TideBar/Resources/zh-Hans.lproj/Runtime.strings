@@ -5,3 +5,14 @@
 "dock.error.synchronizeFailed" = "Dock 偏好设置同步失败";
 "dock.error.verificationFailed" = "Dock 配置验证失败";
 "dock.error.restartFailed" = "Dock 重启失败";
+
+"item.error.title" = "无法完成项目操作";
+"item.error.ok" = "好";
+"item.error.reference" = "不支持这个引用，或它已无法定位有效资源。";
+"item.error.missing" = "资源不可用，可能已被删除、断开连接或无法访问。";
+"item.error.storage" = "无法读取固定项目数据，原始数据已保留。只有确定要替换它时，才在设置中恢复默认值。";
+"item.error.open" = "系统无法打开这个资源。";
+"item.error.changed" = "项目或落点发生了变化，请重新拖拽。";
+"item.error.moveConflict" = "目标存在同名项目，或移动会将目录放入自身。未移动文件。";
+"item.error.crossVolume" = "这个投递操作不支持跨卷移动，请使用 Finder 移动这些资源。";
+"item.error.partialMove" = "部分文件已移动，其余文件移动失败。请检查源目录和目标目录后再重试。";

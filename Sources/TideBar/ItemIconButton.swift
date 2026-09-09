@@ -10,12 +10,34 @@ private class PassthroughView: NSView {
 @MainActor
 private final class IconArtworkView: NSView {
     var icon: NSImage {
-        didSet { needsDisplay = true }
+        didSet {
+            needsDisplay = true
+            effect.update(icon: icon, state: dragState)
+        }
     }
+    private let effect = ItemDragIconEffect()
+    private var dragState: ItemDragIconState = .idle
 
     init(icon: NSImage) {
         self.icon = icon
         super.init(frame: .zero)
+        wantsLayer = true
+        layer?.addSublayer(effect.layer)
+    }
+
+    func setDragState(_ state: ItemDragIconState) {
+        dragState = state
+        effect.update(icon: icon, state: state)
+    }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        effect.layer.frame = NSRect(x: (bounds.width - Layout.iconSize) / 2,
+                                   y: (bounds.height - Layout.iconSize) / 2,
+                                   width: Layout.iconSize, height: Layout.iconSize)
+        CATransaction.commit()
     }
 
     @available(*, unavailable)
@@ -163,15 +185,17 @@ private final class BadgeOverlayView: PassthroughView {
     }
 }
 
-/// 展开态的单个 app 图标：悬停高亮 + 点点（窗口状态）+ 点击启动/切换/还原
+/// 条目图标：通用引用交互；窗口点、角标与潮涌只消费关联的应用状态。
 @MainActor
-final class AppIconButton: NSView {
-    private(set) var entry: AppEntry
-    var onClick: ((AppEntry) -> Void)?
+final class ItemIconButton: NSView {
+    private(set) var entry: ItemEntry
+    var onClick: ((ItemEntry) -> Void)?
+    /// 调用方拥有拖拽 source；按钮只处理手势，不承载跨收起／重建的会话。
+    var onBeginDrag: ((ItemIconButton, NSEvent) -> Bool)?
     var onSetHidden: ((AppIdentity, Bool) -> Void)?
     var onTerminate: ((AppIdentity) -> Void)?
-    var onSetPinned: ((AppIdentity, Bool) -> Void)?
-    /// 潮涌触发，携图标 frame（位于 IconRowView 坐标系，即面板内容坐标）
+    var onSetPinned: ((ItemID, Bool) -> Void)?
+    /// 潮涌触发，携图标 frame（位于 ItemRowView 坐标系，即面板内容坐标）
     var onSurge: ((AppEntry, NSRect) -> Void)?
 
     private enum VisualTransition {
@@ -187,18 +211,21 @@ final class AppIconButton: NSView {
     private let artworkView: IconArtworkView
     private let statusIndicatorView: AppStatusIndicatorView
     private let badgeView: BadgeOverlayView
+    private var dragState: ItemDragIconState = .idle
     private var hovering = false
     private var keyboardSelected = false
     private var pressed = false
     private var pressTimer: Timer?
     private var surged = false
+    private var mouseDownScreenPoint: NSPoint?
+    private var dragAttempted = false
     /// 菜单追踪期间的靶对象持有（NSMenuItem 不保留 target）
     private var menuActions: [MenuAction] = []
 
-    init(entry: AppEntry) {
+    init(entry: ItemEntry) {
         self.entry = entry
         self.artworkView = IconArtworkView(icon: entry.icon)
-        self.statusIndicatorView = AppStatusIndicatorView(entry: entry)
+        self.statusIndicatorView = AppStatusIndicatorView(entry: entry.application)
         self.badgeView = BadgeOverlayView(value: entry.badge)
         super.init(frame: NSRect(x: 0, y: 0, width: Layout.iconSlot, height: Layout.expandedHeight))
         wantsLayer = true   // 根层只承担整栏错峰升降，hover 使用独立视觉层避免 transform 争用
@@ -213,21 +240,23 @@ final class AppIconButton: NSView {
         addSubview(statusIndicatorView)
         addSubview(motionPivot)
         haloView.layer?.opacity = 0
+        toolTip = entry.name
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not supported") }
 
     /// 就地刷新条目（运行状态、图标、点点、角标变化），不动视图身份与交互状态
-    func update(entry newEntry: AppEntry) {
+    func update(entry newEntry: ItemEntry) {
         guard newEntry.id == entry.id else { return }
         let iconChanged = !newEntry.icon.isEqual(entry.icon)
-        let statusChanged = newEntry.isRunning != entry.isRunning
-            || newEntry.dotSignature != entry.dotSignature
+        let statusChanged = newEntry.application?.isRunning != entry.application?.isRunning
+            || newEntry.application?.dotSignature != entry.application?.dotSignature
         let badgeChanged = newEntry.badge != entry.badge
         entry = newEntry
         if iconChanged { artworkView.icon = newEntry.icon }
-        statusIndicatorView.update(entry: newEntry, animated: statusChanged)
+        statusIndicatorView.update(entry: newEntry.application, animated: statusChanged)
+        toolTip = newEntry.name
         if badgeChanged { badgeView.update(newEntry.badge, animated: true) }
     }
 
@@ -260,8 +289,20 @@ final class AppIconButton: NSView {
 
     /// 悬停态由控制器鼠标采样轮询驱动：非激活悬浮窗上 tracking area 的
     /// entered/exited 合成不可靠（有状态机失步案例），改用确定性命中测试。
+    func setDragState(_ state: ItemDragIconState) {
+        guard dragState != state else { return }
+        dragState = state
+        isHidden = state == .lifted
+        if state.suppressesHover {
+            hovering = false
+            pressed = false
+        }
+        artworkView.setDragState(state)
+        animateVisualState(.exit)
+    }
+
     func setHovered(_ on: Bool) {
-        guard hovering != on else { return }
+        guard !dragState.suppressesHover, hovering != on else { return }
         hovering = on
         animateVisualState(on ? .enter : .exit)
     }
@@ -269,7 +310,7 @@ final class AppIconButton: NSView {
     func setKeyboardSelected(_ on: Bool) {
         guard keyboardSelected != on else { return }
         keyboardSelected = on
-        guard let layer = haloView.layer else { return }
+        guard !dragState.suppressesHover, let layer = haloView.layer else { return }
         let opacity: Float = on ? 0.72 : (hovering ? (pressed ? 0.82 : 1) : 0)
         Motion.basic(layer, keyPath: "opacity", to: opacity,
                      duration: Motion.shouldReduceMotion ? Motion.reducedMotionFadeDuration : Motion.hoverEnterDuration)
@@ -277,6 +318,10 @@ final class AppIconButton: NSView {
 
     private func animateVisualState(_ transition: VisualTransition) {
         guard let visualLayer = motionPivot.layer, let haloLayer = haloView.layer else { return }
+        if dragState.suppressesHover {
+            ItemDragStyle.suppressHover(pivot: visualLayer, halo: haloLayer)
+            return
+        }
         let haloOpacity: Float = hovering ? (pressed ? 0.82 : 1) : (keyboardSelected ? 0.72 : 0)
 
         if Motion.shouldReduceMotion {
@@ -335,7 +380,11 @@ final class AppIconButton: NSView {
         hovering = true
         pressed = true
         surged = false
+        dragAttempted = false
+        mouseDownScreenPoint = window?.convertPoint(toScreen: event.locationInWindow)
         animateVisualState(.press)
+        // 非应用条目没有窗口长按；拖拽仍使用同一阈值手势。
+        guard entry.application != nil else { return }
         // 长按计时：期内松开视为点击，超时触发潮涌并吞掉本次点击
         pressTimer = Timer.scheduledTimer(withTimeInterval: Layout.surgePressDelay, repeats: false) { [weak self] _ in
             MainThreadBridge { [weak self] in
@@ -344,12 +393,27 @@ final class AppIconButton: NSView {
                 self.surged = true
                 self.pressed = false
                 self.animateVisualState(.enter)
-                self.onSurge?(self.entry, self.frame)
+                if let app = self.entry.application { self.onSurge?(app, self.frame) }
             }.call()
         }
     }
 
     override func mouseDragged(with event: NSEvent) {
+        guard !dragAttempted else { return }
+        if !surged, let origin = mouseDownScreenPoint,
+           let point = window?.convertPoint(toScreen: event.locationInWindow),
+           hypot(point.x - origin.x, point.y - origin.y) >= Layout.itemDragThreshold,
+           let onBeginDrag {
+            // 先撤销长按和点击，再进入可能嵌套事件追踪的 AppKit 拖拽调用。
+            dragAttempted = true
+            pressTimer?.invalidate()
+            pressTimer = nil
+            pressed = false
+            hovering = false
+            animateVisualState(.exit)
+            _ = onBeginDrag(self, event)
+            return
+        }
         let inside = bounds.contains(convert(event.locationInWindow, from: nil))
         if pressed != inside || hovering != inside {
             pressed = inside
@@ -369,9 +433,11 @@ final class AppIconButton: NSView {
         pressed = false
         hovering = bounds.contains(convert(event.locationInWindow, from: nil))
         animateVisualState(hovering ? .enter : .exit)
-        guard wasPressed, hovering, !surged else { return }
-        if event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.option) {
-            onSurge?(entry, frame)
+        mouseDownScreenPoint = nil
+        guard wasPressed, hovering, !surged, !dragAttempted else { return }
+        if let app = entry.application,
+           event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.option) {
+            onSurge?(app, frame)
         } else {
             onClick?(entry)
         }
@@ -382,10 +448,9 @@ final class AppIconButton: NSView {
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = NSMenu()
         menuActions.removeAll()
-        let identity = entry.identity
+        let identity = entry.id
 
-        // 固定按 bundle identifier 存配置；裸进程（无 bundle）不提供固定项
-        if entry.bundleIdentifier != nil {
+        if entry.canPin {
             let pin = NSMenuItem(title: entry.isPinned
                                  ? L10nManager.shared.current.string("appMenu.unpin", table: .menus)
                                  : L10nManager.shared.current.string("appMenu.pin", table: .menus),
@@ -399,19 +464,20 @@ final class AppIconButton: NSView {
             menu.addItem(pin)
         }
 
-        if let url = entry.applicationURL {
+        if entry.isAvailable, entry.capabilities.contains(.reveal) {
             let reveal = NSMenuItem(title: L10nManager.shared.current.string("appMenu.revealInFinder", table: .menus),
                                     action: #selector(MenuAction.run),
                                     keyEquivalent: "")
-            let action = MenuAction { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+            let item = entry
+            let action = MenuAction { item.reveal() }
             menuActions.append(action)
             reveal.target = action
             menu.addItem(reveal)
         }
         menu.addItem(.separator())
 
-        if entry.isRunning {
-            let shouldHide = !entry.isHidden
+        if let app = entry.application, app.isRunning {
+            let shouldHide = !app.isHidden
             let visibility = NSMenuItem(title: shouldHide
                                         ? L10nManager.shared.current.string("appMenu.hide", table: .menus)
                                         : L10nManager.shared.current.string("appMenu.show", table: .menus),
@@ -419,11 +485,11 @@ final class AppIconButton: NSView {
                                         keyEquivalent: shouldHide ? "h" : "")
             if shouldHide { visibility.keyEquivalentModifierMask = .command }
             let setHidden = onSetHidden
-            let action = MenuAction { setHidden?(identity, shouldHide) }
+            let action = MenuAction { setHidden?(app.id, shouldHide) }
             menuActions.append(action)
             visibility.target = action
             menu.addItem(visibility)
-        } else {
+        } else if entry.capabilities.contains(.open) {
             let open = NSMenuItem(title: L10nManager.shared.current.string("appMenu.open", table: .menus), action: #selector(MenuAction.run), keyEquivalent: "")
             let entry = entry
             let launch = onClick
@@ -433,11 +499,11 @@ final class AppIconButton: NSView {
             menu.addItem(open)
         }
 
-        if entry.canTerminate, entry.isRunning {
+        if let app = entry.application, app.canTerminate, app.isRunning {
             let quit = NSMenuItem(title: L10nManager.shared.current.string("appMenu.quit", table: .menus), action: #selector(MenuAction.run), keyEquivalent: "q")
             quit.keyEquivalentModifierMask = .command
             let terminate = onTerminate
-            let action = MenuAction { terminate?(identity) }
+            let action = MenuAction { terminate?(app.id) }
             menuActions.append(action)
             quit.target = action
             menu.addItem(quit)

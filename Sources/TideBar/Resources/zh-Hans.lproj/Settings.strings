@@ -58,14 +58,15 @@
 "restore.action" = "关闭汐并恢复 macOS Dock";
 
 // 固定项目
-"pinned.header.description" = "选择始终显示在汐中的应用。运行中的其他应用会在固定项目之后自动出现。";
+"pinned.header.description" = "让应用、文件和目录随手可达。固定项目只是引用，原始资源仍留在原处。";
 "pinned.empty" = "还没有固定项目。";
 "pinned.add" = "添加应用…";
+"pinned.addResources" = "添加文件或目录…";
 "pinned.reset" = "恢复默认";
 "pinned.section.header" = "固定到汐";
-"pinned.section.footer" = "拖拽可调整顺序，右键或悬浮按钮可移除项目。固定项目只决定应用在汐中的位置，不会阻止应用自动显示或隐藏。";
-"pinned.resetConfirmTitle" = "恢复默认固定项目？";
-"pinned.notInstalled" = "应用未安装或已移动";
+"pinned.section.footer" = "拖拽调整顺序，右键或悬浮按钮移除项目。取消固定不会删除原始资源，也不会退出应用。";
+"pinned.resetConfirmTitle" = "将所有固定项目替换为默认应用？";
+"pinned.notInstalled" = "资源不可用";
 "pinned.dragHelp" = "拖拽调整顺序";
 "pinned.searchPlaceholder" = "搜索应用";
 "pinned.scanning" = "正在扫描已安装应用…";

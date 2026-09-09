@@ -37,6 +37,9 @@ enum Layout {
     static let badgePollExpanded: TimeInterval = 1
     static let badgePollCollapsed: TimeInterval = 4
 
+    // 手势：先越过拖动阈值则取消长按潮涌；已触发潮涌不再切换成拖拽。
+    static let itemDragThreshold: CGFloat = 6
+
     // 潮涌（二级展开）
     static let surgePressDelay: TimeInterval = 0.4
     static let surgeWidth: CGFloat = 260

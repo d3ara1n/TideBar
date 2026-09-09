@@ -58,250 +58,6 @@ enum BarBackgroundFactory {
 
 // MARK: - 图标横排
 
-struct AppListUpdate {
-    let hasInsertions: Bool
-    let hasRemovals: Bool
-    let removalDuration: TimeInterval
-
-    static let none = AppListUpdate(hasInsertions: false, hasRemovals: false, removalDuration: 0)
-}
-
-@MainActor
-final class IconRowView: NSView {
-    var onLaunch: ((AppEntry) -> Void)?
-    var onUserLaunch: (() -> Void)?
-    var onSetHidden: ((AppIdentity, Bool) -> Void)?
-    var onTerminate: ((AppIdentity) -> Void)?
-    var onSetPinned: ((AppIdentity, Bool) -> Void)?
-    var onSurge: ((AppEntry, NSRect) -> Void)?
-    private var buttons: [AppIconButton] = []
-    /// 离场项保留到动画结束，避免列表真值先删除导致视图瞬间消失。
-    private var departingButtons: [AppIdentity: AppIconButton] = [:]
-    private var departureTokens: [AppIdentity: Int] = [:]
-
-    /// rebuildAll = true：整体重建（展开动画完整重播）
-    /// rebuildAll = false：按 identity 差分，统一处理新增、删除与保留项重排。
-    @discardableResult
-    func update(apps: [AppEntry], rebuildAll: Bool) -> AppListUpdate {
-        if rebuildAll {
-            for button in buttons + Array(departingButtons.values) {
-                button.removeFromSuperview()
-            }
-            departingButtons.removeAll()
-            departureTokens.removeAll()
-            buttons = apps.map { app in
-                let button = makeButton(app)
-                addSubview(button)
-                return button
-            }
-            needsLayout = true
-            return .none
-        }
-
-        var oldFrames = Dictionary(uniqueKeysWithValues: buttons.map { ($0.entry.id, $0.frame) })
-        var kept = Dictionary(uniqueKeysWithValues: buttons.map { ($0.entry.id, $0) })
-        var next: [AppIconButton] = []
-        var newcomers: [AppIconButton] = []
-
-        for app in apps {
-            if let existing = kept.removeValue(forKey: app.id) {
-                existing.update(entry: app)
-                next.append(existing)
-            } else if let returning = departingButtons.removeValue(forKey: app.id) {
-                departureTokens[app.id, default: 0] += 1
-                oldFrames[app.id] = returning.frame
-                restoreForReuse(returning)
-                returning.update(entry: app)
-                next.append(returning)
-            } else {
-                let button = makeButton(app)
-                addSubview(button)
-                next.append(button)
-                newcomers.append(button)
-            }
-        }
-
-        let removed = Array(kept.values)
-        for button in removed {
-            beginDeparture(button)
-        }
-
-        buttons = next
-        needsLayout = true
-        layoutSubtreeIfNeeded()
-
-        let newcomerIDs = Set(newcomers.map { $0.entry.id })
-        if !Motion.shouldReduceMotion {
-            for button in buttons where !newcomerIDs.contains(button.entry.id) {
-                guard let oldFrame = oldFrames[button.entry.id], let layer = button.layer else { continue }
-                let delta = oldFrame.midX - button.frame.midX
-                guard abs(delta) > 0.5 else { continue }
-                Motion.spring(layer, keyPath: "transform.translation.x", from: delta, to: CGFloat(0),
-                              stiffness: Motion.iconRepositionStiffness,
-                              damping: Motion.iconRepositionDamping,
-                              minDuration: Motion.iconRepositionDuration)
-            }
-        }
-        for button in newcomers {
-            rise(button, delay: Motion.iconInsertionDelay)
-        }
-
-        let removalDuration = removed.isEmpty
-            ? 0
-            : (Motion.shouldReduceMotion
-               ? Motion.reducedMotionFadeDuration : Motion.dropDuration)
-        return AppListUpdate(hasInsertions: !newcomers.isEmpty,
-                             hasRemovals: !removed.isEmpty,
-                             removalDuration: removalDuration)
-    }
-
-    private func makeButton(_ app: AppEntry) -> AppIconButton {
-        let button = AppIconButton(entry: app)
-        button.onClick = { [weak self] entry in
-            self?.onUserLaunch?()
-            self?.onLaunch?(entry)
-        }
-        button.onSetHidden = { [weak self] identity, hidden in self?.onSetHidden?(identity, hidden) }
-        button.onTerminate = { [weak self] identity in self?.onTerminate?(identity) }
-        button.onSetPinned = { [weak self] identity, pinned in self?.onSetPinned?(identity, pinned) }
-        button.onSurge = { [weak self] entry, frame in self?.onSurge?(entry, frame) }
-        return button
-    }
-
-    /// 悬停轮询：命中之外的按钮全部清悬停
-    func setHover(hit: AppIconButton?) {
-        for button in buttons {
-            button.setHovered(button === hit)
-        }
-    }
-
-    func setKeyboardSelection(_ identity: AppIdentity?) {
-        for button in buttons {
-            button.setKeyboardSelected(button.entry.identity == identity)
-        }
-    }
-
-    func button(for identity: AppIdentity) -> AppIconButton? {
-        buttons.first { $0.entry.identity == identity }
-    }
-
-    func refreshLayout() {
-        for button in buttons + Array(departingButtons.values) {
-            button.refreshLayout()
-        }
-        needsLayout = true
-        layoutSubtreeIfNeeded()
-    }
-
-    func refreshAppearance() {
-        for button in buttons + Array(departingButtons.values) {
-            button.refreshAppearance()
-        }
-    }
-
-    override func layout() {
-        super.layout()
-        let total = CGFloat(buttons.count) * Layout.iconSlot
-        let originX = (bounds.width - total) / 2
-        for (index, button) in buttons.enumerated() {
-            button.frame = NSRect(x: originX + CGFloat(index) * Layout.iconSlot,
-                                  y: 0,
-                                  width: Layout.iconSlot,
-                                  height: bounds.height)
-        }
-    }
-
-    /// 涌潮波：自中心向两侧发散上涌，波窗封顶（Motion.waveStep）
-    func waveIn() {
-        alphaValue = 1
-        let step = Motion.waveStep(count: buttons.count)
-        let center = Double(buttons.count - 1) / 2
-        for (index, button) in buttons.enumerated() {
-            rise(button, delay: Motion.waveDelay + abs(Double(index) - center) * step)
-        }
-    }
-
-    /// 退潮波：向中心汇聚下坠，外圈先离场（easeIn 加速离场）
-    func waveOut() {
-        let step = Motion.convergeStep(count: buttons.count)
-        let center = Double(buttons.count - 1) / 2
-        for (index, button) in buttons.enumerated() {
-            let delay = abs(Double(index) - center) * step
-            guard let layer = button.layer else { continue }
-            if Motion.shouldReduceMotion {
-                Motion.basic(layer, keyPath: "opacity", to: 0.0,
-                             duration: Motion.reducedMotionFadeDuration, delay: delay)
-            } else {
-                Motion.basic(layer, keyPath: "transform.translation.y", to: Motion.iconDropOffset,
-                             duration: Motion.dropDuration, curve: .easeIn, delay: delay)
-                Motion.basic(layer, keyPath: "opacity", to: 0.0,
-                             duration: Motion.dropDuration, curve: .easeIn, delay: delay)
-            }
-        }
-    }
-
-    private func rise(_ button: AppIconButton, delay: TimeInterval) {
-        guard let layer = button.layer else { return }
-        if Motion.shouldReduceMotion {
-            Motion.basic(layer, keyPath: "opacity", from: Float(0), to: Float(1),
-                         duration: Motion.reducedMotionFadeDuration, delay: delay)
-            return
-        }
-        Motion.spring(layer, keyPath: "transform.translation.y", from: Motion.iconRiseOffset, to: CGFloat(0),
-                      stiffness: Motion.iconRiseStiffness, damping: Motion.iconRiseDamping,
-                      minDuration: Motion.iconRiseDuration, delay: delay)
-        Motion.basic(layer, keyPath: "opacity", from: Float(0), to: Float(1),
-                     duration: Motion.iconRiseDuration, delay: delay)
-    }
-
-    private func beginDeparture(_ button: AppIconButton) {
-        let identity = button.entry.id
-        button.setHovered(false)
-        departingButtons[identity] = button
-        departureTokens[identity, default: 0] += 1
-        let token = departureTokens[identity]
-        let reduceMotion = Motion.shouldReduceMotion
-        let duration = reduceMotion ? Motion.reducedMotionFadeDuration : Motion.dropDuration
-
-        if let layer = button.layer {
-            if !reduceMotion {
-                Motion.basic(layer, keyPath: "transform.translation.y", to: Motion.iconDropOffset,
-                             duration: duration, curve: .easeIn)
-                Motion.basic(layer, keyPath: "transform.scale", to: Motion.iconExitScale,
-                             duration: duration, curve: .easeIn)
-            }
-            Motion.basic(layer, keyPath: "opacity", to: Float(0),
-                         duration: duration, curve: .easeIn)
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self, weak button] in
-            MainActor.assumeIsolated {
-                guard let self, let button,
-                      self.departureTokens[identity] == token,
-                      self.departingButtons[identity] === button else { return }
-                self.departingButtons.removeValue(forKey: identity)
-                self.departureTokens.removeValue(forKey: identity)
-                button.removeFromSuperview()
-            }
-        }
-    }
-
-    private func restoreForReuse(_ button: AppIconButton) {
-        guard let layer = button.layer else { return }
-        layer.removeAnimation(forKey: "motion.transform.translation.x")
-        layer.removeAnimation(forKey: "motion.transform.translation.y")
-        layer.removeAnimation(forKey: "motion.transform.scale")
-        layer.removeAnimation(forKey: "motion.opacity")
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        layer.setValue(CGFloat(0), forKeyPath: "transform.translation.x")
-        layer.setValue(CGFloat(0), forKeyPath: "transform.translation.y")
-        layer.setValue(CGFloat(1), forKeyPath: "transform.scale")
-        layer.opacity = 1
-        CATransaction.commit()
-    }
-}
-
 // MARK: - 面板内容（编舞主体）
 // 窗口恒为展开尺寸，所有形变发生在 layer 空间——与窗口 frame 解耦。
 // 元素命名：潮体 silhouette（水体，展开/收起的形变主体）、玻璃 glass、
@@ -313,12 +69,34 @@ final class TideBarView: NSView {
     private let glass: NSView?
     private let silhouette = CALayer()
     private let tideline = CALayer()
-    private let iconRow = IconRowView()
+    private let iconRow = ItemRowView()
     private(set) var isExpandedState = false
+    weak var dragCoordinator: ItemDragCoordinator? {
+        didSet {
+            if let dragCoordinator {
+                registerForDraggedTypes([ItemDragCoordinator.pasteboardType, .fileURL])
+                iconRow.onBeginDrag = { [weak dragCoordinator] button, event in
+                    dragCoordinator?.begin(from: button, event: event) ?? false
+                }
+            } else {
+                unregisterDraggedTypes()
+                iconRow.onBeginDrag = nil
+            }
+            syncDragContext()
+        }
+    }
+    private var destinationTracking = false
+    var onPreviewWidthChange: (() -> Void)?
+    var extraPreviewSlots: Int { isExpandedState ? iconRow.extraPreviewSlots : 0 }
+
+    func syncDragContext() {
+        iconRow.setDragContext(active: destinationTracking || dragCoordinator?.isDragging == true,
+                               source: dragCoordinator?.liftedItemID)
+    }
     var onUserLaunch: (() -> Void)?
     var onSetHidden: ((AppIdentity, Bool) -> Void)?
     var onTerminate: ((AppIdentity) -> Void)?
-    var onSetPinned: ((AppIdentity, Bool) -> Void)?
+    var onSetPinned: ((ItemID, Bool) -> Void)?
     /// 潮涌触发透传（携图标 frame，面板内容坐标）
     var onSurge: ((AppEntry, NSRect) -> Void)?
 
@@ -326,7 +104,8 @@ final class TideBarView: NSView {
     func updateHover(atScreen point: NSPoint) {
         guard let window else { return }
         let local = convert(window.convertPoint(fromScreen: point), from: nil)
-        iconRow.setHover(hit: iconRow.hitTest(local) as? AppIconButton)
+        syncDragContext()
+        iconRow.setHover(hit: iconRow.hitTest(local) as? ItemIconButton)
     }
     /// 展开代数：状态切换即递增，使未决的延迟隐藏失效（防误杀下一次展开的潮体）
     private var expandGeneration = 0
@@ -517,6 +296,7 @@ final class TideBarView: NSView {
         tideline.shadowOffset = .zero
         tideline.shadowOpacity = 0.28
         layer?.addSublayer(tideline)
+        iconRow.onPreviewWidthChange = { [weak self] in self?.onPreviewWidthChange?() }
         // 呼吸只驱动 shadowOpacity，不与 transform/opacity 编舞冲突
         let breath = CABasicAnimation(keyPath: "shadowOpacity")
         breath.fromValue = 0.1
@@ -592,9 +372,57 @@ final class TideBarView: NSView {
         }
     }
 
+    // MARK: 拖拽目标
+
+    // 注册在稳定的内容视图上；图标行在再次展开时可以全部重建。
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        guard isExpandedState else { return [] }
+        destinationTracking = true
+        syncDragContext()
+        return dragCoordinator?.update(sender, in: self) ?? []
+    }
+
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        guard isExpandedState else { return [] }
+        destinationTracking = true
+        syncDragContext()
+        return dragCoordinator?.update(sender, in: self) ?? []
+    }
+
+    override func draggingExited(_ sender: (any NSDraggingInfo)?) {
+        dragCoordinator?.exit(self)
+    }
+
+    override func prepareForDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        isExpandedState && dragCoordinator?.canPerform(sender, in: self) == true
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        guard isExpandedState else { return false }
+        return dragCoordinator?.perform(sender, in: self) ?? false
+    }
+
+    override func draggingEnded(_ sender: any NSDraggingInfo) {
+        dragCoordinator?.ended(sender, in: self)
+    }
+
+    override func wantsPeriodicDraggingUpdates() -> Bool { true }
+
+    func dropLocation(for sender: any NSDraggingInfo) -> ItemDropLocation {
+        let point = iconRow.convert(sender.draggingLocation, from: nil)
+        return iconRow.dropLocation(at: point)
+    }
+
+    func setDropFeedback(_ intent: ItemDropIntent?, accepted: Bool = true) {
+        destinationTracking = intent != nil && isExpandedState
+        syncDragContext()
+        iconRow.setDragPreview(ItemDragPreview(intent: isExpandedState ? intent : nil, accepted: accepted))
+    }
+
     // MARK: 状态切换
 
-    func setExpanded(_ expanded: Bool, apps: [AppEntry] = [], immediate: Bool = false) {
+    func setExpanded(_ expanded: Bool, apps: [ItemEntry] = [], immediate: Bool = false) {
+        if !expanded { setDropFeedback(nil) }
         clearApplicationIntakeRequest()
         notificationPulseUntil = 0
         if expanded {
@@ -604,6 +432,7 @@ final class TideBarView: NSView {
             // 代数只在真实状态切换时递增：无操作重入不得否决已排定的淡入淡出
             expandGeneration += 1
             isExpandedState = true
+            syncDragContext()
             iconRow.update(apps: apps, rebuildAll: true)
             if Motion.shouldReduceMotion {
                 silhouette.removeAllAnimations()
@@ -706,8 +535,9 @@ final class TideBarView: NSView {
 
     /// 展开态下列表变更：差分刷新，不重播整体动画。
     @discardableResult
-    func refreshApps(_ apps: [AppEntry]) -> AppListUpdate {
-        iconRow.update(apps: apps, rebuildAll: false)
+    func refreshApps(_ apps: [ItemEntry]) -> ItemListUpdate {
+        let result = iconRow.update(apps: apps, rebuildAll: false)
+        return result
     }
 
     func refreshLayout() {

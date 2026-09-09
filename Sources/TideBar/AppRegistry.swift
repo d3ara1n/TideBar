@@ -3,7 +3,7 @@ import Darwin
 import TideBarCore
 import UniformTypeIdentifiers
 
-/// 图标栏的一个条目：固定项与运行项去重合并后的视图模型
+/// 应用身份的快照：固定与临时应用 item 共享同一份进程、窗口和动作语义。
 struct AppEntry: Identifiable {
     let identity: AppIdentity
     /// 固定配置保留采集到的原始 bundle identifier，不用规范化身份代替 locator。
@@ -85,8 +85,7 @@ struct AppEntry: Identifiable {
             }
             activate()
         } else if let applicationURL {
-            let config = NSWorkspace.OpenConfiguration()
-            Task { try? await NSWorkspace.shared.openApplication(at: applicationURL, configuration: config) }
+            launch(applicationURL)
         }
     }
 
@@ -99,8 +98,14 @@ struct AppEntry: Identifiable {
             _ = app.activate()
             sendReopen(to: app)
         } else if let applicationURL {
-            let config = NSWorkspace.OpenConfiguration()
-            Task { try? await NSWorkspace.shared.openApplication(at: applicationURL, configuration: config) }
+            launch(applicationURL)
+        }
+    }
+
+    private func launch(_ url: URL) {
+        Task { @MainActor in
+            do { try await NSWorkspace.shared.openApplication(at: url, configuration: .init()) }
+            catch { ItemErrors.report(error) }
         }
     }
 
@@ -224,19 +229,6 @@ final class AppRegistry {
         AppActionDispatcher.terminate(entry)
     }
 
-    func setPinned(_ pinned: Bool, for identity: AppIdentity) {
-        refresh()
-        guard let entry = entries.first(where: { $0.identity == identity }) else {
-            NSLog("TideBar pin change ignored for unavailable app: %@", identity.bundleIdentifier)
-            return
-        }
-        guard let bundleIdentifier = entry.bundleIdentifier else {
-            NSLog("TideBar pin denied for bundle-less app: %@", identity.bundleIdentifier)
-            return
-        }
-        AppConfiguration.shared.setPinned(pinned, bundleIdentifier: bundleIdentifier)
-    }
-
     func refresh() {
         let workspace = NSWorkspace.shared
         let pinned = AppConfiguration.shared.effectivePinnedBundleIDs
@@ -314,7 +306,11 @@ final class AppRegistry {
 
             let app = apps.first
             let bundleIdentifier = app?.bundleIdentifier ?? description.pinnedBundleIdentifier
+            let pinnedReference = PinnedItemStore.shared.records.first {
+                $0.id == .application(description.identity) && $0.kind == .application
+            }?.reference
             let applicationURL = app?.bundleURL
+                ?? pinnedReference.flatMap(ItemReferences.applicationURL)
                 ?? bundleIdentifier.flatMap { workspace.urlForApplication(withBundleIdentifier: $0) }
                 ?? app?.executablePath.map { URL(fileURLWithPath: $0) }
             guard app != nil || applicationURL != nil else { continue }

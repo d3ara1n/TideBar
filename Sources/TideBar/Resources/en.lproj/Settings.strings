@@ -14,7 +14,7 @@
 "sidebar.section.app" = "TideBar";
 "sidebar.section.system" = "System";
 "page.overview" = "Overview";
-"page.pinned" = "Pinned Apps";
+"page.pinned" = "Pinned Items";
 "page.windows" = "Window Management";
 "page.appearance" = "Appearance & Interaction";
 "page.shortcuts" = "Shortcuts";
@@ -58,14 +58,15 @@
 "restore.action" = "Turn Off TideBar & Restore macOS Dock";
 
 // 固定项目
-"pinned.header.description" = "Choose the apps that always appear in TideBar. Other running apps show up automatically after the pinned ones.";
-"pinned.empty" = "No pinned apps yet.";
+"pinned.header.description" = "Keep apps, files, and folders within reach. Pinned items are references; their original resources stay where they are.";
+"pinned.empty" = "No pinned items yet.";
 "pinned.add" = "Add Apps…";
+"pinned.addResources" = "Add Files or Folders…";
 "pinned.reset" = "Restore Defaults";
 "pinned.section.header" = "Pinned to TideBar";
-"pinned.section.footer" = "Drag to reorder; right-click or hover to remove. Pinning only decides where an app sits in TideBar — it never forces apps to show or hide.";
-"pinned.resetConfirmTitle" = "Restore default pinned apps?";
-"pinned.notInstalled" = "App is missing or moved";
+"pinned.section.footer" = "Drag to reorder; right-click or hover to remove. Removing a pinned reference never deletes its resource or quits its app.";
+"pinned.resetConfirmTitle" = "Replace all pinned items with defaults?";
+"pinned.notInstalled" = "Resource unavailable";
 "pinned.dragHelp" = "Drag to reorder";
 "pinned.searchPlaceholder" = "Search apps";
 "pinned.scanning" = "Scanning installed apps…";

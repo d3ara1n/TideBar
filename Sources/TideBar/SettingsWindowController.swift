@@ -91,7 +91,7 @@ private final class SettingsModel: ObservableObject {
 
     @Published private(set) var dockState: DockController.State = .notEnabled
     @Published private(set) var accessibilityTrusted = false
-    @Published private(set) var pinnedApps: [PinnedApplication] = []
+    @Published private(set) var pinnedItems: [PinnedItemInfo] = []
     @Published private(set) var operation: Operation = .idle
     @Published private(set) var applicationTheme: ApplicationTheme = .system
     @Published private(set) var iconSize: IconSizePreset = .standard
@@ -268,18 +268,27 @@ private final class SettingsModel: ObservableObject {
     }
 
     func refreshPinnedApps() {
-        let workspace = NSWorkspace.shared
-        pinnedApps = AppConfiguration.shared.effectivePinnedBundleIDs.map { bundleIdentifier in
-            let url = workspace.urlForApplication(withBundleIdentifier: bundleIdentifier)
-            let name = url.flatMap { Bundle(url: $0)?.localizedInfoDictionary?["CFBundleDisplayName"] as? String }
-                ?? url?.deletingPathExtension().lastPathComponent
-                ?? bundleIdentifier
-            let icon = url.map { workspace.icon(forFile: $0.path) } ?? workspace.icon(for: .application)
-            return PinnedApplication(bundleIdentifier: bundleIdentifier,
-                                     name: name,
-                                     icon: icon,
-                                     isInstalled: url != nil)
+        pinnedItems = PinnedItemStore.shared.records.map { record in
+            let presentation = ItemBehaviors.presentation(for: record)
+            return PinnedItemInfo(record: record, name: presentation.name,
+                                  icon: presentation.icon, isInstalled: presentation.isAvailable)
         }
+    }
+
+    func addPinnedResources() {
+        let panel = NSOpenPanel()
+        panel.prompt = L10nManager.shared.current.string("pinned.addShort", table: .settings)
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.canCreateDirectories = false
+        guard panel.runModal() == .OK else { return }
+        do {
+            let prepared = try ItemPinOperation.prepare(panel.urls.map(ItemReferences.externalFile),
+                                                       existing: PinnedItemStore.shared.records)
+            try PinnedItemStore.shared.replace(prepared.records)
+        } catch { ItemErrors.report(error) }
+        refreshPinnedApps()
     }
 
     func addPinned(bundleIdentifiers: [String]) {
@@ -290,10 +299,9 @@ private final class SettingsModel: ObservableObject {
     }
 
     func removePinned(at offsets: IndexSet) {
-        let values = offsets.compactMap { pinnedApps.indices.contains($0) ? pinnedApps[$0] : nil }
-        for value in values {
-            AppConfiguration.shared.setPinned(false, bundleIdentifier: value.bundleIdentifier)
-        }
+        let values = offsets.compactMap { pinnedItems.indices.contains($0) ? pinnedItems[$0].id : nil }
+        do { try PinnedItemStore.shared.remove(Set(values)) }
+        catch { ItemErrors.report(error) }
         refreshPinnedApps()
     }
 
@@ -302,8 +310,8 @@ private final class SettingsModel: ObservableObject {
         refreshPinnedApps()
     }
 
-    func removePinned(_ app: PinnedApplication) {
-        guard let index = pinnedApps.firstIndex(of: app) else { return }
+    func removePinned(_ app: PinnedItemInfo) {
+        guard let index = pinnedItems.firstIndex(where: { $0.id == app.id }) else { return }
         removePinned(at: IndexSet(integer: index))
     }
 
@@ -313,6 +321,14 @@ private final class SettingsModel: ObservableObject {
     }
 
     var isTakeoverEnabled: Bool { AppConfiguration.shared.isTakeoverEnabled }
+}
+
+private struct PinnedItemInfo: Identifiable {
+    let record: PinnedItemRecord
+    let name: String
+    let icon: NSImage
+    let isInstalled: Bool
+    var id: ItemID { record.id }
 }
 
 private struct PinnedApplication: Identifiable, Equatable {
@@ -577,12 +593,12 @@ private struct PinnedPage: View {
                        description: l10n.string("pinned.header.description", table: .settings))
 
             Section {
-                if model.pinnedApps.isEmpty {
+                if model.pinnedItems.isEmpty {
                     Text(l10n.string("pinned.empty", table: .settings))
                         .foregroundStyle(.secondary)
                 } else {
                     List {
-                        ForEach(model.pinnedApps) { app in
+                        ForEach(model.pinnedItems) { app in
                             PinnedRow(app: app) {
                                 model.removePinned(app)
                             }
@@ -596,6 +612,7 @@ private struct PinnedPage: View {
 
                 HStack {
                     Button(l10n.string("pinned.add", table: .settings), action: { isShowingApplicationPicker = true })
+                    Button(l10n.string("pinned.addResources", table: .settings), action: model.addPinnedResources)
                     Spacer()
                     Button(l10n.string("pinned.reset", table: .settings), action: { showResetConfirmation = true })
                 }
@@ -619,7 +636,7 @@ private struct PinnedPage: View {
 
 private struct PinnedRow: View {
     @Environment(\.l10n) private var l10n
-    let app: PinnedApplication
+    let app: PinnedItemInfo
     let onRemove: () -> Void
 
     @State private var isHovered = false
@@ -738,7 +755,7 @@ private struct ApplicationPickerSheet: View {
     }
 
     private var pinnedBundleIdentifiers: Set<String> {
-        Set(model.pinnedApps.map(\.bundleIdentifier))
+        Set(model.pinnedItems.compactMap { ItemReferences.applicationLocator($0.record.reference)?.bundleIdentifier })
     }
 
     var body: some View {

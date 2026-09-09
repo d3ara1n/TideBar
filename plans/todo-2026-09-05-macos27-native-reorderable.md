@@ -8,8 +8,9 @@ WWDC26 发布了 SwiftUI 原生任意容器拖拽重排 API（`DynamicViewConten
 
 ## 行动
 
-- Xcode 27 正式版可用后，将固定项目页（及届时任何需要拖拽重排的容器）迁移到原生 API。
-- 迁移前若需要网格/图标式的拖拽编辑 UI，用 `LazyVGrid` + `onDrag`/`DropDelegate` 手写，接受其在 Xcode 27 后被替换——不为等待 API 而冻结 UI 演进。
+- Xcode 27 正式版可用且部署基线允许后，评估固定项目页等 SwiftUI 容器迁移到原生 API；升级工具链本身不等于提高最低系统版本。
+- 迁移前若设置页需要网格/图标式的拖拽编辑 UI，用 `LazyVGrid` + `onDrag`/`DropDelegate` 手写——不为等待 API 而冻结 UI 演进。
+- AppKit 图标栏的内部拖拽与外部资源固定使用系统 dragging source/destination，不属于本计划的 SwiftUI 容器迁移范围；实施见 `todo-2026-09-09-items-and-drag.md`。
 
 ## 触发条件
 

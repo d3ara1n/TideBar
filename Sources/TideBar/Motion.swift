@@ -66,6 +66,13 @@ enum Motion {
     static let iconExitScale: CGFloat = 0.92
     static var listResizeDuration: TimeInterval { time(0.22) }
 
+    // MARK: 拖拽意图（与业务提交独立）
+
+    static var dragFeedbackDuration: TimeInterval { time(0.12) }
+    static var dragRepositionDuration: TimeInterval { time(0.18) }
+    static var dragRepositionStiffness: CGFloat { springStiffness(480) }
+    static var dragRepositionDamping: CGFloat { springDamping(38) }
+
     // MARK: 应用与窗口状态变化
 
     static var statusDuration: TimeInterval { time(0.18) }

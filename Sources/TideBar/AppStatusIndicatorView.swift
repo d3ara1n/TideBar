@@ -25,7 +25,7 @@ final class AppStatusIndicatorView: NSView {
     private let countLayer = CATextLayer()
     private var state: State = .none
 
-    init(entry: AppEntry) {
+    init(entry: AppEntry?) {
         super.init(frame: .zero)
         wantsLayer = true
         layer?.masksToBounds = false
@@ -58,7 +58,7 @@ final class AppStatusIndicatorView: NSView {
         apply(state, animated: false, previous: state)
     }
 
-    func update(entry: AppEntry, animated: Bool) {
+    func update(entry: AppEntry?, animated: Bool) {
         let next = Self.makeState(entry, viewDisplayID: viewDisplayID)
         guard next != state else {
             apply(next, animated: false, previous: state)
@@ -74,8 +74,8 @@ final class AppStatusIndicatorView: NSView {
         (window?.screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
     }
 
-    private static func makeState(_ entry: AppEntry, viewDisplayID: CGDirectDisplayID?) -> State {
-        guard entry.isRunning else { return .none }
+    private static func makeState(_ entry: AppEntry?, viewDisplayID: CGDirectDisplayID?) -> State {
+        guard let entry, entry.isRunning else { return .none }
         guard let windows = entry.windows, !windows.isEmpty else { return .running }
         if windows.count > markersLimit { return .count(windows.count) }
         let dots = windows.map { window in

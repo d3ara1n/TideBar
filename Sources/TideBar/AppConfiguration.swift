@@ -22,7 +22,7 @@ enum ApplicationTheme: String, CaseIterable, Identifiable {
 final class AppConfiguration {
     static let shared = AppConfiguration()
     static let didChange = Notification.Name("TideBar.configurationDidChange")
-    static let pinnedDidChange = Notification.Name("TideBar.pinnedAppsDidChange")
+    static let pinnedDidChange = PinnedItemStore.didChange
     static let appearanceDidChange = Notification.Name("TideBar.appearanceDidChange")
     static let layoutDidChange = Notification.Name("TideBar.layoutDidChange")
     static let behaviorDidChange = Notification.Name("TideBar.behaviorDidChange")
@@ -38,7 +38,6 @@ final class AppConfiguration {
 
     private let defaults = UserDefaults.standard
     private let enabledKey = "tidebar.enabled"
-    private let pinnedKey = "tidebar.pinned"
     private let onboardingKey = "tidebar.onboardingCompleted"
     private let appearanceKey = "tidebar.appearance"
     private let iconSizeKey = "tidebar.iconSize"
@@ -143,48 +142,22 @@ final class AppConfiguration {
         return value
     }
 
-    /// 固定项 bundle id 列表；未设置时使用内建默认值。
-    private(set) var pinnedBundleIDs: [String]? {
-        get { defaults.stringArray(forKey: pinnedKey) }
-        set {
-            defaults.set(newValue, forKey: pinnedKey)
-            NotificationCenter.default.post(name: Self.pinnedDidChange, object: self)
-        }
-    }
+    /// 应用观测只消费通用固定列表的应用投影。
+    var effectivePinnedBundleIDs: [String] { PinnedItemStore.shared.applicationBundleIdentifiers }
 
-    var effectivePinnedBundleIDs: [String] {
-        pinnedBundleIDs ?? Self.defaultPinnedBundleIDs
-    }
-
-    /// 固定操作保留系统提供的原始 bundle identifier；身份比较仍忽略 ASCII 大小写。
     func setPinned(_ pinned: Bool, bundleIdentifier: String) {
-        let identity = AppIdentity(bundleIdentifier)
-        var bundleIdentifiers = effectivePinnedBundleIDs
-        let contains = bundleIdentifiers.contains { AppIdentity($0) == identity }
-
-        if pinned {
-            guard !contains else { return }
-            bundleIdentifiers.append(bundleIdentifier)
-        } else {
-            guard contains else { return }
-            bundleIdentifiers.removeAll { AppIdentity($0) == identity }
-        }
-        pinnedBundleIDs = bundleIdentifiers
+        do { try PinnedItemStore.shared.setPinned(pinned, bundleIdentifier: bundleIdentifier) }
+        catch { ItemErrors.report(error) }
     }
 
     func movePinned(from offsets: IndexSet, to destination: Int) {
-        var values = effectivePinnedBundleIDs
-        let moving = offsets.sorted().map { values[$0] }
-        for index in offsets.sorted(by: >) {
-            values.remove(at: index)
-        }
-        let adjustedDestination = destination - offsets.filter { $0 < destination }.count
-        values.insert(contentsOf: moving, at: min(max(adjustedDestination, 0), values.count))
-        pinnedBundleIDs = values
+        do { try PinnedItemStore.shared.move(from: offsets, to: destination) }
+        catch { ItemErrors.report(error) }
     }
 
     func restoreDefaultPinned() {
-        pinnedBundleIDs = nil
+        do { try PinnedItemStore.shared.restoreDefaults() }
+        catch { ItemErrors.report(error) }
     }
 
     var onboardingCompleted: Bool {

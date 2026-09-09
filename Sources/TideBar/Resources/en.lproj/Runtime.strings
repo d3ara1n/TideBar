@@ -5,3 +5,14 @@
 "dock.error.synchronizeFailed" = "Couldn't synchronize Dock preferences";
 "dock.error.verificationFailed" = "Couldn't verify Dock configuration";
 "dock.error.restartFailed" = "Couldn't restart the Dock";
+
+"item.error.title" = "Couldn't complete the item operation";
+"item.error.ok" = "OK";
+"item.error.reference" = "This reference isn't supported or no longer identifies a valid resource.";
+"item.error.missing" = "The resource is unavailable. It may have been deleted, disconnected, or become inaccessible.";
+"item.error.storage" = "The pinned item data couldn't be read. It has been preserved. Restore Defaults in settings only if you want to replace it.";
+"item.error.open" = "The resource couldn't be opened by the system.";
+"item.error.changed" = "The item or drop position changed. Please try again.";
+"item.error.moveConflict" = "The move would conflict with an existing item or move a folder into itself. No files were moved.";
+"item.error.crossVolume" = "Moving between volumes isn't supported by this drop operation. Use Finder to move these resources.";
+"item.error.partialMove" = "Some files were moved, but the remaining files couldn't be moved. Check the source and destination folders before retrying.";
