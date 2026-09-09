@@ -4,12 +4,15 @@ import ApplicationServices
 // MARK: - 行
 
 /// 潮涌列表项：窗口标题 + 文档图标（回退 app 图标）；最小化/他屏暗显，
-/// 最小化行尾另加「已最小化」标签与他屏窗口区分。
+/// 行尾状态标签区分：最小化优先（还原去向由点点灰空心承载），
+/// 其次他屏（同款标签形态，见 decisions「行尾圆角矩形文字标签」）。
 /// 悬停态由控制器鼠标采样轮询驱动（tracking area 在非激活悬浮窗上不可靠）。
 @MainActor
 final class SurgeRowView: NSView {
     private let snapshot: WindowSnapshot
     private let icon: NSImage
+    /// 窗口归属不在本屏（暗显 + 标签；最小化行仍显示最小化标签）
+    private let isOffscreen: Bool
     private var title: String {
         snapshot.title ?? L10nManager.shared.current.string("window.fallbackTitle", table: .runtime)
     }
@@ -18,12 +21,13 @@ final class SurgeRowView: NSView {
 
     var onPick: ((WindowSnapshot) -> Void)?
 
-    init(snapshot: WindowSnapshot, appIcon: NSImage, dimmed: Bool) {
+    init(snapshot: WindowSnapshot, appIcon: NSImage, isOffscreen: Bool) {
         self.snapshot = snapshot
         self.icon = Self.icon(for: snapshot.document, appIcon: appIcon)
+        self.isOffscreen = isOffscreen
         super.init(frame: NSRect(x: 0, y: 0, width: Layout.surgeWidth, height: Layout.surgeRowHeight))
         wantsLayer = true
-        alphaValue = dimmed ? 0.45 : 1
+        alphaValue = isOffscreen || snapshot.isMinimized ? 0.45 : 1
     }
 
     @available(*, unavailable)
@@ -82,10 +86,15 @@ final class SurgeRowView: NSView {
             .foregroundColor: titleColor,
             .paragraphStyle: paragraph,
         ]
-        // 最小化标签：宽度按文字实测，仅在最小化行占用行尾空间
-        let badgeText = snapshot.isMinimized
-            ? L10nManager.shared.current.string("window.minimizedBadge", table: .runtime)
-            : nil
+        // 状态标签：最小化优先，其次他屏；宽度按文字实测，仅占用行尾空间
+        let badgeText: String?
+        if snapshot.isMinimized {
+            badgeText = L10nManager.shared.current.string("window.minimizedBadge", table: .runtime)
+        } else if isOffscreen {
+            badgeText = L10nManager.shared.current.string("window.offscreenBadge", table: .runtime)
+        } else {
+            badgeText = nil
+        }
         let badgeAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: Layout.surgeMinimizedBadgeFontSize, weight: .medium),
             .foregroundColor: titleColor,
@@ -142,15 +151,16 @@ final class SurgeView: NSView {
     private let glass: NSView?
 
     init(windows: [WindowSnapshot], screen: NSScreen, appIcon: NSImage) {
+        let viewDisplayID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
         func onScreen(_ window: WindowSnapshot) -> Bool {
-            guard let frame = window.frame else { return false }
-            return screen.frame.intersects(frame)
+            guard let viewDisplayID, let screenID = window.screenID else { return false }
+            return screenID == viewDisplayID
         }
         let active = windows.filter { !$0.isMinimized }
-        let rows: [(snapshot: WindowSnapshot, dimmed: Bool)] =
+        let rows: [(snapshot: WindowSnapshot, isOffscreen: Bool)] =
             active.filter(onScreen).map { ($0, false) }
             + active.filter { !onScreen($0) }.map { ($0, true) }
-            + windows.filter(\.isMinimized).map { ($0, true) }
+            + windows.filter(\.isMinimized).map { ($0, !onScreen($0)) }
 
         let height = CGFloat(windows.count) * Layout.surgeRowHeight + Layout.surgeVPadding * 2
         glass = BarBackgroundFactory.makeGlassIfAvailable(cornerRadius: 12)
@@ -162,7 +172,7 @@ final class SurgeView: NSView {
 
         let count = rows.count
         for (index, row) in rows.enumerated() {
-            let view = SurgeRowView(snapshot: row.snapshot, appIcon: appIcon, dimmed: row.dimmed)
+            let view = SurgeRowView(snapshot: row.snapshot, appIcon: appIcon, isOffscreen: row.isOffscreen)
             view.frame = NSRect(x: 0,
                                 y: Layout.surgeVPadding + CGFloat(count - 1 - index) * Layout.surgeRowHeight,
                                 width: Layout.surgeWidth,

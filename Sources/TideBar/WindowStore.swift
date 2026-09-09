@@ -12,6 +12,9 @@ struct WindowSnapshot {
     let document: String?
     let isMinimized: Bool
     let frame: CGRect?
+    /// 窗口归属显示器（交集面积最大者）；最小化或 frame 不可读时保留旧值，
+    /// nil = 未知（冷启动即最小化等），呈现层按本屏处理
+    let screenID: CGDirectDisplayID?
 }
 
 // MARK: - AX 读取（元素级超时防挂起）
@@ -122,6 +125,8 @@ final class WindowStore {
     private var watches: [pid_t: Watch] = [:]
     private var observers: [NSObjectProtocol] = []
     private var loggedNoPermission = false
+    /// 展开态才响应 title 通知（见 setExpanded）
+    private var maintainsTitles = false
     /// 快照集合变化（应用身份粒度）
     var onUpdate: ((AppIdentity) -> Void)?
 
@@ -164,6 +169,21 @@ final class WindowStore {
     func knowledge(for processIdentifier: pid_t) -> WindowKnowledge<WindowSnapshot> {
         guard let snapshots = watches[processIdentifier]?.snapshots else { return .unknown }
         return .known(snapshots)
+    }
+
+    /// 展开/收起切换窗口内容维护范围：收起时 title/document 停更
+    /// （无视图消费，浏览器/编辑器的高频标题变更不再触发 AX 重读），
+    /// 窗口集合与最小化态照常维护（点点与展开刷新依赖）。
+    func setExpanded(_ expanded: Bool) {
+        maintainsTitles = expanded
+    }
+
+    /// 展开等需要新鲜窗口知识的时机：全量重枚举，重读 frame→归属；
+    /// 事件去抖统一吸收，与启动时的批量重枚举同一模式。
+    func refreshAll() {
+        for pid in watches.keys {
+            scheduleReenumerate(pid: pid, after: 0)
+        }
     }
 
     // MARK: 观测生命周期
@@ -238,6 +258,10 @@ final class WindowStore {
 
         var snapshots: [WindowSnapshot] = []
         var complete = true
+        let displays = Self.currentDisplays()
+        let previousScreens = (watch.snapshots ?? []).reduce(into: [:]) { partial, snapshot in
+            partial[snapshot.elementIdentifier] = snapshot.screenID
+        }
         elementLoop: for element in elements {
             AXReader.setWindowElementTimeout(element)
 
@@ -268,14 +292,20 @@ final class WindowStore {
             // 收录规则：标准窗口，或已最小化（最小化时 subrole 不可靠，min 兜底；
             // 对话框/桌面元素两者皆不满足，天然排除）
             guard subrole == (kAXStandardWindowSubrole as String) || minimized else { continue }
+            let elementIdentifier = Int(bitPattern: CFHash(element))
+            let frame = AXReader.readFrame(element)
             snapshots.append(WindowSnapshot(
                 ownerPID: pid,
-                elementIdentifier: Int(bitPattern: CFHash(element)),
+                elementIdentifier: elementIdentifier,
                 element: element,
                 title: AXReader.readString(element, kAXTitleAttribute as String),
                 document: AXReader.readString(element, kAXDocumentAttribute as String),
                 isMinimized: minimized,
-                frame: AXReader.readFrame(element)
+                frame: frame,
+                screenID: WindowScreenAssignment.resolve(frame: frame,
+                                                         isMinimized: minimized,
+                                                         displays: displays,
+                                                         previous: previousScreens[elementIdentifier])
             ))
         }
 
@@ -314,18 +344,28 @@ final class WindowStore {
         }
     }
 
-    /// frame 变动不触发；窗口身份、标题、文档和最小化态共同决定内容修订。
+    /// frame 变动不触发；窗口身份、标题、文档、最小化态与屏归属共同决定内容修订。
     private static func signature(_ snapshots: [WindowSnapshot]) -> [WindowContentRevision] {
         snapshots.map {
             WindowContentRevision(ownerProcessIdentifier: $0.ownerPID,
                                   elementIdentifier: $0.elementIdentifier,
                                   title: $0.title,
                                   document: $0.document,
-                                  isMinimized: $0.isMinimized)
+                                  isMinimized: $0.isMinimized,
+                                  screenID: $0.screenID)
         }
     }
 
     // MARK: AXObserver
+
+    private static func currentDisplays() -> [FullscreenDisplay] {
+        NSScreen.screens.compactMap { screen -> FullscreenDisplay? in
+            guard let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value else {
+                return nil
+            }
+            return FullscreenDisplay(id: id, bounds: CGDisplayBounds(id))
+        }
+    }
 
     /// 每轮重枚举后整体重建 observer：旧窗口的通知随旧 observer 一并失效，无悬挂
     private func attachObserver(pid: pid_t, appElement: AXUIElement,
@@ -379,9 +419,12 @@ final class WindowStore {
         watch.observer = nil
     }
 
-    /// AX 回调落点：仅重排去抖，不做重活
+    /// AX 回调落点：仅重排去抖，不做重活。
+    /// 收起态丢弃 title 通知：重枚举的全窗口 AX 重读无人消费，
+    /// 停滞的 title/document 由展开时的全量重枚举补齐。
     func handleAXEvent(pid: pid_t, notification: String) {
         guard watches[pid] != nil else { return }
+        guard maintainsTitles || notification != (kAXTitleChangedNotification as String) else { return }
         scheduleReenumerate(pid: pid, after: 0.15)
     }
 }

@@ -2,13 +2,22 @@ import AppKit
 import QuartzCore
 
 /// 应用运行与窗口状态标记：灰色短线、窗口圆点和数量之间连续过渡。
+/// 圆点四态：亮/灰 = 点击后本屏有/无变化（窗口在本屏/别屏），
+/// 实/空 = 活跃/最小化；颜色通道即点击后果预期，与形态通道正交。
 @MainActor
 final class AppStatusIndicatorView: NSView {
+    /// isDimmed = 窗口归属不在本屏（归属未知时按本屏处理，不淡化）
+    private struct WindowDot: Equatable {
+        let isMinimized: Bool
+        let isDimmed: Bool
+
+        var order: Int { (isMinimized ? 2 : 0) + (isDimmed ? 1 : 0) }
+    }
+
     private enum State: Equatable {
         case none
         case running
-        /// true = 活跃窗口（实心），false = 最小化窗口（空心）
-        case windows([Bool])
+        case windows([WindowDot])
         case count(Int)
     }
 
@@ -50,7 +59,7 @@ final class AppStatusIndicatorView: NSView {
     }
 
     func update(entry: AppEntry, animated: Bool) {
-        let next = Self.makeState(entry)
+        let next = Self.makeState(entry, viewDisplayID: viewDisplayID)
         guard next != state else {
             apply(next, animated: false, previous: state)
             return
@@ -60,13 +69,23 @@ final class AppStatusIndicatorView: NSView {
         apply(next, animated: animated, previous: previous)
     }
 
-    private static func makeState(_ entry: AppEntry) -> State {
+    /// 所在面板的显示器；未挂载时返回 nil，点色按本屏处理
+    private var viewDisplayID: CGDirectDisplayID? {
+        (window?.screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+    }
+
+    private static func makeState(_ entry: AppEntry, viewDisplayID: CGDirectDisplayID?) -> State {
         guard entry.isRunning else { return .none }
         guard let windows = entry.windows, !windows.isEmpty else { return .running }
         if windows.count > markersLimit { return .count(windows.count) }
-        let active = windows.filter { !$0.isMinimized }.count
-        return .windows(Array(repeating: true, count: active)
-            + Array(repeating: false, count: windows.count - active))
+        let dots = windows.map { window in
+            WindowDot(isMinimized: window.isMinimized,
+                      isDimmed: {
+                          guard let viewDisplayID, let screenID = window.screenID else { return false }
+                          return screenID != viewDisplayID
+                      }())
+        }.sorted { $0.order < $1.order }
+        return .windows(dots)
     }
 
     private static let markersLimit = 5
@@ -94,14 +113,16 @@ final class AppStatusIndicatorView: NSView {
             }
             set(countLayer, keyPath: "opacity", to: Float(0), animated: shouldAnimate)
 
-        case .windows(let filledStates):
+        case .windows(let dots):
             for (index, marker) in markers.enumerated() {
-                guard index < filledStates.count else {
+                guard index < dots.count else {
                     set(marker, keyPath: "opacity", to: Float(0), animated: shouldAnimate)
                     continue
                 }
-                configure(marker: marker, index: index, count: filledStates.count,
-                          filled: filledStates[index], dash: false, color: tone,
+                let dot = dots[index]
+                configure(marker: marker, index: index, count: dots.count,
+                          filled: !dot.isMinimized, dash: false,
+                          color: dot.isDimmed ? quietTone : tone,
                           animated: shouldAnimate)
             }
             set(countLayer, keyPath: "opacity", to: Float(0), animated: shouldAnimate)

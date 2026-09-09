@@ -42,7 +42,8 @@ struct AppEntry: Identifiable {
                                   elementIdentifier: $0.elementIdentifier,
                                   title: $0.title,
                                   document: $0.document,
-                                  isMinimized: $0.isMinimized)
+                                  isMinimized: $0.isMinimized,
+                                  screenID: $0.screenID)
         }
     }
     var contentRevision: AppContentRevision {
@@ -62,11 +63,13 @@ struct AppEntry: Identifiable {
         runningAppsByPID[window.ownerPID]
     }
 
-    /// 点点状态摘要（活跃数/最小化数，nil=不画），供变更判定
+    /// 点点状态摘要（逐窗：活跃/最小化 × 归属屏，nil=不画），供变更判定；
+    /// 归属入摘要使跨屏移动在重枚举后能刷新各屏点色（同屏重算为 no-op）
     var dotSignature: String {
         guard isRunning, let windows else { return "nil" }
-        let mini = windows.filter(\.isMinimized).count
-        return "\(windows.count - mini)/\(mini)"
+        return windows.map { window in
+            (window.isMinimized ? "m" : "a") + "@" + (window.screenID.map(String.init) ?? "?")
+        }.joined(separator: ",")
     }
 
     /// 主点击：仅剩最小化窗口 → 还原最近一个；否则 activate
@@ -175,6 +178,16 @@ final class AppRegistry {
     /// 展开/收起切换角标轮询节奏（展开加速 + 立即全量读）
     func setBadgeCadence(expanded: Bool) {
         badgeStore.setExpanded(expanded)
+    }
+
+    /// 重读全部窗口知识（frame→屏归属）；展开时消费，保证点色反映最新窗口位置
+    func refreshWindows() {
+        windowStore.refreshAll()
+    }
+
+    /// 展开/收起切换窗口内容维护范围（title/document 停更/恢复），与角标节奏同源切换
+    func setWindowCadence(expanded: Bool) {
+        windowStore.setExpanded(expanded)
     }
 
     /// 250ms 去抖，合并应用启停风暴

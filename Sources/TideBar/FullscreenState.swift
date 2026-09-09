@@ -79,6 +79,21 @@ enum FullscreenResolver {
     }
 }
 
+/// 窗口 → 显示器的归属判定（指示器灰点用）：
+/// 非最小化且 frame 有效 → 交集面积最大的屏；其余一律保留旧值——
+/// 最小化窗口的 frame 不可靠（部分 app 归零或跳到 Dock 位置），
+/// 归属只能来自最小化前的最后已知值。
+enum WindowScreenAssignment {
+    static func resolve(frame: CGRect?, isMinimized: Bool,
+                        displays: [FullscreenDisplay],
+                        previous: CGDirectDisplayID?) -> CGDirectDisplayID? {
+        if isMinimized { return previous }
+        guard let frame else { return previous }
+        // 有效 frame 但不与任何屏相交（窗口整体在屏外）同样保留旧值
+        return FullscreenResolver.display(for: frame, in: displays)?.id ?? previous
+    }
+}
+
 /// 观察值绑定采集上下文；重新采样可以保留确认值，切换 Space / 屏幕则必须清空。
 struct FullscreenObservations {
     private(set) var generation = 0

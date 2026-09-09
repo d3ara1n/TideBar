@@ -593,6 +593,8 @@ final class TideBarController {
         state.panel.makeKey()
         // 挂起期间积压的终止通知可能尚未消费；展开即用户可见时刻，先同步对账
         registry.refresh()
+        // 重读窗口 frame→屏归属：跨屏移动发生在收起期无通知，展开时拉一次新鲜值
+        registry.refreshWindows()
         syncBadgeCadence()
         state.view.setExpanded(true, apps: registry.entries)
         NSLog("TideBar expanded on screen %u", displayID(of: state.screen) ?? 0)
@@ -613,11 +615,14 @@ final class TideBarController {
         syncBadgeCadence()
     }
 
-    // MARK: 角标节奏与汐线脉冲
+    // MARK: 展开态节奏与汐线脉冲
 
-    /// 任一屏展开即加速角标轮询；全部收起则降频（足迹最小）
+    /// 任一屏展开即切展开节奏（角标加速轮询、窗口 title 恢复维护）；
+    /// 全部收起则降频/停更（足迹最小）
     private func syncBadgeCadence() {
-        registry.setBadgeCadence(expanded: screens.values.contains { $0.isExpanded })
+        let anyExpanded = screens.values.contains { $0.isExpanded }
+        registry.setBadgeCadence(expanded: anyExpanded)
+        registry.setWindowCadence(expanded: anyExpanded)
     }
 
     /// 逻辑启动只在当前可见的折叠汐线上反馈，不积压到下次折叠或显示。

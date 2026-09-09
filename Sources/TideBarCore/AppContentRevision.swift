@@ -1,3 +1,5 @@
+import CoreGraphics
+
 /// 会影响潮涌与状态标记的窗口内容修订。
 public struct WindowContentRevision: Equatable, Sendable {
     public let ownerProcessIdentifier: Int32
@@ -5,17 +7,20 @@ public struct WindowContentRevision: Equatable, Sendable {
     public let title: String?
     public let document: String?
     public let isMinimized: Bool
+    public let screenID: CGDirectDisplayID?
 
     public init(ownerProcessIdentifier: Int32,
                 elementIdentifier: Int,
                 title: String?,
                 document: String?,
-                isMinimized: Bool) {
+                isMinimized: Bool,
+                screenID: CGDirectDisplayID?) {
         self.ownerProcessIdentifier = ownerProcessIdentifier
         self.elementIdentifier = elementIdentifier
         self.title = title
         self.document = document
         self.isMinimized = isMinimized
+        self.screenID = screenID
     }
 }
 
