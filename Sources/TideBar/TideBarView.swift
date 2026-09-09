@@ -99,13 +99,25 @@ final class TideBarView: NSView {
     var onSetPinned: ((ItemID, Bool) -> Void)?
     /// 潮涌触发透传（携图标 frame，面板内容坐标）
     var onSurge: ((AppEntry, NSRect) -> Void)?
+    /// 悬停目标变化（携图标 frame，本视图坐标系）；nil 表示离开图标区
+    var onHoverItem: ((ItemEntry, NSRect) -> Void)?
+    var onHoverClear: (() -> Void)?
 
-    /// 悬停轮询驱动（屏幕坐标 → 命中图标高亮）
+    /// 悬停轮询驱动（屏幕坐标 → 命中图标高亮）；目标变化时上报，驱动名字气泡
     func updateHover(atScreen point: NSPoint) {
         guard let window else { return }
         let local = convert(window.convertPoint(fromScreen: point), from: nil)
         syncDragContext()
-        iconRow.setHover(hit: iconRow.hitTest(local) as? ItemIconButton)
+        let hit = iconRow.hitTest(local) as? ItemIconButton
+        iconRow.setHover(hit: hit)
+        let hitID = hit?.entry.id
+        guard hitID != hoveredItemID else { return }
+        hoveredItemID = hitID
+        if let hit {
+            onHoverItem?(hit.entry, hit.frame)
+        } else {
+            onHoverClear?()
+        }
     }
     /// 展开代数：状态切换即递增，使未决的延迟隐藏失效（防误杀下一次展开的潮体）
     private var expandGeneration = 0
@@ -114,6 +126,8 @@ final class TideBarView: NSView {
     private var applicationIntakeWork: DispatchWorkItem?
     private var applicationIntakeUntil: CFTimeInterval = 0
     private var notificationPulseUntil: CFTimeInterval = 0
+    /// 当前悬停目标（去重上报用）
+    private var hoveredItemID: ItemID?
 
     /// 收纳只形变汐线，不改窗口或图层几何；同一动作期间的新启动合并消化。
     func intakeApplications() {
@@ -432,6 +446,7 @@ final class TideBarView: NSView {
             // 代数只在真实状态切换时递增：无操作重入不得否决已排定的淡入淡出
             expandGeneration += 1
             isExpandedState = true
+            hoveredItemID = nil
             syncDragContext()
             iconRow.update(apps: apps, rebuildAll: true)
             if Motion.shouldReduceMotion {
@@ -485,6 +500,7 @@ final class TideBarView: NSView {
             guard isExpandedState else { return }
             expandGeneration += 1
             isExpandedState = false
+            hoveredItemID = nil
             if immediate {
                 hardReset()
                 return

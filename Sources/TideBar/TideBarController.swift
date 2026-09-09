@@ -59,10 +59,14 @@ final class TideBarController {
     private var surgeWindowRevision: WindowKnowledge<WindowContentRevision>?
     private var surgeOriginDisplayID: CGDirectDisplayID?
     private var surgeDismissWork: DispatchWorkItem?
+    private var nameBubblePanel: NameBubblePanel?
+    private var nameBubbleTarget: ItemID?
+    private var nameBubbleShowWork: DispatchWorkItem?
 
     func start() {
         dragCoordinator.onBegin = { [weak self] in
             self?.endBarSession(collapse: false, suppressMouse: false)
+            self?.hideNameBubble()
         }
         dragCoordinator.onMovement = { [weak self] in self?.sampleMouse(isMovement: true) }
         dragCoordinator.onSessionChange = { [weak self] in
@@ -458,6 +462,7 @@ final class TideBarController {
             dragCoordinator.invalidate(reason: "takeover-disabled")
             endBarSession(collapse: false, suppressMouse: false)
             dismissSurge(animated: false)
+            hideNameBubble(animated: false)
             for state in screens.values {
                 state.collapseDebounce?.cancel()
                 state.clickPanel.setEnabled(false, above: state.panel)
@@ -480,6 +485,7 @@ final class TideBarController {
         dragCoordinator.invalidate(reason: "panels-rebuilt")
         endBarSession(collapse: false, suppressMouse: false)
         dismissSurge(animated: false)
+        hideNameBubble(animated: false)
         for state in screens.values {
             state.collapseDebounce?.cancel()
             state.clickPanel.setEnabled(false, above: state.panel)
@@ -528,6 +534,11 @@ final class TideBarController {
                 guard let self, let state else { return }
                 self.showSurge(entry: entry, state: state, iconFrame: iconFrame)
             }
+            view.onHoverItem = { [weak self, weak state] entry, iconFrame in
+                guard let self, let state else { return }
+                self.updateNameBubble(entry: entry, iconFrame: iconFrame, state: state)
+            }
+            view.onHoverClear = { [weak self] in self?.hideNameBubble() }
             panel.orderFrontRegardless()
             screens[displayID] = state
         }
@@ -666,6 +677,7 @@ final class TideBarController {
         state.collapseHeldUntilMouseMoves = false
         if suppressReexpand { state.suppressExpandUntilMouseMove = true }
         cancelCollapse(state)
+        hideNameBubble(animated: animated)
         if surgeOriginDisplayID == displayID(of: state.screen) {
             dismissSurge(animated: animated)
         }
@@ -924,6 +936,7 @@ final class TideBarController {
         guard allowsExpansion(state),
               let windows = entry.windows, !windows.isEmpty else { return }
         dismissSurge(animated: false)
+        hideNameBubble()
 
         let list = SurgeView(windows: windows, screen: state.screen, appIcon: entry.icon)
         list.onPick = { [weak self] window in
@@ -999,5 +1012,74 @@ final class TideBarController {
     private func cancelSurgeDismiss() {
         surgeDismissWork?.cancel()
         surgeDismissWork = nil
+    }
+
+    // MARK: - 名字气泡
+
+    /// 悬停目标变化：首入延迟出泡，泡在场时换目标即时切换（原生 Dock 同律）
+    private func updateNameBubble(entry: ItemEntry, iconFrame: NSRect, state: ScreenState) {
+        guard nameBubbleTarget != entry.id else { return }
+        nameBubbleTarget = entry.id
+        nameBubbleShowWork?.cancel()
+        nameBubbleShowWork = nil
+        if nameBubblePanel?.isVisible == true {
+            presentNameBubble(entry: entry, iconFrame: iconFrame, state: state)
+            return
+        }
+        let bridge = MainThreadBridge { [weak self, weak state] in
+            guard let self, let state else { return }
+            guard self.nameBubbleTarget == entry.id else { return }
+            self.presentNameBubble(entry: entry, iconFrame: iconFrame, state: state)
+        }
+        let work = DispatchWorkItem { bridge() }
+        nameBubbleShowWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Layout.nameBubbleShowDelay, execute: work)
+    }
+
+    private func presentNameBubble(entry: ItemEntry, iconFrame: NSRect, state: ScreenState) {
+        hideNameBubble(animated: false)
+        let content = NameBubbleView(name: entry.name)
+        let size = NSSize(width: NameBubbleView.preferredWidth(for: entry.name),
+                          height: NameBubbleView.preferredHeight)
+        let anchor = state.panel.convertToScreen(state.view.convert(iconFrame, to: nil))
+        let visible = state.screen.visibleFrame
+        let x = min(max(anchor.midX - size.width / 2, visible.minX + 8),
+                    visible.maxX - size.width - 8)
+        let y = state.panel.frame.maxY + Layout.nameBubbleGap
+        let panel = NameBubblePanel(contentRect: NSRect(origin: NSPoint(x: x, y: y), size: size))
+        panel.contentView = content
+        panel.alphaValue = 0
+        panel.orderFrontRegardless()
+        content.setScrollingAllowed(true)
+        nameBubblePanel = panel
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Motion.shouldReduceMotion
+                ? Motion.reducedMotionFadeDuration : Layout.nameBubbleFadeDuration
+            panel.animator().alphaValue = 1
+        }
+    }
+
+    private func hideNameBubble(animated: Bool = true) {
+        nameBubbleShowWork?.cancel()
+        nameBubbleShowWork = nil
+        nameBubbleTarget = nil
+        guard let panel = nameBubblePanel else { return }
+        nameBubblePanel = nil
+        (panel.contentView as? NameBubbleView)?.setScrollingAllowed(false)
+        guard animated else {
+            panel.orderOut(nil)
+            panel.close()
+            return
+        }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = Motion.shouldReduceMotion
+                ? Motion.reducedMotionFadeDuration : Layout.nameBubbleFadeDuration
+            panel.animator().alphaValue = 0
+        }, completionHandler: {
+            MainActor.assumeIsolated {
+                panel.orderOut(nil)
+                panel.close()
+            }
+        })
     }
 }

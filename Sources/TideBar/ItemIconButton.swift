@@ -240,7 +240,6 @@ final class ItemIconButton: NSView {
         addSubview(statusIndicatorView)
         addSubview(motionPivot)
         haloView.layer?.opacity = 0
-        toolTip = entry.name
     }
 
     @available(*, unavailable)
@@ -256,7 +255,6 @@ final class ItemIconButton: NSView {
         entry = newEntry
         if iconChanged { artworkView.icon = newEntry.icon }
         statusIndicatorView.update(entry: newEntry.application, animated: statusChanged)
-        toolTip = newEntry.name
         if badgeChanged { badgeView.update(newEntry.badge, animated: true) }
     }
 

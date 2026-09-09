@@ -39,6 +39,21 @@ enum Layout {
     static let badgePollExpanded: TimeInterval = 1
     static let badgePollCollapsed: TimeInterval = 4
 
+    // 名字气泡（悬停名，所有条目通用；替代系统 tooltip）：玻璃小泡浮于图标上方
+    static let nameBubbleFontSize: CGFloat = 13
+    static let nameBubbleMaxWidth: CGFloat = 240
+    static let nameBubblePaddingX: CGFloat = 12
+    static let nameBubblePaddingY: CGFloat = 6
+    /// 与图标栏上缘的间隙（同潮涌）
+    static let nameBubbleGap: CGFloat = 8
+    static let nameBubbleShowDelay: TimeInterval = 0.35
+    static let nameBubbleFadeDuration: TimeInterval = 0.12
+    // 跑马灯（气泡内文本超宽时）：匀速是可读性参数（不随动画速度系数缩放），两端停留，溢出过小不值得滚
+    static let nameScrollSpeed: CGFloat = 18
+    static let nameScrollDwell: TimeInterval = 1.2
+    static let nameScrollMinOverflow: CGFloat = 4
+    static let nameFadeWidth: CGFloat = 6
+
     // 手势：先越过拖动阈值则取消长按潮涌；已触发潮涌不再切换成拖拽。
     static let itemDragThreshold: CGFloat = 6
 
