@@ -16,3 +16,7 @@
 "item.error.moveConflict" = "The move would conflict with an existing item or move a folder into itself. No files were moved.";
 "item.error.crossVolume" = "Moving between volumes isn't supported by this drop operation. Use Finder to move these resources.";
 "item.error.partialMove" = "Some files were moved, but the remaining files couldn't be moved. Check the source and destination folders before retrying.";
+
+"surge.directory.empty" = "Empty folder";
+"surge.directory.unreadable" = "Can't read this folder";
+"surge.directory.truncated" = "Large folder — showing a partial list";

@@ -16,3 +16,7 @@
 "item.error.moveConflict" = "目标存在同名项目，或移动会将目录放入自身。未移动文件。";
 "item.error.crossVolume" = "这个投递操作不支持跨卷移动，请使用 Finder 移动这些资源。";
 "item.error.partialMove" = "部分文件已移动，其余文件移动失败。请检查源目录和目标目录后再重试。";
+
+"surge.directory.empty" = "空文件夹";
+"surge.directory.unreadable" = "无法读取此文件夹";
+"surge.directory.truncated" = "项目过多，仅显示部分列表";

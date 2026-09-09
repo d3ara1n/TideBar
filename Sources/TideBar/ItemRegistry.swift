@@ -25,6 +25,8 @@ struct ItemEntry: Identifiable {
         return true
     }
     var capabilities: ItemCapabilities { ItemBehaviors.provider(for: kind)?.capabilities ?? [] }
+    /// 是否提供长按潮涌体（触发门槛查能力，不问条目内容）
+    var canSurge: Bool { capabilities.contains(.surgeBody) }
     var canPin: Bool { isPinned || application?.bundleIdentifier != nil }
     var badge: BadgeValue? { application?.badge }
 

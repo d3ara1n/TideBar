@@ -1,46 +1,82 @@
 import AppKit
 import ApplicationServices
 
+// MARK: - 潮涌体协议
+
+/// 潮涌体：条目类型提供的长按面板内容。容器（SurgePanel 与控制器）负责窗口、
+/// 玻璃材质、锚定定位、Esc 与离场防抖；体自绘内容与自身状态（列表／空／错误／截断）。
+/// 悬停由控制器转发采样点驱动（非激活悬浮窗上 NSTrackingArea 不可靠）。
+/// 键盘会话（⌥Tab）只覆盖应用窗口导航，相关钩子由应用体实现。
+@MainActor
+protocol SurgeBody: AnyObject {
+    /// 期望的面板内容尺寸；面板窗口与玻璃按此包裹
+    var bodySize: NSSize { get }
+    /// 悬停采样（体坐标系）：体自行命中处理
+    func setHover(at point: NSPoint)
+    /// 错峰升起（进入动画，与汐线展开共用语言）
+    func rise()
+    /// 反向退落；返回总时长
+    @discardableResult
+    func drop() -> TimeInterval
+    /// 语言切换时重绘动态文案
+    func refreshLocalizedText()
+    /// 键盘会话选择（应用窗口体）
+    func setKeyboardSelection(_ identifier: Int?)
+    /// 键盘会话导航标识（应用窗口体）
+    func rowIdentifiers() -> [Int]
+}
+
+extension SurgeBody {
+    func setHover(at point: NSPoint) {}
+    func rise() {}
+    @discardableResult
+    func drop() -> TimeInterval { 0 }
+    func refreshLocalizedText() {}
+    func setKeyboardSelection(_ identifier: Int?) {}
+    func rowIdentifiers() -> [Int] { [] }
+}
+
+/// 体存在类型：既是视图，又实现潮涌体协议
+typealias AnySurgeBody = NSView & SurgeBody
+
 // MARK: - 行
 
-/// 潮涌列表项：窗口标题 + 文档图标（回退 app 图标）；最小化/他屏暗显，
-/// 行尾状态标签区分：最小化优先（还原去向由点点灰空心承载），
-/// 其次他屏（同款标签形态，见 decisions「行尾圆角矩形文字标签」）。
-/// 悬停态由控制器鼠标采样轮询驱动（tracking area 在非激活悬浮窗上不可靠）。
+/// 行尾标签语义：draw 时按语言解析词条，语言切换即时生效
+enum SurgeRowBadge {
+    case none
+    case minimized
+    case offscreen
+}
+
+/// 潮涌通用行：图标 + 标题 + 行尾标签；拾取回调由体注入。
 @MainActor
 final class SurgeRowView: NSView {
-    private let snapshot: WindowSnapshot
-    private let icon: NSImage
-    /// 窗口归属不在本屏（暗显 + 标签；最小化行仍显示最小化标签）
-    private let isOffscreen: Bool
-    private var title: String {
-        snapshot.title ?? L10nManager.shared.current.string("window.fallbackTitle", table: .runtime)
+    struct Model {
+        let identifier: Int
+        let title: String
+        let icon: NSImage
+        let badge: SurgeRowBadge
+        /// 暗显（最小化／他屏等降级呈现）
+        let isDimmed: Bool
     }
+
+    private let model: Model
     private var hovering = false
     private var keyboardSelected = false
 
-    var onPick: ((WindowSnapshot) -> Void)?
+    var onPick: ((Int) -> Void)?
 
-    init(snapshot: WindowSnapshot, appIcon: NSImage, isOffscreen: Bool) {
-        self.snapshot = snapshot
-        self.icon = Self.icon(for: snapshot.document, appIcon: appIcon)
-        self.isOffscreen = isOffscreen
+    init(model: Model) {
+        self.model = model
         super.init(frame: NSRect(x: 0, y: 0, width: Layout.surgeWidth, height: Layout.surgeRowHeight))
         wantsLayer = true
-        alphaValue = isOffscreen || snapshot.isMinimized ? 0.45 : 1
+        alphaValue = model.isDimmed ? 0.45 : 1
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not supported") }
 
-    /// kAXDocument → 文档图标；非文件路径/不存在则回退 app 图标
-    private static func icon(for document: String?, appIcon: NSImage) -> NSImage {
-        guard let document else { return appIcon }
-        let path = document.hasPrefix("file://") ? URL(string: document)?.path : document
-        guard let path, path.hasPrefix("/"),
-              FileManager.default.fileExists(atPath: path) else { return appIcon }
-        return NSWorkspace.shared.icon(forFile: path)
-    }
+    var rowIdentifier: Int { model.identifier }
 
     func setHovered(_ on: Bool) {
         guard hovering != on else { return }
@@ -53,8 +89,6 @@ final class SurgeRowView: NSView {
         keyboardSelected = on
         needsDisplay = true
     }
-
-    var windowIdentifier: Int { snapshot.elementIdentifier }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
@@ -76,7 +110,7 @@ final class SurgeRowView: NSView {
         }
         let side: CGFloat = 18
         let iconRect = NSRect(x: 14, y: (bounds.height - side) / 2, width: side, height: side)
-        icon.draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: 1)
+        model.icon.draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: 1)
 
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineBreakMode = .byTruncatingTail
@@ -88,12 +122,10 @@ final class SurgeRowView: NSView {
         ]
         // 状态标签：最小化优先，其次他屏；宽度按文字实测，仅占用行尾空间
         let badgeText: String?
-        if snapshot.isMinimized {
-            badgeText = L10nManager.shared.current.string("window.minimizedBadge", table: .runtime)
-        } else if isOffscreen {
-            badgeText = L10nManager.shared.current.string("window.offscreenBadge", table: .runtime)
-        } else {
-            badgeText = nil
+        switch model.badge {
+        case .none: badgeText = nil
+        case .minimized: badgeText = L10nManager.shared.current.string("window.minimizedBadge", table: .runtime)
+        case .offscreen: badgeText = L10nManager.shared.current.string("window.offscreenBadge", table: .runtime)
         }
         let badgeAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: Layout.surgeMinimizedBadgeFontSize, weight: .medium),
@@ -108,7 +140,7 @@ final class SurgeRowView: NSView {
         let badgeReserve = badgeText == nil ? 0 : badgeWidth + Layout.surgeMinimizedBadgeGap
         let titleRect = NSRect(x: iconRect.maxX + 10, y: (bounds.height - 17) / 2,
                                width: bounds.width - iconRect.maxX - 24 - badgeReserve, height: 17)
-        (title as NSString).draw(in: titleRect, withAttributes: attributes)
+        (model.title as NSString).draw(in: titleRect, withAttributes: attributes)
 
         if let badgeText {
             let badgeRect = NSRect(x: bounds.width - Layout.surgeMinimizedBadgeTrailing - badgeWidth,
@@ -136,103 +168,19 @@ final class SurgeRowView: NSView {
 
     override func mouseUp(with event: NSEvent) {
         if bounds.contains(convert(event.locationInWindow, from: nil)) {
-            onPick?(snapshot)
+            onPick?(model.identifier)
         }
     }
 }
 
-// MARK: - 列表
+// MARK: - 错峰升降
 
-/// 潮涌窗口列表：本屏正常 → 他屏暗显 → 最小化暗显＋「已最小化」标签；行自图标侧（下）错峰升起。
-/// 磨砂玻璃底，与图标栏同材质。
+/// 行级错峰动画：靠近图标的行先动；应用窗口行与目录最近文件行共用同一语言。
 @MainActor
-final class SurgeView: NSView {
-    var onPick: ((WindowSnapshot) -> Void)?
-    private let glass: NSView?
-
-    init(windows: [WindowSnapshot], screen: NSScreen, appIcon: NSImage) {
-        let viewDisplayID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
-        func onScreen(_ window: WindowSnapshot) -> Bool {
-            guard let viewDisplayID, let screenID = window.screenID else { return false }
-            return screenID == viewDisplayID
-        }
-        let active = windows.filter { !$0.isMinimized }
-        let rows: [(snapshot: WindowSnapshot, isOffscreen: Bool)] =
-            active.filter(onScreen).map { ($0, false) }
-            + active.filter { !onScreen($0) }.map { ($0, true) }
-            + windows.filter(\.isMinimized).map { ($0, !onScreen($0)) }
-
-        let height = CGFloat(windows.count) * Layout.surgeRowHeight + Layout.surgeVPadding * 2
-        glass = BarBackgroundFactory.makeGlassIfAvailable(cornerRadius: 12)
-        super.init(frame: NSRect(x: 0, y: 0, width: Layout.surgeWidth, height: height))
-        wantsLayer = true
-        if let glass {
-            addSubview(glass)
-        }
-
-        let count = rows.count
-        for (index, row) in rows.enumerated() {
-            let view = SurgeRowView(snapshot: row.snapshot, appIcon: appIcon, isOffscreen: row.isOffscreen)
-            view.frame = NSRect(x: 0,
-                                y: Layout.surgeVPadding + CGFloat(count - 1 - index) * Layout.surgeRowHeight,
-                                width: Layout.surgeWidth,
-                                height: Layout.surgeRowHeight)
-            view.onPick = { [weak self] snapshot in self?.onPick?(snapshot) }
-            addSubview(view)
-        }
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("not supported") }
-
-    override func layout() {
-        super.layout()
-        glass?.frame = bounds
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        // 玻璃路径材质自绘背景；仅旧系统回退时手绘深色卡
-        guard glass == nil else { return }
-        let background = NSBezierPath(roundedRect: bounds, xRadius: 12, yRadius: 12)
-        NSColor.black.withAlphaComponent(0.55).setFill()
-        background.fill()
-        NSColor.white.withAlphaComponent(0.16).setStroke()
-        background.lineWidth = 1
-        background.stroke()
-    }
-
-    /// 悬停轮询驱动（面板内容坐标）：命中行高亮，其余清悬停
-    func setHover(at point: NSPoint) {
-        let hit = hitTest(point) as? SurgeRowView
-        for case let row as SurgeRowView in subviews {
-            row.setHovered(row === hit)
-        }
-    }
-
-    func setKeyboardSelection(_ identifier: Int?) {
-        for case let row as SurgeRowView in subviews {
-            row.setKeyboardSelected(row.windowIdentifier == identifier)
-        }
-    }
-
-    func refreshLocalizedText() {
-        for case let row as SurgeRowView in subviews {
-            row.needsDisplay = true
-        }
-    }
-
-    func rowIdentifiers() -> [Int] {
-        subviews.compactMap { ($0 as? SurgeRowView)?.windowIdentifier }
-    }
-
-    func row(for identifier: Int) -> SurgeRowView? {
-        subviews.compactMap { $0 as? SurgeRowView }.first { $0.windowIdentifier == identifier }
-    }
-
-    /// 错峰升起：靠近图标的行先动，逐行向上传递（与汐线展开共用语言）
-    func riseRows() {
-        let rowsBottomUp = subviews.compactMap { $0 as? SurgeRowView }.reversed()
-        for (index, row) in rowsBottomUp.enumerated() {
+enum SurgeMotion {
+    /// 升起：自图标侧（下）逐行向上传递
+    static func rise(_ rows: [NSView]) {
+        for (index, row) in rows.reversed().enumerated() {
             guard let layer = row.layer else { continue }
             let delay = Double(index) * Layout.surgeStaggerStep
             if Motion.shouldReduceMotion {
@@ -248,11 +196,10 @@ final class SurgeView: NSView {
         }
     }
 
-    /// 反向退落：顶部先坠、逐行向下传递（easeIn 加速离场，与收起语言一致）；返回总时长
+    /// 退落：顶部先坠、逐行向下传递（easeIn 加速离场，与收起语言一致）；返回总时长
     @discardableResult
-    func dropRows() -> TimeInterval {
-        let rowsTopDown = subviews.compactMap { $0 as? SurgeRowView }
-        for (index, row) in rowsTopDown.enumerated() {
+    static func drop(_ rows: [NSView]) -> TimeInterval {
+        for (index, row) in rows.enumerated() {
             guard let layer = row.layer else { continue }
             let delay = Double(index) * Layout.surgeStaggerStep
             if !Motion.shouldReduceMotion {
@@ -263,8 +210,112 @@ final class SurgeView: NSView {
                          duration: Motion.shouldReduceMotion ? Motion.reducedMotionFadeDuration : Motion.dropDuration,
                          curve: .easeIn, delay: delay)
         }
-        return Layout.surgeStaggerStep * Double(max(rowsTopDown.count - 1, 0))
+        return Layout.surgeStaggerStep * Double(max(rows.count - 1, 0))
             + (Motion.shouldReduceMotion ? Motion.reducedMotionFadeDuration : Motion.dropDuration)
+    }
+}
+
+// MARK: - 应用体
+
+/// 应用潮涌体：窗口行列表。本屏正常 → 他屏暗显 → 最小化暗显＋「已最小化」标签。
+/// 潮涌：图标下方点点语义的对偶，点击行 = 还原/聚焦对应窗口。
+@MainActor
+final class AppSurgeView: NSView, SurgeBody {
+    var onPick: ((WindowSnapshot) -> Void)?
+
+    private var rows: [SurgeRowView] = []
+    private var snapshots: [Int: WindowSnapshot] = [:]
+    var bodySize: NSSize {
+        NSSize(width: Layout.surgeWidth,
+               height: CGFloat(rows.count) * Layout.surgeRowHeight + Layout.surgeVPadding * 2)
+    }
+
+    /// kAXDocument → 文档图标；非文件路径/不存在则回退 app 图标
+    private static func icon(for document: String?, appIcon: NSImage) -> NSImage {
+        guard let document else { return appIcon }
+        let path = document.hasPrefix("file://") ? URL(string: document)?.path : document
+        guard let path, path.hasPrefix("/"),
+              FileManager.default.fileExists(atPath: path) else { return appIcon }
+        return NSWorkspace.shared.icon(forFile: path)
+    }
+
+    init(windows: [WindowSnapshot], screen: NSScreen, appIcon: NSImage) {
+        let viewDisplayID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+        func onScreen(_ window: WindowSnapshot) -> Bool {
+            guard let viewDisplayID, let screenID = window.screenID else { return false }
+            return screenID == viewDisplayID
+        }
+        let active = windows.filter { !$0.isMinimized }
+        let ordered: [(snapshot: WindowSnapshot, isOffscreen: Bool)] =
+            active.filter(onScreen).map { ($0, false) }
+            + active.filter { !onScreen($0) }.map { ($0, true) }
+            + windows.filter(\.isMinimized).map { ($0, !onScreen($0)) }
+        let fallbackTitle = L10nManager.shared.current.string("window.fallbackTitle", table: .runtime)
+        super.init(frame: .zero)
+        wantsLayer = true
+
+        let count = ordered.count
+        for (index, entry) in ordered.enumerated() {
+            let model = SurgeRowView.Model(identifier: entry.snapshot.elementIdentifier,
+                                           title: entry.snapshot.title ?? fallbackTitle,
+                                           icon: Self.icon(for: entry.snapshot.document, appIcon: appIcon),
+                                           badge: entry.snapshot.isMinimized ? .minimized
+                                               : (entry.isOffscreen ? .offscreen : .none),
+                                           isDimmed: entry.snapshot.isMinimized || entry.isOffscreen)
+            let row = SurgeRowView(model: model)
+            row.onPick = { [weak self] identifier in self?.pick(identifier) }
+            row.frame = NSRect(x: 0,
+                               y: Layout.surgeVPadding + CGFloat(count - 1 - index) * Layout.surgeRowHeight,
+                               width: Layout.surgeWidth,
+                               height: Layout.surgeRowHeight)
+            snapshots[model.identifier] = entry.snapshot
+            rows.append(row)
+            addSubview(row)
+        }
+        frame = NSRect(origin: .zero, size: bodySize)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("not supported") }
+
+    /// 行点击：按行标识取回窗口快照交给拾取回调
+    private func pick(_ identifier: Int) {
+        if let snapshot = snapshots[identifier] {
+            onPick?(snapshot)
+        }
+    }
+
+    /// 悬停轮询驱动（面板内容坐标）：命中行高亮，其余清悬停
+    func setHover(at point: NSPoint) {
+        let hit = hitTest(point) as? SurgeRowView
+        for row in rows {
+            row.setHovered(row === hit)
+        }
+    }
+
+    func setKeyboardSelection(_ identifier: Int?) {
+        for row in rows {
+            row.setKeyboardSelected(identifier == row.rowIdentifier)
+        }
+    }
+
+    func refreshLocalizedText() {
+        for row in rows {
+            row.needsDisplay = true
+        }
+    }
+
+    func rowIdentifiers() -> [Int] {
+        rows.map(\.rowIdentifier)
+    }
+
+    func rise() {
+        SurgeMotion.rise(rows)
+    }
+
+    @discardableResult
+    func drop() -> TimeInterval {
+        SurgeMotion.drop(rows)
     }
 }
 
@@ -291,4 +342,42 @@ final class SurgePanel: NSPanel {
     }
 
     override var canBecomeKey: Bool { false }
+}
+
+/// 潮涌容器视图：玻璃底（或回退深色卡）+ 体内容；材质归容器，体只画内容。
+@MainActor
+final class SurgeContainerView: NSView {
+    let body: AnySurgeBody
+    private let glass: NSView?
+
+    init(body: AnySurgeBody) {
+        self.body = body
+        glass = BarBackgroundFactory.makeGlassIfAvailable(cornerRadius: 12)
+        super.init(frame: NSRect(origin: .zero, size: body.bodySize))
+        wantsLayer = true
+        if let glass {
+            addSubview(glass)
+        }
+        body.frame = bounds
+        addSubview(body)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("not supported") }
+
+    override func layout() {
+        super.layout()
+        glass?.frame = bounds
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        // 玻璃路径材质自绘背景；仅旧系统回退时手绘深色卡
+        guard glass == nil else { return }
+        let background = NSBezierPath(roundedRect: bounds, xRadius: 12, yRadius: 12)
+        NSColor.black.withAlphaComponent(0.55).setFill()
+        background.fill()
+        NSColor.white.withAlphaComponent(0.16).setStroke()
+        background.lineWidth = 1
+        background.stroke()
+    }
 }

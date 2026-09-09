@@ -7,6 +7,8 @@ struct ItemCapabilities: OptionSet {
     static let open = Self(rawValue: 1 << 0)
     static let reveal = Self(rawValue: 1 << 1)
     static let receive = Self(rawValue: 1 << 2)
+    /// 提供长按潮涌体（应用窗口列表、目录最近文件等）
+    static let surgeBody = Self(rawValue: 1 << 3)
 }
 
 struct ItemPresentation {
@@ -29,12 +31,15 @@ protocol ItemBehaviorProviding {
     func open(_ reference: ItemReference) async throws
     func reveal(_ reference: ItemReference) throws
     func receive(_ references: [ItemReference], at target: ItemReference) -> ItemReceiveProposal?
+    /// 构造潮涌体；无内容返回 nil。按需计算（目录枚举等）可离主线程。
+    func surgeBody(for entry: ItemEntry, on screen: NSScreen) async -> AnySurgeBody?
 }
 
 extension ItemBehaviorProviding {
     func open(_ reference: ItemReference) async throws { throw ItemFailure("item.error.reference") }
     func reveal(_ reference: ItemReference) throws { throw ItemFailure("item.error.reference") }
     func receive(_ references: [ItemReference], at target: ItemReference) -> ItemReceiveProposal? { nil }
+    func surgeBody(for entry: ItemEntry, on screen: NSScreen) async -> AnySurgeBody? { nil }
 }
 
 @MainActor
@@ -56,7 +61,7 @@ enum ItemBehaviors {
 
 @MainActor
 private struct ApplicationItemBehavior: ItemBehaviorProviding {
-    let capabilities: ItemCapabilities = [.open, .reveal, .receive]
+    let capabilities: ItemCapabilities = [.open, .reveal, .receive, .surgeBody]
     func presentation(for record: PinnedItemRecord) -> ItemPresentation {
         let url = ItemReferences.applicationURL(record.reference)
         return ItemPresentation(name: url?.deletingPathExtension().lastPathComponent ?? record.fallbackName,
@@ -71,6 +76,11 @@ private struct ApplicationItemBehavior: ItemBehaviorProviding {
     func reveal(_ reference: ItemReference) throws {
         guard let url = ItemReferences.applicationURL(reference) else { throw ItemFailure("item.error.missing") }
         NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+    func surgeBody(for entry: ItemEntry, on screen: NSScreen) async -> AnySurgeBody? {
+        // 未运行或窗口知识降级的应用没有潮涌体（与既有窗口列表门槛一致）
+        guard let app = entry.application, let windows = app.windows, !windows.isEmpty else { return nil }
+        return AppSurgeView(windows: windows, screen: screen, appIcon: app.icon)
     }
     func receive(_ references: [ItemReference], at target: ItemReference) -> ItemReceiveProposal? {
         guard !references.isEmpty, let appURL = ItemReferences.applicationURL(target),
@@ -95,7 +105,9 @@ private struct ApplicationItemBehavior: ItemBehaviorProviding {
 @MainActor
 private struct FileItemBehavior: ItemBehaviorProviding {
     let isDirectory: Bool
-    var capabilities: ItemCapabilities { isDirectory ? [.open, .reveal, .receive] : [.open, .reveal] }
+    var capabilities: ItemCapabilities {
+        isDirectory ? [.open, .reveal, .receive, .surgeBody] : [.open, .reveal]
+    }
     func presentation(for record: PinnedItemRecord) -> ItemPresentation {
         let url = try? ItemReferences.fileURL(record.reference)
         return ItemPresentation(name: url.map { FileManager.default.displayName(atPath: $0.path) } ?? record.fallbackName,
@@ -109,6 +121,20 @@ private struct FileItemBehavior: ItemBehaviorProviding {
     }
     func reveal(_ reference: ItemReference) throws {
         NSWorkspace.shared.activateFileViewerSelecting([try ItemReferences.fileURL(reference)])
+    }
+    func surgeBody(for entry: ItemEntry, on screen: NSScreen) async -> AnySurgeBody? {
+        // 文件条目的伪预览体是下一阶段目标，本期只有目录提供最近文件体
+        guard isDirectory else { return nil }
+        guard let directory = try? ItemReferences.fileURL(entry.reference) else {
+            return DirectorySurgeView(outcome: .init(state: .failed))
+        }
+        let limit = Layout.surgeRecentLimit
+        let budget = Layout.surgeRecentEntryBudget
+        // 病态大目录的枚举离主线程；结果回主线程装配视图
+        let outcome = await Task.detached(priority: .userInitiated) {
+            DirectoryRecentFiles.load(from: directory, limit: limit, entryBudget: budget)
+        }.value
+        return DirectorySurgeView(outcome: outcome)
     }
     func receive(_ references: [ItemReference], at target: ItemReference) -> ItemReceiveProposal? {
         guard isDirectory, !references.isEmpty,

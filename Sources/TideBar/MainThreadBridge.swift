@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 /// 把任意 block 回调桥接到 MainActor。
@@ -19,4 +20,15 @@ final class MainThreadBridge: @unchecked Sendable {
     }
 
     func callAsFunction() { call() }
+}
+
+/// 携带一枚 NSEvent 过主线程桥：monitor 回调无法直接把非 Sendable 事件
+/// 传入 MainActor 方法；monitor 派发本身在主线程，存取串行无竞争。
+final class NSEventBox: @unchecked Sendable {
+    private var event: NSEvent?
+    func store(_ event: NSEvent) { self.event = event }
+    func take() -> NSEvent? {
+        defer { event = nil }
+        return event
+    }
 }

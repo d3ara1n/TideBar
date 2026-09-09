@@ -53,20 +53,34 @@ final class TideBarController {
     private let fullscreenDetector = FullscreenDetector()
     private var fullscreenStates: [CGDirectDisplayID: FullscreenState] = [:]
 
-    // 潮涌：同一时刻只存在一个，归属于触发它的屏
+    // 潮涌：同一时刻只存在一个，归属于触发它的屏；内容是条目类型的潮涌体
     private var surgePanel: SurgePanel?
-    private var surgeIdentity: AppIdentity?
+    private var surgeItemID: ItemID?
     private var surgeWindowRevision: WindowKnowledge<WindowContentRevision>?
     private var surgeOriginDisplayID: CGDirectDisplayID?
-    private var surgeDismissWork: DispatchWorkItem?
+    /// 体构造含按需计算（目录枚举离主线程）；请求代数丢弃过期的异步结果
+    private var surgeRequestGeneration = 0
+    /// 潮涌打开即驻留，收场只由他处交互触发：
+    /// 左键「按下与松开均在面板外」的完整点击才收场（长按触发的本次松手豁免），
+    /// 拖动是动作的起点而非目标动作，拖拽结束的松手也不算外部点击；
+    /// 拖入面板的丢弃（按下在外、松手在内）不收场——小工具的接收路径。
+    private var pressBeganOutsideSurge = true
+    private var surgeExcusesNextLeftRelease = false
     private var nameBubblePanel: NameBubblePanel?
     private var nameBubbleTarget: ItemID?
     private var nameBubbleShowWork: DispatchWorkItem?
 
     func start() {
         dragCoordinator.onBegin = { [weak self] in
-            self?.endBarSession(collapse: false, suppressMouse: false)
-            self?.hideNameBubble()
+            guard let self else { return }
+            // 拖动是动作的起点而非目标动作；潮涌可能是落点，不因拖动开始而收场。
+            // 键盘会话（含其窗口潮涌）照常结束；拖拽结束的松手豁免。
+            if self.barSession != nil {
+                self.endBarSession(collapse: false, suppressMouse: false)
+            } else if self.surgePanel != nil {
+                self.surgeExcusesNextLeftRelease = true
+            }
+            self.hideNameBubble()
         }
         dragCoordinator.onMovement = { [weak self] in self?.sampleMouse(isMovement: true) }
         dragCoordinator.onSessionChange = { [weak self] in
@@ -75,6 +89,8 @@ final class TideBarController {
         }
         dragCoordinator.allowsRemovalAt = { [weak self] point in
             guard let self, AppConfiguration.shared.isTakeoverEnabled, !self.screens.isEmpty else { return false }
+            // 潮涌面板不是拖出移除的有效落点（拖到潮涌上松手不视为栏外取消固定）
+            if let surge = self.surgePanel, surge.frame.contains(point) { return false }
             return self.screens.values.allSatisfy {
                 !$0.panel.frame.insetBy(dx: -Layout.keepMargin, dy: -Layout.keepMargin).contains(point)
                     && !self.hotZone(for: $0.screen).contains(point)
@@ -93,11 +109,25 @@ final class TideBarController {
         // 真实移动与轮询分流，菜单动作可保持展开直到用户再次移动鼠标。
         let movementSample = MainThreadBridge { [weak self] in self?.sampleMouse(isMovement: true) }
         let pollSample = MainThreadBridge { [weak self] in self?.sampleMouse(isMovement: false) }
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { _ in
-            movementSample()
+        let sampleMasks: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged,
+                                                    .leftMouseDown, .leftMouseUp,
+                                                    .rightMouseDown, .otherMouseDown]
+        let pressBox = NSEventBox()
+        let pressSample = MainThreadBridge { [weak self] in
+            guard let event = pressBox.take() else { return }
+            self?.trackSurgePress(event)
         }
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { event in
-            movementSample()
+        func handle(_ event: NSEvent) {
+            if event.type == .mouseMoved || event.type == .leftMouseDragged {
+                movementSample()
+            } else {
+                pressBox.store(event)
+                pressSample()
+            }
+        }
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: sampleMasks) { handle($0) }
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: sampleMasks) { event in
+            handle(event)
             return event
         }
         PollScheduler.shared.register(Self.mouseDemand, interval: Layout.pollInterval) {
@@ -354,7 +384,7 @@ final class TideBarController {
         guard let session = barSession,
               let state = screens[session.displayID],
               let identity = session.selectedApplication,
-              let entry = navigationApplications.first(where: { $0.identity == identity }),
+              let entry = items.entries.first(where: { $0.application?.identity == identity }),
               let iconFrame = state.view.iconFrame(for: identity) else { return }
         showSurge(entry: entry, state: state, iconFrame: iconFrame, fromKeyboard: true)
         cancelSwitcherTimeout()
@@ -371,7 +401,7 @@ final class TideBarController {
         var updated = session
         updated.selectWindow(ids[next], now: nil, timeout: nil)
         barSession = updated
-        (surgePanel?.contentView as? SurgeView)?.setKeyboardSelection(ids[next])
+        (surgePanel?.contentView as? SurgeContainerView)?.body.setKeyboardSelection(ids[next])
     }
 
     private func commitBarSession() {
@@ -639,18 +669,40 @@ final class TideBarController {
         updateSurgeHover(at: location)
     }
 
-    /// 潮涌悬停与离场判定：命中面板内则行高亮 + 取消收起；否则重排收起防抖
+    /// 潮涌悬停：只驱动行高亮（命中行高亮，离面板清悬停）；
+    /// 收起不依赖鼠标位置——潮涌打开即驻留，收场只由他处交互触发。
     private func updateSurgeHover(at location: NSPoint) {
-        guard let panel = surgePanel, panel.isVisible else { return }
-        if barSession != nil { return }
-        guard panel.frame.contains(location) else {
-            scheduleSurgeDismiss()
-            return
-        }
-        cancelSurgeDismiss()
-        if let list = panel.contentView as? SurgeView {
-            let local = list.convert(panel.convertPoint(fromScreen: location), from: nil)
-            list.setHover(at: local)
+        guard let panel = surgePanel, panel.isVisible, barSession == nil,
+              !dragCoordinator.isDragging,
+              let container = panel.contentView as? SurgeContainerView else { return }
+        let local = container.body.convert(panel.convertPoint(fromScreen: location), from: nil)
+        container.body.setHover(at: local)
+    }
+
+    /// 他处交互判定（按下/松开事件的观察者）：
+    /// 左键「按下与松开均在面板外」的完整点击才收场；长按触发与拖拽结束的松手豁免
+    ///（新按下即豁免已消费，豁免不跨按下存活）；按下在外、松手在内 = 拖入面板的
+    /// 丢弃，不收场。右/中键在面板外按下即收场（打开菜单是明确的他处交互）。
+    private func trackSurgePress(_ event: NSEvent) {
+        let insideSurge = surgePanel?.frame.contains(NSEvent.mouseLocation) == true
+        switch event.type {
+        case .leftMouseDown:
+            pressBeganOutsideSurge = !insideSurge
+            surgeExcusesNextLeftRelease = false
+        case .rightMouseDown, .otherMouseDown:
+            pressBeganOutsideSurge = !insideSurge
+            if !insideSurge {
+                dismissSurge(animated: true)
+            }
+        case .leftMouseUp:
+            guard surgePanel != nil else { return }
+            if surgeExcusesNextLeftRelease {
+                surgeExcusesNextLeftRelease = false
+            } else if pressBeganOutsideSurge, !insideSurge {
+                dismissSurge(animated: true)
+            }
+        default:
+            break
         }
     }
 
@@ -678,9 +730,8 @@ final class TideBarController {
         if suppressReexpand { state.suppressExpandUntilMouseMove = true }
         cancelCollapse(state)
         hideNameBubble(animated: animated)
-        if surgeOriginDisplayID == displayID(of: state.screen) {
-            dismissSurge(animated: animated)
-        }
+        // 潮涌不随栏收起：打开即驻留（小工具需在面板外交互后返回），
+        // 悬浮在收起的汐线上方；收场只由他处交互或模式变化触发。
         state.panel.ignoresMouseEvents = true
         state.view.setExpanded(false, immediate: !animated)
         syncTidelineClickTarget(state)
@@ -771,6 +822,9 @@ final class TideBarController {
 
         if behavior == .hidden {
             if state.isExpanded { collapse(state, animated: false) }
+            if surgeOriginDisplayID == displayID(of: state.screen) {
+                dismissSurge(animated: false)
+            }
             if barSession?.displayID == displayID(of: state.screen) {
                 endBarSession(collapse: false, suppressMouse: false)
             }
@@ -789,6 +843,9 @@ final class TideBarController {
             // 只在进入点击模式时收起；成功点击后的展开不能被后续全屏轮询撤销。
             if behavior == .clickToExpand, previous != .clickToExpand {
                 if state.isExpanded { collapse(state, animated: false) }
+                if surgeOriginDisplayID == displayID(of: state.screen) {
+                    dismissSurge(animated: false)
+                }
                 if barSession?.displayID == displayID(of: state.screen) {
                     endBarSession(collapse: false, suppressMouse: false)
                 }
@@ -830,7 +887,7 @@ final class TideBarController {
     }
 
     func languageDidChange() {
-        (surgePanel?.contentView as? SurgeView)?.refreshLocalizedText()
+        (surgePanel?.contentView as? SurgeContainerView)?.body.refreshLocalizedText()
     }
 
     func appearanceDidChange() {
@@ -848,10 +905,11 @@ final class TideBarController {
                 state.view.stopTidelineRipple()
             }
         }
-        // 条目消失、窗口知识降级或任意窗口内容变化时，现有潮涌模型即过期。
-        if let surgeIdentity {
-            let currentRevision = navigationApplications.first(where: { $0.id == surgeIdentity })?.windowRevision
-            if currentRevision != surgeWindowRevision {
+        // 条目消失、窗口知识降级或任意窗口内容变化时，应用体的潮涌模型即过期；
+        // 目录体无观察者（打开时按需计算），只对条目消失收场。
+        if let surgeItemID {
+            let current = items.entries.first(where: { $0.id == surgeItemID })
+            if current == nil || current?.application?.windowRevision != surgeWindowRevision {
                 dismissSurge(animated: true)
             }
         }
@@ -905,7 +963,7 @@ final class TideBarController {
         barSession = session
         state.view.setKeyboardSelection(session.selectedApplication)
         if case .windows = session.level {
-            (surgePanel?.contentView as? SurgeView)?.setKeyboardSelection(session.selectedWindowIdentifier)
+            (surgePanel?.contentView as? SurgeContainerView)?.body.setKeyboardSelection(session.selectedWindowIdentifier)
         }
     }
 
@@ -931,60 +989,97 @@ final class TideBarController {
 
     // MARK: - 潮涌
 
-    private func showSurge(entry: AppEntry, state: ScreenState, iconFrame: NSRect,
+    /// 长按面板：容器（窗口、玻璃、锚定、Esc、防抖）归控制器，内容由条目类型的
+    /// 潮涌体提供；体构造可含按需计算（目录最近文件离主线程枚举）。
+    private func showSurge(entry: ItemEntry, state: ScreenState, iconFrame: NSRect,
                            fromKeyboard: Bool = false) {
-        guard allowsExpansion(state),
-              let windows = entry.windows, !windows.isEmpty else { return }
+        guard allowsExpansion(state), entry.canSurge,
+              let provider = ItemBehaviors.provider(for: entry.kind) else { return }
+        surgeRequestGeneration += 1
+        let generation = surgeRequestGeneration
+        Task {
+            guard let body = await provider.surgeBody(for: entry, on: state.screen),
+                  generation == surgeRequestGeneration else { return }
+            presentSurge(body: body, entry: entry, state: state,
+                         iconFrame: iconFrame, fromKeyboard: fromKeyboard)
+        }
+    }
+
+    private func presentSurge(body: AnySurgeBody, entry: ItemEntry, state: ScreenState,
+                              iconFrame: NSRect, fromKeyboard: Bool) {
+        // 异步构造期间条目可能已消失；以注册表当前真值对账窗口修订
+        guard let live = items.entries.first(where: { $0.id == entry.id }) else { return }
         dismissSurge(animated: false)
         hideNameBubble()
+        // 呈现时左键仍按住 = 长按触发，本次松手不当作外部点击
+        surgeExcusesNextLeftRelease = NSEvent.pressedMouseButtons & 1 != 0
+        surgeRequestGeneration += 1
+        wireSurgeActions(body: body, entry: live)
 
-        let list = SurgeView(windows: windows, screen: state.screen, appIcon: entry.icon)
-        list.onPick = { [weak self] window in
-            guard let self else { return }
-            self.dismissSurge(animated: true)
-            if let app = entry.runningApp(for: window) {
-                AXReader.raise(window, app: app)
-            }
-            if self.barSession != nil {
-                self.cancelBarSession()
-            }
-        }
-
-        let height = CGFloat(windows.count) * Layout.surgeRowHeight + Layout.surgeVPadding * 2
+        let size = body.bodySize
         let anchor = state.panel.convertToScreen(state.view.convert(iconFrame, to: nil))
         let visible = state.screen.visibleFrame
-        let x = min(max(anchor.midX - Layout.surgeWidth / 2, visible.minX + 8),
-                    visible.maxX - Layout.surgeWidth - 8)
+        let x = min(max(anchor.midX - size.width / 2, visible.minX + 8),
+                    visible.maxX - size.width - 8)
         let y = state.panel.frame.maxY + Layout.surgeGap
 
         let panel = SurgePanel(contentRect: NSRect(x: x, y: y,
-                                                   width: Layout.surgeWidth,
-                                                   height: min(height, visible.maxY - y)))
-        panel.contentView = list
+                                                   width: size.width,
+                                                   height: min(size.height, visible.maxY - y)))
+        panel.contentView = SurgeContainerView(body: body)
         panel.orderFrontRegardless()
         surgePanel = panel
-        surgeIdentity = entry.id
-        surgeWindowRevision = entry.windowRevision
+        surgeItemID = live.id
+        surgeWindowRevision = live.application?.windowRevision
         surgeOriginDisplayID = displayID(of: state.screen)
-        if fromKeyboard, var session = barSession {
-            _ = session.enterWindows(for: entry.identity,
-                                     firstWindowIdentifier: list.rowIdentifiers().first)
+        if fromKeyboard, let app = live.application, var session = barSession {
+            _ = session.enterWindows(for: app.identity,
+                                     firstWindowIdentifier: body.rowIdentifiers().first)
             barSession = session
-            list.setKeyboardSelection(session.selectedWindowIdentifier)
+            body.setKeyboardSelection(session.selectedWindowIdentifier)
         }
-        list.riseRows()
-        NSLog("TideBar surge shown for %@ (%d windows)", entry.id.bundleIdentifier, windows.count)
+        body.rise()
+        NSLog("TideBar surge shown for %@ (kind: %@)", entry.id.rawValue, entry.kind.rawValue)
+    }
+
+    /// 体只声明内容；拾取的容器侧效果（收起、会话收尾）与类型动作在控制器合流。
+    private func wireSurgeActions(body: AnySurgeBody, entry: ItemEntry) {
+        if let appBody = body as? AppSurgeView, let app = entry.application {
+            appBody.onPick = { [weak self] window in
+                guard let self else { return }
+                self.dismissSurge(animated: true)
+                if let running = app.runningApp(for: window) {
+                    AXReader.raise(window, app: running)
+                }
+                if self.barSession != nil {
+                    self.cancelBarSession()
+                }
+            }
+        } else if let directoryBody = body as? DirectorySurgeView {
+            directoryBody.onOpen = { [weak self] url in
+                guard let self else { return }
+                self.dismissSurge(animated: true)
+                if !NSWorkspace.shared.open(url) {
+                    ItemErrors.report(ItemFailure("item.error.open"))
+                }
+                if self.barSession != nil {
+                    self.cancelBarSession()
+                }
+            }
+        }
     }
 
     private func dismissSurge(animated: Bool) {
-        cancelSurgeDismiss()
+        pressBeganOutsideSurge = true
+        surgeExcusesNextLeftRelease = false
         guard let panel = surgePanel else { return }
         surgePanel = nil
-        surgeIdentity = nil
+        surgeItemID = nil
         surgeWindowRevision = nil
         surgeOriginDisplayID = nil
-        if animated, let list = panel.contentView as? SurgeView {
-            let total = list.dropRows()
+        surgeRequestGeneration += 1
+        if animated, let container = panel.contentView as? SurgeContainerView {
+            let total = container.body.drop()
             NSAnimationContext.runAnimationGroup({ context in
                 context.duration = total
                 panel.animator().alphaValue = 0
@@ -1000,24 +1095,15 @@ final class TideBarController {
         }
     }
 
-    /// 离开潮涌面板后的收起防抖（与汐线收起同律）
-    private func scheduleSurgeDismiss() {
-        surgeDismissWork?.cancel()
-        let bridge = MainThreadBridge { [weak self] in self?.dismissSurge(animated: true) }
-        let work = DispatchWorkItem { bridge() }
-        surgeDismissWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Layout.surgeDismissDebounce, execute: work)
-    }
-
-    private func cancelSurgeDismiss() {
-        surgeDismissWork?.cancel()
-        surgeDismissWork = nil
-    }
-
     // MARK: - 名字气泡
 
     /// 悬停目标变化：首入延迟出泡，泡在场时换目标即时切换（原生 Dock 同律）
     private func updateNameBubble(entry: ItemEntry, iconFrame: NSRect, state: ScreenState) {
+        // 潮涌在场时气泡让位（与潮涌同层级，不让位会叠在列表上）
+        guard surgePanel == nil || surgeOriginDisplayID != displayID(of: state.screen) else {
+            hideNameBubble(animated: false)
+            return
+        }
         guard nameBubbleTarget != entry.id else { return }
         nameBubbleTarget = entry.id
         nameBubbleShowWork?.cancel()

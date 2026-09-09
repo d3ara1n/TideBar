@@ -196,7 +196,7 @@ final class ItemIconButton: NSView {
     var onTerminate: ((AppIdentity) -> Void)?
     var onSetPinned: ((ItemID, Bool) -> Void)?
     /// 潮涌触发，携图标 frame（位于 ItemRowView 坐标系，即面板内容坐标）
-    var onSurge: ((AppEntry, NSRect) -> Void)?
+    var onSurge: ((ItemEntry, NSRect) -> Void)?
 
     private enum VisualTransition {
         case enter
@@ -381,8 +381,8 @@ final class ItemIconButton: NSView {
         dragAttempted = false
         mouseDownScreenPoint = window?.convertPoint(toScreen: event.locationInWindow)
         animateVisualState(.press)
-        // 非应用条目没有窗口长按；拖拽仍使用同一阈值手势。
-        guard entry.application != nil else { return }
+        // 无潮涌体的条目没有长按；拖拽仍使用同一阈值手势。
+        guard entry.canSurge else { return }
         // 长按计时：期内松开视为点击，超时触发潮涌并吞掉本次点击
         pressTimer = Timer.scheduledTimer(withTimeInterval: Layout.surgePressDelay, repeats: false) { [weak self] _ in
             MainThreadBridge { [weak self] in
@@ -391,7 +391,7 @@ final class ItemIconButton: NSView {
                 self.surged = true
                 self.pressed = false
                 self.animateVisualState(.enter)
-                if let app = self.entry.application { self.onSurge?(app, self.frame) }
+                self.onSurge?(self.entry, self.frame)
             }.call()
         }
     }
@@ -433,9 +433,8 @@ final class ItemIconButton: NSView {
         animateVisualState(hovering ? .enter : .exit)
         mouseDownScreenPoint = nil
         guard wasPressed, hovering, !surged, !dragAttempted else { return }
-        if let app = entry.application,
-           event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.option) {
-            onSurge?(app, frame)
+        if event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.option), entry.canSurge {
+            onSurge?(entry, frame)
         } else {
             onClick?(entry)
         }

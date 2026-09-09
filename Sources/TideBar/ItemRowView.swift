@@ -21,7 +21,7 @@ final class ItemRowView: NSView {
     var onSetHidden: ((AppIdentity, Bool) -> Void)?
     var onTerminate: ((AppIdentity) -> Void)?
     var onSetPinned: ((ItemID, Bool) -> Void)?
-    var onSurge: ((AppEntry, NSRect) -> Void)?
+    var onSurge: ((ItemEntry, NSRect) -> Void)?
     private var buttons: [ItemIconButton] = []
     /// 离场项保留到动画结束，避免列表真值先删除导致视图瞬间消失。
     private var departingButtons: [ItemID: ItemIconButton] = [:]

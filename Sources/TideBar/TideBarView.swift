@@ -98,7 +98,7 @@ final class TideBarView: NSView {
     var onTerminate: ((AppIdentity) -> Void)?
     var onSetPinned: ((ItemID, Bool) -> Void)?
     /// 潮涌触发透传（携图标 frame，面板内容坐标）
-    var onSurge: ((AppEntry, NSRect) -> Void)?
+    var onSurge: ((ItemEntry, NSRect) -> Void)?
     /// 悬停目标变化（携图标 frame，本视图坐标系）；nil 表示离开图标区
     var onHoverItem: ((ItemEntry, NSRect) -> Void)?
     var onHoverClear: (() -> Void)?

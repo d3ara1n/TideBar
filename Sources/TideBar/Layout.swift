@@ -73,7 +73,11 @@ enum Layout {
     static var surgeStaggerStep: TimeInterval {
         0.025 / AppConfiguration.shared.animation.speedFactor
     }
-    static let surgeDismissDebounce: TimeInterval = 0.3
+    // 目录潮涌体：最近文件显示上限、病态目录条目预算与截断脚注
+    static let surgeRecentLimit = 8
+    static let surgeRecentEntryBudget = 20_000
+    static let surgeFooterHeight: CGFloat = 18
+    static let surgeFooterFontSize: CGFloat = 10.5
 
     // 接近热区（收起态触发展开）：胶囊外扩范围
     static let hotMarginX: CGFloat = 120

@@ -36,3 +36,11 @@ private struct ReferenceOnlyBehavior: ItemBehaviorProviding {
     #expect(sink.target == target)
     #expect(!behavior.capabilities.contains(.open))
 }
+
+/// 潮涌体能力矩阵：应用与目录提供，文件条目的伪预览体是下一阶段目标。
+@Test @MainActor func surgeBodyCapabilityFollowsKind() {
+    #expect(ItemBehaviors.provider(for: .application)?.capabilities.contains(.surgeBody) == true)
+    #expect(ItemBehaviors.provider(for: .directory)?.capabilities.contains(.surgeBody) == true)
+    #expect(ItemBehaviors.provider(for: .file)?.capabilities.contains(.surgeBody) == false)
+    #expect(ItemBehaviors.provider(for: ItemKind(rawValue: "widget"))?.capabilities.contains(.surgeBody) != true)
+}
