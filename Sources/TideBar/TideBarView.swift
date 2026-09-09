@@ -19,7 +19,9 @@ final class StableBlurBackgroundView: NSView {
         effect.state = .active
         effect.wantsLayer = true
         effect.layer?.masksToBounds = true
-        effect.layer?.cornerCurve = .continuous
+        // 胶囊（nil）必须用 circular 曲线：满半径下 continuous 是超椭圆端部，
+        // 与潮体/汐线的半圆胶囊不一致，交叉淡化时可见形状跳变；定圆角卡片保持 continuous
+        effect.layer?.cornerCurve = fixedCornerRadius == nil ? .circular : .continuous
         addSubview(effect)
         updateAppearance()
     }
@@ -595,11 +597,12 @@ final class TideBarView: NSView {
     func setExpanded(_ expanded: Bool, apps: [AppEntry] = [], immediate: Bool = false) {
         clearApplicationIntakeRequest()
         notificationPulseUntil = 0
-        expandGeneration += 1
         if expanded {
             // 展开即确认：未读提醒的波纹停住（角标本身接管展示）
             stopTidelineRipple()
             guard !isExpandedState else { return }
+            // 代数只在真实状态切换时递增：无操作重入不得否决已排定的淡入淡出
+            expandGeneration += 1
             isExpandedState = true
             iconRow.update(apps: apps, rebuildAll: true)
             if Motion.shouldReduceMotion {
@@ -651,6 +654,7 @@ final class TideBarView: NSView {
             iconRow.waveIn()
         } else {
             guard isExpandedState else { return }
+            expandGeneration += 1
             isExpandedState = false
             if immediate {
                 hardReset()

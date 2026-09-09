@@ -5,7 +5,7 @@ import TideBarCore
 /// 潮汐动画语言——所有动效参数的唯一真值。
 ///
 /// 语言三律：
-/// 1. **涌潮带弹性，退潮走加速**：展开的形变用 CASpring（~6% 过冲一次回弹 = 水的重量感）；
+/// 1. **涌潮快而饱满，退潮走加速**：展开形变用近临界 CASpring（胀满即收，端部不越出玻璃胶囊）；
 ///    收起一律 easeIn 加速离场且更短——潮来得从容，退得利落。
 /// 2. **波扫封顶**：错峰总波窗固定，图标越多步长越密——观感是「一道波扫过」而非逐个排队。
 /// 3. **方向感**：展开波自中心（汐线）向两侧发散，收起波向中心汇聚。
@@ -42,10 +42,10 @@ enum Motion {
 
     /// 汐线感应：轻微增厚（预告，让展开不突兀）
     static var senseDuration: TimeInterval { time(0.14) }
-    /// 潮体胶囊 → bar 的弹性形变
+    /// 潮体胶囊 → bar 的形变（临界阻尼：胀满即收，端部不越出玻璃胶囊）
     static var swellDuration: TimeInterval { time(0.38) }
     static var swellStiffness: CGFloat { springStiffness(320) }
-    static var swellDamping: CGFloat { springDamping(24) }
+    static var swellDamping: CGFloat { springDamping(36) }
     /// 玻璃显影：潮体胀开的同时玻璃凝成，随后潮体淡出
     static var glassFadeDelay: TimeInterval { time(0.08) }
     static var glassFadeDuration: TimeInterval { time(0.22) }
