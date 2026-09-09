@@ -43,6 +43,7 @@ struct AppEntry: Identifiable {
                                   title: $0.title,
                                   document: $0.document,
                                   isMinimized: $0.isMinimized,
+                                  isActive: $0.isActive,
                                   screenID: $0.screenID)
         }
     }
@@ -63,12 +64,13 @@ struct AppEntry: Identifiable {
         runningAppsByPID[window.ownerPID]
     }
 
-    /// 点点状态摘要（逐窗：活跃/最小化 × 归属屏，nil=不画），供变更判定；
+    /// 点点状态摘要（逐窗：聚焦、最小化、归属屏，nil=不画），供变更判定；
     /// 归属入摘要使跨屏移动在重枚举后能刷新各屏点色（同屏重算为 no-op）
     var dotSignature: String {
         guard isRunning, let windows else { return "nil" }
         return windows.map { window in
-            (window.isMinimized ? "m" : "a") + "@" + (window.screenID.map(String.init) ?? "?")
+            (window.isActive ? "f" : "") + (window.isMinimized ? "m" : "a")
+                + "@" + (window.screenID.map(String.init) ?? "?")
         }.joined(separator: ",")
     }
 

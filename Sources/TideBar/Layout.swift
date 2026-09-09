@@ -17,10 +17,12 @@ enum Layout {
     static var iconVisualSide: CGFloat { max(iconSize + 6, iconSlot - 6) }
     static let barHPadding: CGFloat = 10
 
-    // 点点（窗口状态）：实心=活跃、空心=最小化，>5 收敛为数字
+    // 点点（窗口状态）：颜色=聚焦（强调色）/普通，实心=未最小化、空心=最小化，别屏降透明度；>5 收敛为数字
     static let dotSize: CGFloat = 4.5
     static let dotPitch: CGFloat = 7
     static let dotBaseline: CGFloat = 4.5
+    /// 别屏窗口圆点的整体不透明度（实心填充与空心描边同时生效）
+    static let dotDimmedOpacity: Float = 0.55
     /// 无可显示窗口点时的运行态短线，与圆点共用基线。
     static let runningDashWidth: CGFloat = 10
     static let runningDashHeight: CGFloat = 3

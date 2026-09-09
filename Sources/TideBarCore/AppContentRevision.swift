@@ -7,6 +7,8 @@ public struct WindowContentRevision: Equatable, Sendable {
     public let title: String?
     public let document: String?
     public let isMinimized: Bool
+    /// 该窗口为当前聚焦窗口（点点强调色）；进入修订使焦点切换驱动 UI 刷新
+    public let isActive: Bool
     public let screenID: CGDirectDisplayID?
 
     public init(ownerProcessIdentifier: Int32,
@@ -14,12 +16,14 @@ public struct WindowContentRevision: Equatable, Sendable {
                 title: String?,
                 document: String?,
                 isMinimized: Bool,
+                isActive: Bool,
                 screenID: CGDirectDisplayID?) {
         self.ownerProcessIdentifier = ownerProcessIdentifier
         self.elementIdentifier = elementIdentifier
         self.title = title
         self.document = document
         self.isMinimized = isMinimized
+        self.isActive = isActive
         self.screenID = screenID
     }
 }

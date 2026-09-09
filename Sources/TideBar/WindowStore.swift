@@ -15,6 +15,8 @@ struct WindowSnapshot {
     /// 窗口归属显示器（交集面积最大者）；最小化或 frame 不可读时保留旧值，
     /// nil = 未知（冷启动即最小化等），呈现层按本屏处理
     let screenID: CGDirectDisplayID?
+    /// 该窗口为当前聚焦窗口（点点强调色）；采集基准见 WindowStore 的前台基准
+    let isActive: Bool
 }
 
 // MARK: - AX 读取（元素级超时防挂起）
@@ -81,6 +83,16 @@ enum AXReader {
         return CGRect(origin: point, size: cgSize)
     }
 
+    /// 元素型属性（如 kAXFocusedWindow）；无值或非元素型返回 nil
+    static func readElement(_ appElement: AXUIElement, _ attribute: String) -> AXUIElement? {
+        var value: AnyObject?
+        guard AXUIElementCopyAttributeValue(appElement, attribute as CFString, &value) == .success,
+              let value,
+              CFGetTypeID(value) == AXUIElementGetTypeID()
+        else { return nil }
+        return (value as! AXUIElement)
+    }
+
     /// kAXWindows 列表（一次重试：app 冷启动/忙碌时偶发 cannotComplete）
     static func readWindows(of appElement: AXUIElement) -> [AXUIElement]? {
         var result: [AXUIElement]?
@@ -129,6 +141,9 @@ final class WindowStore {
     private var activated = false
     /// 展开态才响应 title 通知（见 setExpanded）
     private var maintainsTitles = false
+    /// 聚焦标记的前台基准：最近的非自身前台 app。面板成为 key 时 frontmost 会
+    /// 短暂指向 TideBar，跳过自身使潮涌/键盘会话不清掉真实前台 app 的标记。
+    private var markingFrontmostPID: pid_t?
     /// 快照集合变化（应用身份粒度）
     var onUpdate: ((AppIdentity) -> Void)?
 
@@ -145,6 +160,10 @@ final class WindowStore {
         }
         activated = true
         let center = NSWorkspace.shared.notificationCenter
+        if let frontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier,
+           frontmost != ProcessInfo.processInfo.processIdentifier {
+            markingFrontmostPID = frontmost
+        }
         observers.append(center.addObserver(forName: NSWorkspace.didLaunchApplicationNotification,
                                             object: nil, queue: .main) { [weak self] note in
             guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
@@ -154,6 +173,10 @@ final class WindowStore {
                                             object: nil, queue: .main) { [weak self] note in
             guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
             MainThreadBridge { [weak self] in self?.removeWatch(pid: app.processIdentifier) }.call()
+        })
+        observers.append(center.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
+                                            object: nil, queue: .main) { _ in
+            MainThreadBridge { [weak self] in self?.frontmostApplicationDidChange() }.call()
         })
 
         for app in NSWorkspace.shared.runningApplications where isWatchable(app) {
@@ -188,6 +211,19 @@ final class WindowStore {
         for pid in watches.keys {
             scheduleReenumerate(pid: pid, after: 0)
         }
+    }
+
+    /// 前台切换：重算新旧 app 的聚焦标记。收起态只记基准不重枚举，
+    /// 展开时的全量刷新补齐；基准未变（如自身面板短暂成为 key）则无动作。
+    private func frontmostApplicationDidChange() {
+        let previous = markingFrontmostPID
+        if let frontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier,
+           frontmost != ProcessInfo.processInfo.processIdentifier {
+            markingFrontmostPID = frontmost
+        }
+        guard maintainsTitles, markingFrontmostPID != previous else { return }
+        if let previous { scheduleReenumerate(pid: previous, after: 0) }
+        if let current = markingFrontmostPID { scheduleReenumerate(pid: current, after: 0) }
     }
 
     // MARK: 观测生命周期
@@ -263,6 +299,11 @@ final class WindowStore {
         var snapshots: [WindowSnapshot] = []
         var complete = true
         let displays = Self.currentDisplays()
+        // 聚焦窗口仅前台 app 读取；与快照比对靠 elementIdentifier（CFHash 跨查询稳定）
+        let focusedWindowIdentifier: Int? = markingFrontmostPID == pid
+            ? AXReader.readElement(appElement, kAXFocusedWindowAttribute as String)
+                .map { Int(bitPattern: CFHash($0)) }
+            : nil
         let previousScreens = (watch.snapshots ?? []).reduce(into: [:]) { partial, snapshot in
             partial[snapshot.elementIdentifier] = snapshot.screenID
         }
@@ -309,7 +350,8 @@ final class WindowStore {
                 screenID: WindowScreenAssignment.resolve(frame: frame,
                                                          isMinimized: minimized,
                                                          displays: displays,
-                                                         previous: previousScreens[elementIdentifier])
+                                                         previous: previousScreens[elementIdentifier]),
+                isActive: elementIdentifier == focusedWindowIdentifier
             ))
         }
 
@@ -348,7 +390,7 @@ final class WindowStore {
         }
     }
 
-    /// frame 变动不触发；窗口身份、标题、文档、最小化态与屏归属共同决定内容修订。
+    /// frame 变动不触发；窗口身份、标题、文档、最小化态、聚焦态与屏归属共同决定内容修订。
     private static func signature(_ snapshots: [WindowSnapshot]) -> [WindowContentRevision] {
         snapshots.map {
             WindowContentRevision(ownerProcessIdentifier: $0.ownerPID,
@@ -356,6 +398,7 @@ final class WindowStore {
                                   title: $0.title,
                                   document: $0.document,
                                   isMinimized: $0.isMinimized,
+                                  isActive: $0.isActive,
                                   screenID: $0.screenID)
         }
     }
@@ -401,6 +444,9 @@ final class WindowStore {
             // 标题通知只增强菜单与潮涌的实时内容；不支持时不抹掉已确认的窗口知识。
             _ = add(window.element, kAXTitleChangedNotification as String)
         }
+        // 聚焦切换（应用内 Cmd+` 等）驱动点点强调色；安装失败不降级，
+        // 焦点漂移由前台切换与展开全量刷新兑底。
+        _ = add(appElement, kAXFocusedWindowChangedNotification as String)
         guard essentialInstalled else {
             NSLog("TideBar AXObserver missing essential notification for pid %d", pid)
             watches[pid] = watch
@@ -424,11 +470,15 @@ final class WindowStore {
     }
 
     /// AX 回调落点：仅重排去抖，不做重活。
-    /// 收起态丢弃 title 通知：重枚举的全窗口 AX 重读无人消费，
-    /// 停滞的 title/document 由展开时的全量重枚举补齐。
+    /// 收起态丢弃 title 与聚焦通知：重枚举的全窗口 AX 重读无人消费，
+    /// 停滞的 title 与过期的聚焦标记由展开时的全量重枚举补齐。
     func handleAXEvent(pid: pid_t, notification: String) {
         guard watches[pid] != nil else { return }
-        guard maintainsTitles || notification != (kAXTitleChangedNotification as String) else { return }
+        if !maintainsTitles {
+            let title = kAXTitleChangedNotification as String
+            let focusedWindow = kAXFocusedWindowChangedNotification as String
+            guard notification != title, notification != focusedWindow else { return }
+        }
         scheduleReenumerate(pid: pid, after: 0.15)
     }
 }

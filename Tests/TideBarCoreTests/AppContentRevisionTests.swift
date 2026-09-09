@@ -47,12 +47,14 @@ private func revision(processIdentifier: Int32 = 10,
                                       title: "First",
                                       document: nil,
                                       isMinimized: false,
+                                      isActive: false,
                                       screenID: 1)
     let second = WindowContentRevision(ownerProcessIdentifier: 10,
                                        elementIdentifier: 100,
                                        title: "Second",
                                        document: nil,
                                        isMinimized: false,
+                                       isActive: false,
                                        screenID: 1)
 
     let replacement = WindowContentRevision(ownerProcessIdentifier: 10,
@@ -60,11 +62,30 @@ private func revision(processIdentifier: Int32 = 10,
                                             title: "First",
                                             document: nil,
                                             isMinimized: false,
+                                            isActive: false,
                                             screenID: 1)
 
     #expect(revision(windows: .known([first])) != revision(windows: .known([second])))
     #expect(revision(windows: .known([first])) != revision(windows: .known([replacement])))
     #expect(revision(windows: .unknown) != revision(windows: .known([])))
+}
+
+@Test func focusChangeChangesAppContentRevision() {
+    let plain = WindowContentRevision(ownerProcessIdentifier: 10,
+                                      elementIdentifier: 100,
+                                      title: "First",
+                                      document: nil,
+                                      isMinimized: false,
+                                      isActive: false,
+                                      screenID: 1)
+    let focused = WindowContentRevision(ownerProcessIdentifier: 10,
+                                        elementIdentifier: 100,
+                                        title: "First",
+                                        document: nil,
+                                        isMinimized: false,
+                                        isActive: true,
+                                        screenID: 1)
+    #expect(revision(windows: .known([plain])) != revision(windows: .known([focused])))
 }
 
 @Test func screenAssignmentChangeChangesAppContentRevision() {
@@ -73,12 +94,14 @@ private func revision(processIdentifier: Int32 = 10,
                                          title: "First",
                                          document: nil,
                                          isMinimized: false,
+                                         isActive: false,
                                          screenID: 1)
     let external = WindowContentRevision(ownerProcessIdentifier: 10,
                                           elementIdentifier: 100,
                                           title: "First",
                                           document: nil,
                                           isMinimized: false,
+                                          isActive: false,
                                           screenID: 2)
     #expect(revision(windows: .known([builtin])) != revision(windows: .known([external])))
 }

@@ -2,16 +2,23 @@ import AppKit
 import QuartzCore
 
 /// 应用运行与窗口状态标记：灰色短线、窗口圆点和数量之间连续过渡。
-/// 圆点四态：亮/灰 = 点击后本屏有/无变化（窗口在本屏/别屏），
-/// 实/空 = 活跃/最小化；颜色通道即点击后果预期，与形态通道正交。
+/// 圆点三通道单一含义：颜色 = 聚焦（强调色）/普通，形状 = 实心/空心 = 未最小化/最小化，
+/// 透明度 = 窗口归属别屏；通道正交组合，无优先级裁决。
 @MainActor
 final class AppStatusIndicatorView: NSView {
-    /// isDimmed = 窗口归属不在本屏（归属未知时按本屏处理，不淡化）
+    /// isOnOtherScreen = 窗口归属不在本屏（归属未知时按本屏处理，不淡化）
+    /// isActive = 该窗口是当前聚焦窗口（强调色）
     private struct WindowDot: Equatable {
         let isMinimized: Bool
-        let isDimmed: Bool
+        let isOnOtherScreen: Bool
+        let isActive: Bool
 
-        var order: Int { (isMinimized ? 2 : 0) + (isDimmed ? 1 : 0) }
+        /// 聚焦 > 本屏未最小化 > 别屏未最小化 > 本屏最小化 > 别屏最小化
+        var order: Int {
+            if isMinimized { return 3 + (isOnOtherScreen ? 1 : 0) }
+            if isActive { return 0 }
+            return 1 + (isOnOtherScreen ? 1 : 0)
+        }
     }
 
     private enum State: Equatable {
@@ -80,10 +87,11 @@ final class AppStatusIndicatorView: NSView {
         if windows.count > markersLimit { return .count(windows.count) }
         let dots = windows.map { window in
             WindowDot(isMinimized: window.isMinimized,
-                      isDimmed: {
+                      isOnOtherScreen: {
                           guard let viewDisplayID, let screenID = window.screenID else { return false }
                           return screenID != viewDisplayID
-                      }())
+                      }(),
+                      isActive: window.isActive)
         }.sorted { $0.order < $1.order }
         return .windows(dots)
     }
@@ -94,6 +102,7 @@ final class AppStatusIndicatorView: NSView {
         let reduceMotion = Motion.shouldReduceMotion
         let shouldAnimate = animated && !reduceMotion
         let tone = AppearanceColors.cgColor(.labelColor, for: effectiveAppearance)
+        let accentTone = AppearanceColors.cgColor(.controlAccentColor, for: effectiveAppearance)
         let quietTone = AppearanceColors.cgColor(.secondaryLabelColor, for: effectiveAppearance)
 
         switch next {
@@ -106,7 +115,7 @@ final class AppStatusIndicatorView: NSView {
 
         case .running:
             configure(marker: markers[0], index: 0, count: 1, filled: true,
-                      dash: true, color: quietTone, animated: shouldAnimate)
+                      dash: true, color: quietTone, dimmed: false, animated: shouldAnimate)
             for (index, marker) in markers.dropFirst().enumerated() {
                 set(marker, keyPath: "opacity", to: Float(0), animated: shouldAnimate,
                     delay: Double(markers.count - index - 2) * Motion.statusStagger)
@@ -122,7 +131,8 @@ final class AppStatusIndicatorView: NSView {
                 let dot = dots[index]
                 configure(marker: marker, index: index, count: dots.count,
                           filled: !dot.isMinimized, dash: false,
-                          color: dot.isDimmed ? quietTone : tone,
+                          color: dot.isActive ? accentTone : tone,
+                          dimmed: dot.isOnOtherScreen,
                           animated: shouldAnimate)
             }
             set(countLayer, keyPath: "opacity", to: Float(0), animated: shouldAnimate)
@@ -159,7 +169,7 @@ final class AppStatusIndicatorView: NSView {
     }
 
     private func configure(marker: CALayer, index: Int, count: Int, filled: Bool,
-                           dash: Bool, color: CGColor, animated: Bool) {
+                           dash: Bool, color: CGColor, dimmed: Bool, animated: Bool) {
         let size = dash
             ? CGSize(width: Layout.runningDashWidth, height: Layout.runningDashHeight)
             : CGSize(width: Layout.dotSize, height: Layout.dotSize)
@@ -181,7 +191,8 @@ final class AppStatusIndicatorView: NSView {
         set(marker, keyPath: "backgroundColor", to: background, animated: animated, delay: delay)
         set(marker, keyPath: "borderColor", to: color, animated: animated, delay: delay)
         set(marker, keyPath: "borderWidth", to: borderWidth, animated: animated, delay: delay)
-        set(marker, keyPath: "opacity", to: Float(1), animated: animated, delay: delay)
+        set(marker, keyPath: "opacity", to: dimmed ? Layout.dotDimmedOpacity : Float(1),
+            animated: animated, delay: delay)
     }
 
     private func set(_ target: CALayer, keyPath: String, to value: Any,
