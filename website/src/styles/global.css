@@ -620,6 +620,9 @@ html[data-theme="dark"] .theme-toggle .icon-sun {
 /* ===== 底部 TideBar 导航 ===== */
 
 .tide-nav {
+  /* 收回防抖：与 App Layout.collapseDebounce（0.3s）一致，
+     离开热区 300ms 后才收回，期间回到热区即取消（展开方向 delay 归零） */
+  --collapse-debounce: 300ms;
   position: fixed;
   z-index: 50;
   right: 0;
@@ -629,13 +632,18 @@ html[data-theme="dark"] .theme-toggle .icon-sun {
   pointer-events: none;
 }
 
+/* 展开热区：以汐线为中心的矩形（bar 展开宽约 324px），鼠标在周围才触发潮汐展开 */
 .tide-nav-hit {
   position: absolute;
-  inset: 0;
+  bottom: 0;
+  left: 50%;
+  width: 380px;
+  height: 96px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
   pointer-events: auto;
+  transform: translateX(-50%);
 }
 
 /* 汐线：160×3 呼吸胶囊 */
@@ -649,7 +657,8 @@ html[data-theme="dark"] .theme-toggle .icon-sun {
   background: var(--text);
   opacity: 0.8;
   transform: translateX(-50%);
-  transition: opacity 200ms ease, transform 260ms var(--ease-spring);
+  transition: opacity 200ms ease var(--collapse-debounce),
+    transform 260ms var(--ease-spring) var(--collapse-debounce);
   animation: tideline-breath 3.2s ease-in-out infinite;
 }
 
@@ -677,8 +686,9 @@ html[data-theme="dark"] .theme-toggle .icon-sun {
   pointer-events: none;
   transform: translate(-50%, 20px) scale(0.4);
   transform-origin: bottom center;
-  transition: opacity 220ms ease, transform 360ms var(--ease-spring),
-    background-color 0.4s ease;
+  transition: opacity 220ms ease var(--collapse-debounce),
+    transform 360ms var(--ease-spring) var(--collapse-debounce),
+    background-color 0.4s ease var(--collapse-debounce);
 }
 
 .tide-nav:hover .tide-nav-bar,
@@ -687,6 +697,7 @@ html[data-theme="dark"] .theme-toggle .icon-sun {
   opacity: 1;
   pointer-events: auto;
   transform: translate(-50%, 0) scale(1);
+  transition-delay: 0s;
 }
 
 .tide-nav:hover .tide-nav-line,
@@ -694,6 +705,7 @@ html[data-theme="dark"] .theme-toggle .icon-sun {
 .tide-nav.is-open .tide-nav-line {
   opacity: 0;
   transform: translateX(-50%) scale(0.7, 1.6);
+  transition-delay: 0s;
 }
 
 /* 图标波 */
@@ -708,7 +720,8 @@ html[data-theme="dark"] .theme-toggle .icon-sun {
   text-decoration: none;
   opacity: 0;
   transform: translateY(16px) scale(0.5);
-  transition: opacity 240ms ease, transform 380ms var(--ease-spring);
+  transition: opacity 240ms ease var(--collapse-debounce),
+    transform 380ms var(--ease-spring) var(--collapse-debounce);
 }
 
 .tide-nav:hover .tide-nav-item,
@@ -837,7 +850,7 @@ html[data-theme="dark"] .theme-toggle .icon-sun {
   html.js .desktop-hero {
     position: absolute;
     z-index: 1;
-    top: 45%;
+    top: calc(50dvh - var(--menubar-h));
     left: 50%;
     width: min(880px, 88vw);
     padding: 0;
@@ -856,7 +869,7 @@ html[data-theme="dark"] .theme-toggle .icon-sun {
   html.js .window {
     position: absolute;
     z-index: 2;
-    top: 44%;
+    top: calc(50dvh - var(--menubar-h));
     left: 50%;
     width: min(920px, 88vw);
     max-height: calc(100dvh - var(--menubar-h) - 190px);
@@ -1021,6 +1034,10 @@ html[data-theme="dark"] .theme-toggle .icon-sun {
   }
 
   .tide-nav-hit {
+    inset: 0;
+    width: auto;
+    height: auto;
+    transform: none;
     padding-bottom: calc(6px + env(safe-area-inset-bottom));
   }
 

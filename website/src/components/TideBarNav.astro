@@ -77,8 +77,11 @@ const labels = lang === "en"
     if (event.key === "Escape") activate("home");
   });
 
-  // 触摸设备：点按汐线展开
-  nav?.querySelector(".tide-nav-line")?.addEventListener("click", () => nav.classList.toggle("is-open"));
+  // 触摸设备：点按汐线展开（桌面靠鼠标热区 hover，不用点击锁定）
+  const touchMode = matchMedia("(hover: none)");
+  nav?.querySelector(".tide-nav-line")?.addEventListener("click", () => {
+    if (touchMode.matches) nav.classList.toggle("is-open");
+  });
   nav?.addEventListener("focusin", () => nav.classList.add("is-open"));
   nav?.addEventListener("focusout", (event) => {
     if (!nav.contains(event.relatedTarget as Node | null)) nav.classList.remove("is-open");
@@ -98,6 +101,8 @@ const labels = lang === "en"
     if (!desktopMode.matches) return; // 移动端保持锚点滚动
     event.preventDefault();
     activate(id);
+    // 指针点击后交还焦点，避免 :focus-within 把栏锁定在展开态
+    if (event.detail > 0) (document.activeElement as HTMLElement | null)?.blur();
   });
 
   // 点击桌面空白处回到桌面
