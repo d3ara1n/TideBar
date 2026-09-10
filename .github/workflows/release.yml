@@ -48,12 +48,27 @@ jobs:
               run: |
                   ./scripts/build-app.sh "${{ steps.ver.outputs.version }}"
 
+            - name: Generate appcast
+              if: steps.ver.outputs.skip != 'true'
+              env:
+                  SPARKLE_EDDSA_KEY: ${{ secrets.SPARKLE_EDDSA_KEY }}
+              run: |
+                  ver="${{ steps.ver.outputs.version }}"
+                  curl -sL -o /tmp/sparkle.tar.xz \
+                      "https://github.com/sparkle-project/Sparkle/releases/download/2.9.6/Sparkle-2.9.6.tar.xz"
+                  tar xzf /tmp/sparkle.tar.xz -C /tmp
+                  echo "$SPARKLE_EDDSA_KEY" | /tmp/bin/generate_appcast --ed-key-file - \
+                      --download-url-prefix "https://github.com/d3ara1n/TideBar/releases/download/v$ver/" \
+                      --full-release-notes-url "https://github.com/d3ara1n/TideBar/releases/tag/v$ver" \
+                      dist/
+                  cat dist/appcast.xml
+
             - name: Tag and publish release
               if: steps.ver.outputs.skip != 'true'
               env:
                   GH_TOKEN: ${{ github.token }}
               run: |
                   ver="${{ steps.ver.outputs.version }}"
-                  gh release create "v$ver" "dist/TideBar-$ver.zip" \
+                  gh release create "v$ver" "dist/TideBar-$ver.zip" "dist/appcast.xml" \
                       --target "$GITHUB_SHA" \
                       --title "TideBar v$ver" --generate-notes

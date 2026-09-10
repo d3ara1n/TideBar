@@ -208,6 +208,13 @@ killall Dock
 5. **首版 `⌥Tab` 采用临时切换会话**：第一次触发优先定位当前前台应用，后续按键循环切换；空闲超时自动提交当前选择并收起（设置页可配，默认约 0.9 秒）。`Return` 立即提交，`Esc` 取消。`⌥Space` 独立作为持久 toggle，不受超时影响。两个快捷键的初始选择共用当前前台应用优先、首个条目回退的规则。
 6. **快捷键录入采用 KeyboardShortcuts**：不维护自制 Recorder 和第二套 Carbon 注册；使用 KeyboardShortcuts 3.0.1 的 SwiftUI Recorder（录制期间暂停热键、失焦结束录制、Esc 取消、Delete 清除）。设置页保存后经其内置存储与 Carbon 注册立即生效；录入至少一个修饰键加一个普通键，注册成功不等于系统层面无冲突。该依赖是快捷键功能的专项例外，不引入 SwiftUIX 等通用 UI 大依赖。
 
+## 自更新与发布管道（Sparkle）
+
+1. **Sparkle 2 作为专项依赖例外**：与 KeyboardShortcuts 同例，单用途事实标准，不构成通用 UI 大依赖先例；binary framework，接入时随包分发。
+2. **发布侧管道先行，应用侧后置**：EdDSA 密钥（私钥存 `~/.signing/tidebar/`，与签名证书同处；公钥固化在 Info.plist `SUPublicEDKey`）、`SUFeedURL` 指向 GitHub Releases 固定跳转、appcast 随 release 自动生成，均已落地；app 内无 Sparkle 代码时这些键无人消费，属预期，接入时不需改管道。
+3. **appcast 单条目**：每次发布全新生成，仅含最新版本；不维护历史条目，不回下载旧 zip。Sparkle 客户端拉最新条目即可完成任意旧版升级。
+4. **更新完整性走 EdDSA，与 codesign 独立**：自签证书不公证不影响更新可信性；首次下载仍需右键打开，属不公证路线既定代价。
+
 ## 本地化与应用内语言切换
 
 1. **资源格式用经典 .strings（SE-0278），不用 String Catalogs**：xcstrings 的编译与符号生成绑定 Xcode/xcodebuild 链路，`swift build` 不原生支持。词条按功能域分 table（Onboarding/Settings/Menus/Runtime/Labels），en + zh-Hans 双语人工维护，key 点分层命名。

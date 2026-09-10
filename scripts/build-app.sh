@@ -53,6 +53,10 @@ cat > "$STAGING/Contents/Info.plist" <<EOF
     <true/>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © $(date +%Y) dearain. All rights reserved.</string>
+    <key>SUFeedURL</key>
+    <string>https://github.com/d3ara1n/TideBar/releases/latest/download/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>nPOwF817jWyg1G9Cx/jk7uSH2NhNTBMdVJ7QdIGaAZk=</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 </dict>

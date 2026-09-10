@@ -30,12 +30,14 @@
 
 ### 待办（发布首跑前）
 
-- [ ] GitHub secrets：`MAC_SIGNING_P12`（`base64 ~/.signing/tidebar/TideBarSigning.p12`）、`MAC_SIGNING_P12_PASSWORD`（`~/.signing/tidebar/p12-password.txt`）
-- [ ] push 后 `workflow_dispatch` 手动触发一次 Release 验证全链路
+- [ ] GitHub secrets：`MAC_SIGNING_P12`（`base64 ~/.signing/tidebar/TideBarSigning.p12`）、`MAC_SIGNING_P12_PASSWORD`（`~/.signing/tidebar/p12-password.txt`）✅ 已配
+- [ ] GitHub secrets：`SPARKLE_EDDSA_KEY`（`~/.signing/tidebar/SparkleEdDSA.key` 内容）
+- [ ] push 后 Actions 页面禁用 Release workflow（启用时机另行决定）
+- [ ] 启用时 `workflow_dispatch` 手动触发一次验证全链路（首版 0.1.0，真发布）
 
 ## 边界
 
 - 不公证，不上架 App Store；用户首开右键→打开，README 说明。
 - 打包脚本只产出构建产物，不注册任何系统状态。
 - 不含登录项；登录项是打包之后的应用内功能，另行立案。
-- 自更新（Sparkle 2，EdDSA + appcast 托管 GitHub Releases）另行立案：含依赖引入、设置页检查更新入口、appcast 生成进发布 workflow。
+- Sparkle 发布侧管道已随本计划落地（EdDSA 密钥、`SUFeedURL`/`SUPublicEDKey`、appcast 随 release 生成，见 decisions.md）；应用侧（SPM 依赖、framework 嵌套签名、设置页检查更新入口）另行立案。
