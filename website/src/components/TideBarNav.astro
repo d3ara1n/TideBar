@@ -1,0 +1,70 @@
+---
+import { Download, GitBranch, House, ShieldCheck, Sparkles } from "@lucide/astro";
+
+interface Props {
+  lang?: "en" | "zh";
+}
+
+const { lang = "en" } = Astro.props;
+const labels = lang === "en"
+  ? { home: "Home", features: "Features", privacy: "Privacy", download: "Download", source: "Source" }
+  : { home: "首页", features: "特色", privacy: "隐私", download: "下载", source: "源码" };
+---
+<nav class="tide-nav" aria-label={lang === "en" ? "Main navigation" : "主导航"}>
+  <div class="tide-nav-hit-area">
+    <div class="tide-nav-inner">
+      <a class="tide-nav-item" href={lang === "en" ? "/" : "/zh/"} data-section="home" aria-label={labels.home}>
+        <House size={19} strokeWidth={1.8} aria-hidden="true" />
+        <span>{labels.home}</span>
+      </a>
+      <a class="tide-nav-item" href="#features" data-section="features" aria-label={labels.features}>
+        <Sparkles size={19} strokeWidth={1.8} aria-hidden="true" />
+        <span>{labels.features}</span>
+      </a>
+      <a class="tide-nav-item" href="#privacy" data-section="privacy" aria-label={labels.privacy}>
+        <ShieldCheck size={19} strokeWidth={1.8} aria-hidden="true" />
+        <span>{labels.privacy}</span>
+      </a>
+      <a class="tide-nav-item tide-nav-download" href="#download" data-section="download" aria-label={labels.download}>
+        <Download size={19} strokeWidth={1.8} aria-hidden="true" />
+        <span>{labels.download}</span>
+      </a>
+      <a class="tide-nav-item" href="#source" data-section="source" aria-label={labels.source}>
+        <GitBranch size={19} strokeWidth={1.8} aria-hidden="true" />
+        <span>{labels.source}</span>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<script>
+  const nav = document.querySelector<HTMLElement>(".tide-nav");
+  const items = [...document.querySelectorAll<HTMLAnchorElement>(".tide-nav-item[data-section]")];
+  const sections = items
+    .map((item) => document.getElementById(item.dataset.section ?? ""))
+    .filter((section): section is HTMLElement => section !== null);
+
+  const setActive = (id: string) => {
+    items.forEach((item) => item.toggleAttribute("aria-current", item.dataset.section === id));
+  };
+
+  if (nav) {
+    nav.addEventListener("focusin", () => nav.classList.add("is-open"));
+    nav.addEventListener("focusout", (event) => {
+      if (!nav.contains(event.relatedTarget as Node | null)) nav.classList.remove("is-open");
+    });
+  }
+
+  if ("IntersectionObserver" in window && sections.length > 0) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible) setActive(visible.target.id);
+      },
+      { rootMargin: "-20% 0px -60%", threshold: [0.1, 0.4, 0.7] }
+    );
+    sections.forEach((section) => observer.observe(section));
+  }
+</script>
