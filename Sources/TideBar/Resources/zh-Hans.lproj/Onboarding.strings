@@ -8,9 +8,9 @@
 
 // 第 1 步：认识汐
 "intro.title" = "欢迎使用汐 TideBar";
-"intro.message" = "汐是一条收在屏幕底部的细线，空闲时几乎不可见。鼠标靠近时它潮汐般展开为应用栏；长按图标还能直达该应用的任意窗口——包括最小化的。";
-"intro.demoTitle" = "演示：汐线 → 应用栏 → 潮涌";
-"intro.demoCaption" = "鼠标靠近，细线展开为应用栏；长按（或 ⌥+点击）图标，潮涌列出该应用的全部窗口";
+"intro.message" = "汐是一条收在屏幕底部的细线，空闲时几乎不可见。光标靠近时它潮汐般展开为图标栏；按住图标还能直达该应用的任意窗口——包括最小化的。";
+"intro.demoTitle" = "演示：汐线 → 图标栏 → 潮涌";
+"intro.demoCaption" = "光标靠近，细线展开为图标栏；按住（或 ⌥+点击）图标，潮涌列出该应用的全部窗口";
 "intro.privacyNote" = "汐不提供窗口内容缩略图，也不会请求屏幕录制权限。";
 
 // 第 2 步：窗口管理权限
@@ -22,7 +22,7 @@
 "permission.deniedMessage" = "授权后汐才能列出并还原窗口。系统设置可能需要数秒刷新，可点击「重新检查」确认。";
 "permission.openSettings" = "打开系统设置";
 "permission.recheck" = "重新检查";
-"permission.degradedNote" = "未授权也可以继续使用：汐线与应用栏不受影响，只是无法列出和还原窗口。稍后可在设置中心的「权限」页完成授权。";
+"permission.degradedNote" = "未授权也可以继续使用：汐线与图标栏不受影响，只是无法列出和还原窗口。稍后可在设置中心的「权限」页完成授权。";
 
 // 第 3 步：Dock 接管
 "takeover.title" = "Dock 接管";
@@ -64,7 +64,7 @@
 "finish.gesture.approachDetail" = "汐线自动展开";
 "finish.gesture.clickTitle" = "点击";
 "finish.gesture.clickDetail" = "启动或切换应用";
-"finish.gesture.holdTitle" = "长按";
+"finish.gesture.holdTitle" = "按住";
 "finish.gesture.holdDetail" = "潮涌窗口列表";
 "finish.gesture.optionClickTitle" = "⌥+点击";
 "finish.gesture.optionClickDetail" = "直接弹出潮涌";

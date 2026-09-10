@@ -89,13 +89,13 @@
 "windows.footer.notGranted" = "Accessibility access is used to list windows, identify minimized and fullscreen states, and bring windows back to the front.";
 
 // 外观与交互
-"appearance.header.description" = "Tune the theme, the tide line, expansion animation, and the app bar.";
+"appearance.header.description" = "Tune the theme, the tide line, expansion animation, and the icon bar.";
 "appearance.section.theme" = "Appearance";
 "appearance.theme" = "Theme";
 "appearance.theme.footer" = "The selected theme applies to the Settings window, the tide line, Surge, and app menus.";
 "appearance.iconSize" = "App icon size";
 "appearance.brightness" = "Tide line brightness";
-"appearance.section.tideline" = "Tide Line & App Bar";
+"appearance.section.tideline" = "Tide Line & Icon Bar";
 "appearance.tideline.footer" = "Icon size adjusts the icon slots as well; tide line brightness only affects the resting look, not the approach hot zone.";
 "appearance.animation" = "Expansion animation";
 "appearance.reducedMotion" = "Reduce motion";
@@ -140,7 +140,7 @@
 
 // 关于
 "about.header.title" = "About TideBar";
-"about.header.description" = "A hairline at rest, a sea of windows at hand.";
+"about.header.description" = "A hairline at rest, every window at hand.";
 "about.name" = "TideBar";
 "about.tagline" = "A zero-footprint window taskbar";
 "about.version" = "Version %@ (Build %@)";

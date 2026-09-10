@@ -2,9 +2,9 @@
 
 # TideBar 汐
 
-**A hairline at rest, a sea of windows at hand.**
+**A hairline at rest, every window at hand.**
 
-TideBar (汐) is a zero-footprint window taskbar for macOS. At rest, it is a hairline tucked against the bottom edge of the screen; move the cursor close and it tides up into an app bar — every window's state visible as a dot, one click away. Press and hold any icon and the Surge list lays out all of that app's windows, minimized ones included, each a click from restoration. Turn on takeover and the system Dock steps aside, leaving nothing on screen but the line — a whole row back on small MacBook displays. One permission (Accessibility), no screen recording, no network.
+TideBar (汐) is a zero-footprint window taskbar for macOS. At rest, it is a hairline tucked against the bottom edge of the screen; move the cursor close and it tides up into an icon bar — every window's state visible as a dot, one click away. Click and hold (or ⌥-click) any icon and the Surge list lays out all of that app's windows, minimized ones included — one click brings any of them back. Turn on takeover and the system Dock steps aside, leaving nothing on screen but the line — a whole row of screen back on small MacBook displays. One permission (Accessibility), no screen recording, no tracking or account.
 
 English · [简体中文](README.zh-CN.md)
 
@@ -13,9 +13,9 @@ English · [简体中文](README.zh-CN.md)
 </div>
 
 <!-- Once demo assets are produced (plans/todo-2026-09-06-branding.md), remove the placeholder below and enable the image:
-<img src="docs/images/demo.gif" alt="Tide line → app bar → Surge" width="720"> -->
+<img src="docs/images/demo.gif" alt="Tide line → icon bar → Surge" width="720"> -->
 
-> 🎬 **Demo placeholder**: tide line → app bar → Surge (animation and before/after screenshots to come)
+> 🎬 **Demo placeholder**: tide line → icon bar → Surge (animation and before/after screenshots to come)
 
 ## Features
 
@@ -29,7 +29,7 @@ Small dots under each icon mirror your windows: filled for the active window, ho
 
 ### Surge · Reach any window
 
-Press and hold (or ⌥-click) an icon to fan out its window list; jump straight to any window by title, minimized ones restore on a click. When the Dock hides, minimized windows finally have a home.
+Click and hold (or ⌥-click) an icon to fan out its window list; jump straight to any window by title, minimized ones restore on a click. When the Dock hides, minimized windows finally have a home.
 
 ### Ripple · Considerate notifications
 
@@ -38,8 +38,8 @@ A new badge nudges the line once; unread, it keeps gently rippling; opening the 
 ## Permissions & Privacy
 
 - **One permission only**: Accessibility — used to list and restore windows and detect fullscreen state.
-- **No screen recording**: TideBar shows no window thumbnails and never reads your screen.
-- **No network**: no tracking, no telemetry, no account.
+- **No screen recording**: TideBar shows no window thumbnails and asks for no Screen Recording permission.
+- **No telemetry**: no tracking, no account, no analytics.
 
 ## Install
 

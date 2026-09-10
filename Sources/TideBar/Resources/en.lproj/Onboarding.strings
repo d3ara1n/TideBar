@@ -8,9 +8,9 @@
 
 // 第 1 步：认识汐
 "intro.title" = "Welcome to TideBar";
-"intro.message" = "TideBar is a hairline tucked against the bottom edge of your screen — nearly invisible at rest. Move the cursor close and it rises into an app bar; press and hold any icon to reach every window of that app, minimized ones included.";
-"intro.demoTitle" = "Demo: tide line → app bar → Surge";
-"intro.demoCaption" = "Move close and the hairline rises into the app bar; press and hold (or ⌥-click) an icon and Surge lays out all of that app's windows";
+"intro.message" = "TideBar is a hairline tucked against the bottom edge of your screen — nearly invisible at rest. Move the cursor close and it rises into an icon bar; click and hold any icon to reach every window of that app, minimized ones included.";
+"intro.demoTitle" = "Demo: tide line → icon bar → Surge";
+"intro.demoCaption" = "Move close and the hairline rises into the icon bar; click and hold (or ⌥-click) an icon and Surge lays out all of that app's windows";
 "intro.privacyNote" = "TideBar shows no window content thumbnails and never requests screen recording.";
 
 // 第 2 步：窗口管理权限
@@ -22,7 +22,7 @@
 "permission.deniedMessage" = "TideBar needs this access to list and restore windows. System Settings may take a few seconds to refresh — click “Check Again” to confirm.";
 "permission.openSettings" = "Open System Settings";
 "permission.recheck" = "Check Again";
-"permission.degradedNote" = "You can keep going without granting access: the tide line and app bar are unaffected — TideBar just can't list or restore windows. You can grant it later in Settings → Access.";
+"permission.degradedNote" = "You can keep going without granting access: the tide line and icon bar are unaffected — TideBar just can't list or restore windows. You can grant it later in Settings → Access.";
 
 // 第 3 步：Dock 接管
 "takeover.title" = "Dock Takeover";
@@ -64,7 +64,7 @@
 "finish.gesture.approachDetail" = "The tide line rises to meet you";
 "finish.gesture.clickTitle" = "Click";
 "finish.gesture.clickDetail" = "Launch or switch apps";
-"finish.gesture.holdTitle" = "Press & hold";
+"finish.gesture.holdTitle" = "Click & hold";
 "finish.gesture.holdDetail" = "Surge window list";
 "finish.gesture.optionClickTitle" = "⌥-click";
 "finish.gesture.optionClickDetail" = "Open Surge instantly";

@@ -2,7 +2,7 @@ import SwiftUI
 
 // 引导向导视图：四步分页 + 底部导航条。
 // 演示动画规划（当前以占位框标记，后续以代码生成动画填充，录制动图备选）：
-//   1. 第 1 步主演示位：汐线 → 应用栏 → 潮涌 的三段式展开过程；
+//   1. 第 1 步主演示位：汐线 → 图标栏 → 潮涌 的三段式展开过程；
 //   2. 第 3 步对比示意位：接管前后（系统 Dock 常驻 ↔ 汐线收于底部）。
 // 替换占位时动画不得成为阅读前提：需遵循 AppConfiguration.reducedMotion，
 // 减少动态效果下退化为静态示意。
@@ -211,7 +211,7 @@ private struct IntroStep: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            // 演示位 1：汐线 → 应用栏 → 潮涌（代码生成动画占位）
+            // 演示位 1：汐线 → 图标栏 → 潮涌（代码生成动画占位）
             DemoPlaceholder(
                 title: l10n.string("intro.demoTitle", table: .onboarding),
                 caption: l10n.string("intro.demoCaption", table: .onboarding)

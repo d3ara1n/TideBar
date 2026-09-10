@@ -17,16 +17,16 @@ const titles = en
   <div class="desktop-wallpaper" aria-hidden="true"></div>
 
   <section class="desktop-hero" id="home" aria-labelledby="hero-title">
-    <p class="eyebrow">{en ? "A zero-footprint window taskbar for macOS" : "macOS 零占用窗口任务栏"}</p>
+    <p class="eyebrow">{en ? "A zero-footprint window taskbar for macOS" : "macOS 不占屏幕的窗口任务栏"}</p>
     <h1 id="hero-title">
       {en
-        ? <>A hairline at rest, <span class="headline-dim">a sea of windows at hand.</span></>
-        : <>平时是一条线，<span class="headline-dim">需要时是一片海。</span></>}
+        ? <>A hairline at rest, <span class="headline-dim">every window at hand.</span></>
+        : <>平时是一条线，<span class="headline-dim">需要时每个窗口触手可及。</span></>}
     </h1>
     <p class="lede">
       {en
-        ? "TideBar disappears to the bottom edge until you need it, then brings every window within reach."
-        : "汐平时隐入屏幕底边，需要时展开而来，让每个窗口触手可及。"}
+        ? "TideBar tucks into the bottom edge as a hairline until you need it — then apps and every window are one move away. Turn on takeover and the Dock steps aside, giving a small MacBook a full row back."
+        : "汐平时收成屏幕底边的一条细线，需要时展开为图标栏——应用与每个窗口都一触即达。开启接管，系统 Dock 隐去，小屏 MacBook 多出一整行空间。"}
     </p>
     <div class="hero-actions">
       <a class="button button-primary" href="#download" data-section-link="download">
@@ -54,16 +54,16 @@ const titles = en
       <p class="eyebrow">{en ? "The tide in four movements" : "四种潮汐状态"}</p>
       <h2 id="features-title">
         {en
-          ? <>Quiet by default. <span class="headline-dim">Complete when called.</span></>
-          : <>默认安静，<span class="headline-dim">需要时完整出现。</span></>}
+          ? <>Quiet by default. <span class="headline-dim">Ready when called.</span></>
+          : <>平时安静，<span class="headline-dim">唤之即来。</span></>}
       </h2>
       <div class="feature-grid">
         <article class="feature-card">
           <span class="feature-chip"><Waves strokeWidth={1.8} aria-hidden="true" /></span>
           <h3>{en ? "Tide Line" : "汐线"}</h3>
           <p>{en
-            ? "A 2–3pt line hugs the bottom edge until your cursor calls it up."
-            : "2–3pt 细线贴着屏幕底边，直到鼠标将它唤起。"}</p>
+            ? "A 2–3pt hairline hugs the bottom edge until your cursor calls up the icon bar."
+            : "2–3pt 细线贴着屏幕底边，光标靠近即展开为图标栏。"}</p>
         </article>
         <article class="feature-card">
           <span class="feature-chip"><CircleDot strokeWidth={1.8} aria-hidden="true" /></span>
@@ -76,8 +76,8 @@ const titles = en
           <span class="feature-chip"><LayoutList strokeWidth={1.8} aria-hidden="true" /></span>
           <h3>{en ? "Surge" : "潮涌"}</h3>
           <p>{en
-            ? "Press and hold an app to reach any window, including the ones Dock left behind."
-            : "长按应用即可直达任意窗口，包括被 Dock 带走的最小化窗口。"}</p>
+            ? "Click and hold an app to reach any window — minimized ones included, one click to restore."
+            : "按住应用即可直达任意窗口——最小化的也在列表里，点击即还原。"}</p>
         </article>
         <article class="feature-card">
           <span class="feature-chip"><Bell strokeWidth={1.8} aria-hidden="true" /></span>
@@ -87,6 +87,9 @@ const titles = en
             : "未读角标让细线保持轻微在场，不抢夺注意力；展开即确认。"}</p>
         </article>
       </div>
+      <p class="window-note">{en
+        ? "In fullscreen apps the line opens on a click by default; hover-to-open and fully hidden modes are in Settings."
+        : "全屏应用下默认点击汐线展开；悬停展开与完全隐藏可在设置中选择。"}</p>
     </div>
   </section>
 
@@ -105,7 +108,9 @@ const titles = en
         src="/demo.webp"
         width="1600"
         height="1000"
-        alt={en ? "TideBar demo" : "汐实拍演示"}
+        alt={en
+          ? "The hairline resting at the bottom edge, the icon bar risen from it, and the Surge window list of a single app."
+          : "屏幕底边的细线、由它展开的图标栏，以及某个应用的潮涌窗口列表。"}
       />
     </div>
   </section>
@@ -123,13 +128,13 @@ const titles = en
       <p class="eyebrow">{en ? "Designed with restraint" : "克制的设计"}</p>
       <h2 id="privacy-title">
         {en
-          ? <>One permission. <span class="headline-dim">No screen recording. No network.</span></>
-          : <>一项权限。<span class="headline-dim">不录屏。不联网。</span></>}
+          ? <>One permission. <span class="headline-dim">No screen recording. No telemetry.</span></>
+          : <>一项权限。<span class="headline-dim">不申请屏幕录制。无遥测。</span></>}
       </h2>
       <p class="lede">
         {en
-          ? "TideBar uses Accessibility only to list and restore windows and detect fullscreen state. It never reads your screen or sends your data anywhere."
-          : "汐仅使用辅助功能来列出、还原窗口并识别全屏状态。不读取屏幕内容，也不向任何地方发送数据。"}
+          ? "TideBar uses Accessibility only to list and restore windows and detect fullscreen state. It shows no window thumbnails, asks for no Screen Recording permission, and collects nothing about you."
+          : "汐仅使用辅助功能来列出、还原窗口并识别全屏状态。不显示窗口缩略图，不申请屏幕录制权限，也不收集你的任何信息。"}
       </p>
       <div class="privacy-list">
         <span class="privacy-pill"><Check strokeWidth={2.4} aria-hidden="true" />{en ? "Accessibility only" : "仅需辅助功能"}</span>

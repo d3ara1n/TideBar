@@ -48,7 +48,7 @@
 ## 边界
 
 - 品牌资产（图标等）在本立项产出；打包进 `.app` 的接线由 todo-2026-09-10-app-bundle-release.md 承接，其开工在本立项素材就绪之后（2026-09-06 拍板）。
-- 演示动画的产出依赖 onboarding 已归档立案中的演示位实现（汐线→应用栏→潮涌、接管前后对比）；若 README 先行，先用截图。
+- 演示动画的产出依赖 onboarding 已归档立案中的演示位实现（汐线→图标栏→潮涌、接管前后对比）；若 README 先行，先用截图。
 - 官网落地页发布前完成，随本立项产出：静态单页放 `website/`，零构建手写 HTML/CSS，经 `.github/workflows/` 的 Pages 工作流发布（Pages 的分支部署模式只认根目录或 `docs/`，子目录必须走 Actions）；仓库侧加 `CNAME` 指向 `tidebar.dearain.dev`。下载与发布动作走 GitHub Releases。
 
 ## 开工条件
