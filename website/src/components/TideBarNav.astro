@@ -1,5 +1,5 @@
 ---
-import { ArrowDown, CodeXml, House, ShieldCheck, Sparkles } from "@lucide/astro";
+import { ArrowDown, CodeXml, House, Monitor, ShieldCheck, Sparkles } from "@lucide/astro";
 
 interface Props {
   lang?: "en" | "zh";
@@ -7,8 +7,8 @@ interface Props {
 
 const { lang = "en" } = Astro.props;
 const labels = lang === "en"
-  ? { home: "Home", features: "Features", privacy: "Privacy", download: "Download", source: "Source" }
-  : { home: "首页", features: "特色", privacy: "隐私", download: "下载", source: "源码" };
+  ? { home: "Home", features: "Features", demo: "Demo", privacy: "Privacy", download: "Download", source: "Source" }
+  : { home: "首页", features: "特色", demo: "演示", privacy: "隐私", download: "下载", source: "源码" };
 ---
 <nav class="tide-nav" aria-label={lang === "en" ? "Main navigation" : "主导航"}>
   <div class="tide-nav-hit">
@@ -22,15 +22,19 @@ const labels = lang === "en"
         <span class="nav-icon tile-features"><Sparkles strokeWidth={1.9} aria-hidden="true" /></span>
         <span class="nav-name">{labels.features}</span>
       </a>
-      <a class="tide-nav-item" style="--i:2" href="#privacy" data-section="privacy" aria-label={labels.privacy}>
+      <a class="tide-nav-item" style="--i:2" href="#demo" data-section="demo" aria-label={labels.demo}>
+        <span class="nav-icon tile-demo"><Monitor strokeWidth={1.9} aria-hidden="true" /></span>
+        <span class="nav-name">{labels.demo}</span>
+      </a>
+      <a class="tide-nav-item" style="--i:3" href="#privacy" data-section="privacy" aria-label={labels.privacy}>
         <span class="nav-icon tile-privacy"><ShieldCheck strokeWidth={1.9} aria-hidden="true" /></span>
         <span class="nav-name">{labels.privacy}</span>
       </a>
-      <a class="tide-nav-item" style="--i:3" href="#download" data-section="download" aria-label={labels.download}>
+      <a class="tide-nav-item" style="--i:4" href="#download" data-section="download" aria-label={labels.download}>
         <span class="nav-icon tile-download"><ArrowDown strokeWidth={1.9} aria-hidden="true" /></span>
         <span class="nav-name">{labels.download}</span>
       </a>
-      <a class="tide-nav-item" style="--i:4" href="#source" data-section="source" aria-label={labels.source}>
+      <a class="tide-nav-item" style="--i:5" href="#source" data-section="source" aria-label={labels.source}>
         <span class="nav-icon tile-source"><CodeXml strokeWidth={1.9} aria-hidden="true" /></span>
         <span class="nav-name">{labels.source}</span>
       </a>
@@ -47,8 +51,8 @@ const labels = lang === "en"
   const appName = document.getElementById("menubar-app-name");
   const isZh = document.documentElement.lang === "zh-CN";
   const appNames: Record<string, string> = isZh
-    ? { home: "汐", features: "特色", privacy: "隐私", download: "下载", source: "源码" }
-    : { home: "TideBar", features: "Features", privacy: "Privacy", download: "Download", source: "Source" };
+    ? { home: "汐", features: "特色", demo: "演示", privacy: "隐私", download: "下载", source: "源码" }
+    : { home: "TideBar", features: "Features", demo: "Demo", privacy: "Privacy", download: "Download", source: "Source" };
 
   let current = "home";
 
@@ -97,7 +101,7 @@ const labels = lang === "en"
     }
     if (!anchor) return;
     const id = anchor.dataset.section ?? anchor.getAttribute("href")?.slice(1) ?? "";
-    if (!["home", "features", "privacy", "download", "source"].includes(id)) return;
+    if (!["home", "features", "demo", "privacy", "download", "source"].includes(id)) return;
     if (!desktopMode.matches) return; // 移动端保持锚点滚动
     event.preventDefault();
     activate(id);
@@ -114,7 +118,7 @@ const labels = lang === "en"
 
   // hash 直达
   const initial = location.hash.slice(1);
-  if (["features", "privacy", "download", "source"].includes(initial)) {
+  if (["features", "demo", "privacy", "download", "source"].includes(initial)) {
     activate(initial, false);
   } else {
     activate("home", false);

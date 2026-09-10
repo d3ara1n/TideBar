@@ -10,8 +10,8 @@ const { lang = "en" } = Astro.props;
 const en = lang === "en";
 
 const titles = en
-  ? { features: "Features", privacy: "Privacy", download: "Download", source: "Source" }
-  : { features: "特色", privacy: "隐私", download: "下载", source: "源码" };
+  ? { features: "Features", demo: "Demo", privacy: "Privacy", download: "Download", source: "Source" }
+  : { features: "特色", demo: "演示", privacy: "隐私", download: "下载", source: "源码" };
 ---
 <main class="desktop" id="main-content">
   <div class="desktop-wallpaper" aria-hidden="true"></div>
@@ -87,6 +87,26 @@ const titles = en
             : "未读角标让细线保持轻微在场，不抢夺注意力；展开即确认。"}</p>
         </article>
       </div>
+    </div>
+  </section>
+
+  <section class="window" id="demo" data-window="demo" aria-label={titles.demo}>
+    <div class="window-titlebar">
+      <button class="window-close" type="button" data-close aria-label={en ? "Close window" : "关闭窗口"}>
+        <X strokeWidth={2.6} aria-hidden="true" />
+      </button>
+      <span class="window-dot yellow" aria-hidden="true"></span>
+      <span class="window-dot green" aria-hidden="true"></span>
+      <span class="window-title">{titles.demo}</span>
+    </div>
+    <div class="window-body">
+      <img
+        class="demo-shot"
+        src="/demo.webp"
+        width="1600"
+        height="1000"
+        alt={en ? "TideBar demo" : "汐实拍演示"}
+      />
     </div>
   </section>
 

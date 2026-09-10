@@ -59,15 +59,16 @@ const alternateLabel = lang === "en" ? "中文" : "EN";
         <a class="menubar-item" href="https://github.com/d3ara1n/TideBar/releases">
           <span>{lang === "en" ? "Releases" : "版本"}</span>
         </a>
+      </div>
+      <div class="menubar-side">
         <a class="menubar-item" href={alternatePath} hreflang={lang === "en" ? "zh-CN" : "en"}>
           <Languages aria-hidden="true" />
           <span>{alternateLabel}</span>
         </a>
-      </div>
-      <div class="menubar-side">
         <button class="menubar-item theme-toggle" type="button" aria-label={lang === "en" ? "Toggle color theme" : "切换颜色主题"}>
-          <Sun class="icon-sun" size={15} strokeWidth={1.8} aria-hidden="true" />
-          <Moon class="icon-moon" size={15} strokeWidth={1.8} aria-hidden="true" />
+          <Sun class="icon-sun" strokeWidth={1.8} aria-hidden="true" />
+          <Moon class="icon-moon" strokeWidth={1.8} aria-hidden="true" />
+          <span id="theme-label"></span>
         </button>
         <span class="menubar-clock" id="menubar-clock" aria-hidden="true"></span>
       </div>
@@ -77,8 +78,13 @@ const alternateLabel = lang === "en" ? "中文" : "EN";
 </html>
 
 <script>
-  // 主题切换：持久化到 localStorage，未手动选择时跟随系统
+  // 主题切换：持久化到 localStorage，未手动选择时跟随系统；
+  // 按钮文字显示目标主题（与语言切换显示目标语言一致）
   const root = document.documentElement;
+  const themeLabel = document.getElementById("theme-label");
+  const isZh = document.documentElement.lang === "zh-CN";
+  const labelFor = (theme?: string) =>
+    theme === "dark" ? (isZh ? "浅色" : "Light") : isZh ? "深色" : "Dark";
   const metas = [
     document.querySelector<HTMLMetaElement>('meta[name="theme-color"][media*="light"]'),
     document.querySelector<HTMLMetaElement>('meta[name="theme-color"][media*="dark"]'),
@@ -95,6 +101,7 @@ const alternateLabel = lang === "en" ? "中文" : "EN";
     const theme = event.matches ? "dark" : "light";
     root.dataset.theme = theme;
     applyMeta(theme);
+    themeLabel && (themeLabel.textContent = labelFor(theme));
   });
 
   document.querySelector(".theme-toggle")?.addEventListener("click", () => {
@@ -102,9 +109,11 @@ const alternateLabel = lang === "en" ? "中文" : "EN";
     root.dataset.theme = next;
     localStorage.setItem("tidebar-theme", next);
     applyMeta(next);
+    themeLabel && (themeLabel.textContent = labelFor(next));
   });
 
   applyMeta(root.dataset.theme === "dark" ? "dark" : "light");
+  themeLabel && (themeLabel.textContent = labelFor(root.dataset.theme));
 
   // 菜单栏时钟
   const clock = document.getElementById("menubar-clock");
