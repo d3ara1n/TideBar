@@ -1,0 +1,14 @@
+# GitHub 官方 release notes 的分组配置（--generate-notes）。
+# PR 打 label 进对应分组，不打则落入 Other Changes。
+changelog:
+  exclude:
+    labels: [chore-release]
+  categories:
+    - title: 🚀 Features
+      labels: [feature, enhancement]
+    - title: 🐛 Bug Fixes
+      labels: [bug, fix]
+    - title: 📚 Documentation
+      labels: [documentation]
+    - title: ⚙️ Other Changes
+      labels: ["*"]

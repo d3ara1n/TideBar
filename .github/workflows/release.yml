@@ -1,0 +1,59 @@
+name: Release
+
+on:
+    schedule:
+        - cron: "0 2 * * 1" # 每周一 UTC 02:00（北京 10:00）
+    workflow_dispatch:
+
+concurrency:
+    group: release
+    cancel-in-progress: false
+
+permissions:
+    contents: write
+
+jobs:
+    release:
+        runs-on: macos-15
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Compute version
+              id: ver
+              run: |
+                  version=$(./scripts/compute-version.sh)
+                  if [[ -z "$version" ]]; then
+                      echo "skip=true" >> "$GITHUB_OUTPUT"
+                      echo "无可发布变更（自上个 tag 起无 feat/fix/perf/refactor），本轮跳过"
+                  else
+                      echo "version=$version" >> "$GITHUB_OUTPUT"
+                      echo "下个版本: $version"
+                  fi
+
+            - name: Import signing identity
+              if: steps.ver.outputs.skip != 'true'
+              run: |
+                  echo "${{ secrets.MAC_SIGNING_P12 }}" | base64 -d > /tmp/signing.p12
+                  security create-keychain -p build /tmp/build.keychain-db
+                  security import /tmp/signing.p12 -k /tmp/build.keychain-db \
+                      -P "${{ secrets.MAC_SIGNING_P12_PASSWORD }}" -T /usr/bin/codesign
+                  security list-keychains -s /tmp/build.keychain-db \
+                      $(security list-keychains -d user | tr -d '"')
+                  security set-key-partition-list -S apple-tool:,apple: -s -k build /tmp/build.keychain-db
+
+            - name: Build and codesign app
+              if: steps.ver.outputs.skip != 'true'
+              run: |
+                  ./scripts/build-app.sh "${{ steps.ver.outputs.version }}"
+
+            - name: Tag and publish release
+              if: steps.ver.outputs.skip != 'true'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  ver="${{ steps.ver.outputs.version }}"
+                  gh release create "v$ver" "dist/TideBar-$ver.zip" \
+                      --target "$GITHUB_SHA" \
+                      --title "TideBar v$ver" --generate-notes
