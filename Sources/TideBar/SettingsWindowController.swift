@@ -550,19 +550,25 @@ private struct OverviewPage: View {
                        description: l10n.string("overview.header.description", table: .settings))
 
             Section {
-                Toggle(l10n.string("general.loginItem", table: .settings), isOn: Binding(
-                    get: { model.loginItemState == .enabled },
-                    set: { model.setLoginItem($0) }
-                ))
-                .disabled(model.loginItemState == .unavailableDev)
-                if model.loginItemState == .requiresApproval {
-                    Button(l10n.string("general.openLoginItemsSettings", table: .settings),
-                           action: model.openLoginItemsSettings)
+                if model.loginItemState == .unavailableDev {
+                    Text(l10n.string("general.loginItemDevHint", table: .settings))
+                        .foregroundStyle(.secondary)
+                } else {
+                    Toggle(l10n.string("general.loginItem", table: .settings), isOn: Binding(
+                        get: { model.loginItemState == .enabled },
+                        set: { model.setLoginItem($0) }
+                    ))
+                    if model.loginItemState == .requiresApproval {
+                        Button(l10n.string("general.openLoginItemsSettings", table: .settings),
+                               action: model.openLoginItemsSettings)
+                    }
                 }
             } header: {
                 Text(l10n.string("general.section", table: .settings))
             } footer: {
-                Text(footerText)
+                if let footerText {
+                    Text(footerText)
+                }
             }
 
             Section {
@@ -592,12 +598,12 @@ private struct OverviewPage: View {
         }
     }
 
-    private var footerText: String {
+    private var footerText: String? {
         switch model.loginItemState {
         case .requiresApproval:
             return l10n.string("general.loginItemRequiresApproval", table: .settings)
         case .unavailableDev:
-            return l10n.string("general.loginItemDevHint", table: .settings)
+            return nil
         case .enabled, .notRegistered:
             return l10n.string("general.loginItemFooter", table: .settings)
         }
@@ -1313,7 +1319,8 @@ private struct AboutPage: View {
             Section {
                 LabeledContent(l10n.string("about.systemRequirements", table: .settings),
                                value: l10n.string("about.requirementsValue", table: .settings))
-                LabeledContent(l10n.string("about.copyright", table: .settings), value: "© 2026 Chien Zhang")
+                LabeledContent(l10n.string("about.copyright", table: .settings),
+                               value: "© \(Calendar.current.component(.year, from: Date())) dearain")
                 LabeledContent(l10n.string("about.feedback", table: .settings)) {
                     Link("GitHub Issues", destination: feedbackURL)
                 }

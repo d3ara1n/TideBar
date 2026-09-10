@@ -395,9 +395,9 @@ private struct FinishStep: View {
                                                   table: .onboarding))
             }
 
-            Toggle(l10n.string("finish.launchAtLogin", table: .onboarding), isOn: $model.launchAtLogin)
-                .disabled(!model.canManageLoginItem)
-            if !model.canManageLoginItem {
+            if model.canManageLoginItem {
+                Toggle(l10n.string("finish.launchAtLogin", table: .onboarding), isOn: $model.launchAtLogin)
+            } else {
                 Text(l10n.string("finish.launchAtLoginDevNote", table: .onboarding))
                     .font(.caption)
                     .foregroundStyle(.tertiary)
