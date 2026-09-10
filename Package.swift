@@ -7,6 +7,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     dependencies: [
         .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "3.0.1"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.9.6"),
     ],
     targets: [
         .target(name: "TideBarCore", path: "Sources/TideBarCore"),
@@ -15,6 +16,7 @@ let package = Package(
             dependencies: [
                 "TideBarCore",
                 .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts"),
+                .product(name: "Sparkle", package: "Sparkle"),
             ],
             path: "Sources/TideBar",
             resources: [.process("Resources")]

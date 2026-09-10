@@ -19,6 +19,14 @@ mkdir -p "$STAGING/Contents/MacOS" "$STAGING/Contents/Resources"
 
 echo "── 组装 bundle ──"
 cp .build/release/TideBar "$STAGING/Contents/MacOS/"
+
+# Sparkle 为动态 framework（官方 Developer ID 签名，保留原签不重签）
+if [ -d .build/release/Sparkle.framework ]; then
+    mkdir -p "$STAGING/Contents/Frameworks"
+    cp -R .build/release/Sparkle.framework "$STAGING/Contents/Frameworks/"
+    # SPM 扁平布局的 rpath 是 @loader_path；bundle 内 framework 在 ../Frameworks
+    install_name_tool -add_rpath @loader_path/../Frameworks "$STAGING/Contents/MacOS/TideBar"
+fi
 cp -R .build/release/TideBar_TideBar.bundle "$STAGING/Contents/Resources/"
 cp brand/composer/AppIcon.icns "$STAGING/Contents/Resources/"
 
@@ -57,6 +65,10 @@ cat > "$STAGING/Contents/Info.plist" <<EOF
     <string>https://github.com/d3ara1n/TideBar/releases/latest/download/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string>nPOwF817jWyg1G9Cx/jk7uSH2NhNTBMdVJ7QdIGaAZk=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 </dict>

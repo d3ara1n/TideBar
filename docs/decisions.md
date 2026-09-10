@@ -211,9 +211,13 @@ killall Dock
 ## 自更新与发布管道（Sparkle）
 
 1. **Sparkle 2 作为专项依赖例外**：与 KeyboardShortcuts 同例，单用途事实标准，不构成通用 UI 大依赖先例；binary framework，接入时随包分发。
-2. **发布侧管道先行，应用侧后置**：EdDSA 密钥（私钥存 `~/.signing/tidebar/`，与签名证书同处；公钥固化在 Info.plist `SUPublicEDKey`）、`SUFeedURL` 指向 GitHub Releases 固定跳转、appcast 随 release 自动生成，均已落地；app 内无 Sparkle 代码时这些键无人消费，属预期，接入时不需改管道。
+2. **发布侧管道与应用侧一体落地**：EdDSA 密钥（私钥存 `~/.signing/tidebar/`，与签名证书同处；公钥固化在 Info.plist `SUPublicEDKey`）、`SUFeedURL` 指向 GitHub Releases 固定跳转、appcast 随 release 自动生成；应用侧 `UpdateCoordinator` 包装 `SPUStandardUpdaterController`，入口在设置页「关于」，自动检查每日一拍（`SUScheduledCheckInterval=86400`）。Sparkle.framework 随包分发（`Contents/Frameworks/`，保留官方 Developer ID 签名不重签，外层 app 签名封印嵌套完整性）。开发路径（swift run 裸可执行）不启动 updater，UI 禁用并提示，沿用「开发与发布启动路径分离」。
 3. **appcast 单条目**：每次发布全新生成，仅含最新版本；不维护历史条目，不回下载旧 zip。Sparkle 客户端拉最新条目即可完成任意旧版升级。
 4. **更新完整性走 EdDSA，与 codesign 独立**：自签证书不公证不影响更新可信性；首次下载仍需右键打开，属不公证路线既定代价。
+
+## 开机启动
+
+`SMAppService.mainApp`（macOS 13+ API）注册 app 本体为登录项，无后台 helper、无额外权限；用户可在系统设置 › 通用 › 登录项中管理，设置页开关与系统真值同步（开窗与操作后刷新，不轮询）。`requiresApproval` 状态提供系统设置引导。开发路径裸可执行无注册能力，开关禁用。
 
 ## 本地化与应用内语言切换
 

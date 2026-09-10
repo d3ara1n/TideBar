@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyAppearance()
         configureStatusItem()
         DockController.shared.start()
+        UpdateCoordinator.shared.start()
         controller.start()
         shortcutManager.onAction = { [weak self] action in
             self?.controller.handleShortcut(action)

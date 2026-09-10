@@ -1,5 +1,6 @@
 import AppKit
 import KeyboardShortcuts
+import ServiceManagement
 import SwiftUI
 import TideBarCore
 
@@ -82,6 +83,14 @@ private final class SettingsModel: ObservableObject {
         case manualRecovery
     }
 
+    /// 登录项当前状态；裸可执行（swift run）无注册能力。
+    enum LoginItemState {
+        case enabled
+        case notRegistered
+        case requiresApproval
+        case unavailableDev
+    }
+
     enum Operation: Equatable {
         case idle
         case working(OperationKind)
@@ -100,6 +109,7 @@ private final class SettingsModel: ObservableObject {
     @Published private(set) var reducedMotion: ReducedMotionPreference = .automatic
     @Published private(set) var fullscreenBehavior: FullscreenBehavior = .clickToExpand
     @Published private(set) var switcherCommitDelay: Double = 0.9
+    @Published private(set) var loginItemState: LoginItemState = .notRegistered
 
     private var observers: [NSObjectProtocol] = []
 
@@ -147,6 +157,7 @@ private final class SettingsModel: ObservableObject {
         reducedMotion = configuration.reducedMotion
         fullscreenBehavior = configuration.fullscreenBehavior
         switcherCommitDelay = configuration.switcherCommitDelay
+        refreshLoginItem()
     }
 
     func refreshDock() {
@@ -196,6 +207,37 @@ private final class SettingsModel: ObservableObject {
     func setSwitcherCommitDelay(_ value: Double) {
         switcherCommitDelay = value
         AppConfiguration.shared.switcherCommitDelay = value
+    }
+
+    func refreshLoginItem() {
+        guard UpdateCoordinator.isAppBundle else {
+            loginItemState = .unavailableDev
+            return
+        }
+        switch SMAppService.mainApp.status {
+        case .enabled: loginItemState = .enabled
+        case .requiresApproval: loginItemState = .requiresApproval
+        case .notRegistered, .notFound: loginItemState = .notRegistered
+        @unknown default: loginItemState = .notRegistered
+        }
+    }
+
+    func setLoginItem(_ enabled: Bool) {
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            NSLog("Login item operation failed: %@", String(describing: error))
+        }
+        refreshLoginItem()
+    }
+
+    func openLoginItemsSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     func restoreDefaultShortcuts() {
@@ -516,6 +558,22 @@ private struct OverviewPage: View {
                        description: l10n.string("overview.header.description", table: .settings))
 
             Section {
+                Toggle(l10n.string("general.loginItem", table: .settings), isOn: Binding(
+                    get: { model.loginItemState == .enabled },
+                    set: { model.setLoginItem($0) }
+                ))
+                .disabled(model.loginItemState == .unavailableDev)
+                if model.loginItemState == .requiresApproval {
+                    Button(l10n.string("general.openLoginItemsSettings", table: .settings),
+                           action: model.openLoginItemsSettings)
+                }
+            } header: {
+                Text(l10n.string("general.section", table: .settings))
+            } footer: {
+                Text(footerText)
+            }
+
+            Section {
                 statusCard
             }
 
@@ -539,6 +597,17 @@ private struct OverviewPage: View {
             Button(l10n.string("action.cancel", table: .settings), role: .cancel) {}
         } message: {
             Text(l10n.string("restore.confirmMessage", table: .settings))
+        }
+    }
+
+    private var footerText: String {
+        switch model.loginItemState {
+        case .requiresApproval:
+            return l10n.string("general.loginItemRequiresApproval", table: .settings)
+        case .unavailableDev:
+            return l10n.string("general.loginItemDevHint", table: .settings)
+        case .enabled, .notRegistered:
+            return l10n.string("general.loginItemFooter", table: .settings)
         }
     }
 
@@ -1197,6 +1266,7 @@ private struct PermissionsPage: View {
 
 private struct AboutPage: View {
     @Environment(\.l10n) private var l10n
+    @State private var automaticChecks = UpdateCoordinator.shared.automaticallyChecksForUpdates
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
             ?? l10n.string("about.devVersion", table: .settings)
@@ -1229,6 +1299,23 @@ private struct AboutPage: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+            }
+
+            Section {
+                if UpdateCoordinator.shared.isAvailable {
+                    Toggle(l10n.string("about.automaticChecks", table: .settings), isOn: $automaticChecks)
+                        .onChange(of: automaticChecks) { _, value in
+                            UpdateCoordinator.shared.automaticallyChecksForUpdates = value
+                        }
+                    Button(l10n.string("about.checkForUpdates", table: .settings)) {
+                        UpdateCoordinator.shared.checkForUpdates()
+                    }
+                } else {
+                    Text(l10n.string("about.updatesDevHint", table: .settings))
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text(l10n.string("about.updateSection", table: .settings))
             }
 
             Section {

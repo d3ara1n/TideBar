@@ -154,3 +154,15 @@
 "appearance.section.language" = "语言";
 "appearance.language" = "应用语言";
 "appearance.language.footer" = "切换立即应用到汐的所有界面。";
+
+// 通用与更新
+"general.section" = "通用";
+"general.loginItem" = "登录时启动 TideBar";
+"general.loginItemFooter" = "也可在系统设置 › 通用 › 登录项中管理。";
+"general.loginItemDevHint" = "仅正式 TideBar.app 中可用。";
+"general.loginItemRequiresApproval" = "待批准——请在系统设置 › 通用 › 登录项中允许 TideBar。";
+"general.openLoginItemsSettings" = "打开系统设置";
+"about.updateSection" = "软件更新";
+"about.checkForUpdates" = "检查更新…";
+"about.automaticChecks" = "自动检查更新";
+"about.updatesDevHint" = "正式 TideBar.app 中提供更新检查。";

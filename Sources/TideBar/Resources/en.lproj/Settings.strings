@@ -154,3 +154,15 @@
 "appearance.section.language" = "Language";
 "appearance.language" = "App language";
 "appearance.language.footer" = "Changes apply immediately across TideBar.";
+
+// 通用与更新
+"general.section" = "General";
+"general.loginItem" = "Launch TideBar at Login";
+"general.loginItemFooter" = "Also manageable in System Settings › General › Login Items.";
+"general.loginItemDevHint" = "Available in the release TideBar.app only.";
+"general.loginItemRequiresApproval" = "Approval pending — allow TideBar in System Settings › General › Login Items.";
+"general.openLoginItemsSettings" = "Open System Settings";
+"about.updateSection" = "Software Update";
+"about.checkForUpdates" = "Check for Updates…";
+"about.automaticChecks" = "Check for updates automatically";
+"about.updatesDevHint" = "Update checks are available in the release TideBar.app.";
