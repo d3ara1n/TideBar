@@ -87,6 +87,10 @@ final class OnboardingModel: ObservableObject {
     @Published private(set) var accessibilityTrusted = AXIsProcessTrusted()
     @Published private(set) var dockState: DockController.State = .notEnabled
     @Published private(set) var dockOperation: DockOperation = .idle
+    /// 登录自启勾选：opt-out，默认开启；完成向导时按终值生效。
+    @Published var launchAtLogin = true
+
+    var canManageLoginItem: Bool { UpdateCoordinator.isAppBundle }
 
     /// 「开始使用」「跳过引导」后由控制器关闭窗口。
     var onFinish: (() -> Void)?
@@ -157,8 +161,9 @@ final class OnboardingModel: ObservableObject {
     }
 
     /// 「跳过引导」与「开始使用」同等对待：只有用户明确结束向导才写入完成标记；
-    /// 中途关窗不写，下次启动重新打开向导。
+    /// 中途关窗不写，下次启动重新打开向导。登录自启按完成页勾选终值生效（opt-out 默认勾选）。
     func finish() {
+        LoginItem.set(launchAtLogin)
         AppConfiguration.shared.onboardingCompleted = true
         onFinish?()
     }

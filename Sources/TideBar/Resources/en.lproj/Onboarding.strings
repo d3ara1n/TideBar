@@ -71,3 +71,5 @@
 "finish.gesture.rightClickTitle" = "Right-click";
 "finish.gesture.rightClickDetail" = "Pin, hide, and quit";
 "finish.settingsNote" = "Appearance, fullscreen behavior, and shortcuts live in Settings; the TideBar icon in the menu bar opens Settings anytime.";
+"finish.launchAtLogin" = "Launch TideBar at Login";
+"finish.launchAtLoginDevNote" = "Available in the release TideBar.app.";

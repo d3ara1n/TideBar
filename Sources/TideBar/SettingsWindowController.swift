@@ -223,15 +223,7 @@ private final class SettingsModel: ObservableObject {
     }
 
     func setLoginItem(_ enabled: Bool) {
-        do {
-            if enabled {
-                try SMAppService.mainApp.register()
-            } else {
-                try SMAppService.mainApp.unregister()
-            }
-        } catch {
-            NSLog("Login item operation failed: %@", String(describing: error))
-        }
+        LoginItem.set(enabled)
         refreshLoginItem()
     }
 

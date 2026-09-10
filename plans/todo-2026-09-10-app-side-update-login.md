@@ -3,7 +3,7 @@
 ## 目标
 
 - [x] Sparkle 应用侧落地：SPM 依赖、framework 随包分发、AboutPage 检查更新入口与自动检查开关
-- [x] 开机启动管理：SMAppService 注册/注销，OverviewPage 开关，requiresApproval 引导
+- [x] 开机启动管理：SMAppService 注册/注销，OverviewPage 开关，requiresApproval 引导；向导完成页同步提供 opt-out 默认勾选（跳过与完成同效，按终值对称设置），LoginItem 统一入口
 - [x] build-app.sh 支持 framework 嵌套签名与自动检查默认键
 - [x] swift build + 本地打包验证（含 appcast 对新 zip 的解析）
 
