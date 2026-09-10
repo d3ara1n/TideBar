@@ -1,6 +1,5 @@
 ---
-import { ArrowDown, Check, ExternalLink } from "@lucide/astro";
-import MockDemo from "./MockDemo.astro";
+import { ArrowDown, Bell, Check, ChevronRight, CircleDot, CodeXml, LayoutList, Waves, X } from "@lucide/astro";
 import TideBarNav from "./TideBarNav.astro";
 
 interface Props {
@@ -9,108 +8,184 @@ interface Props {
 
 const { lang = "en" } = Astro.props;
 const en = lang === "en";
+
+const titles = en
+  ? { features: "Features", privacy: "Privacy", download: "Download", source: "Source" }
+  : { features: "特色", privacy: "隐私", download: "下载", source: "源码" };
 ---
-<main id="main-content">
-  <section class="hero section-shell" id="home" aria-labelledby="hero-title">
-    <div class="hero-copy">
-      <p class="eyebrow">{en ? "A zero-footprint window taskbar for macOS" : "macOS 零占用窗口任务栏"}</p>
-      <h1 id="hero-title">{en ? "A hairline at rest, a sea of windows at hand." : "平时是一条线，需要时是一片海。"}</h1>
-      <p class="hero-lede">
+<main class="desktop" id="main-content">
+  <div class="desktop-wallpaper" aria-hidden="true"></div>
+
+  <section class="desktop-hero" id="home" aria-labelledby="hero-title">
+    <p class="eyebrow">{en ? "A zero-footprint window taskbar for macOS" : "macOS 零占用窗口任务栏"}</p>
+    <h1 id="hero-title">
+      {en
+        ? <>A hairline at rest, <span class="headline-dim">a sea of windows at hand.</span></>
+        : <>平时是一条线，<span class="headline-dim">需要时是一片海。</span></>}
+    </h1>
+    <p class="lede">
+      {en
+        ? "TideBar disappears to the bottom edge until you need it, then brings every window within reach."
+        : "汐平时隐入屏幕底边，需要时展开而来，让每个窗口触手可及。"}
+    </p>
+    <div class="hero-actions">
+      <a class="button button-primary" href="#download" data-section-link="download">
+        <ArrowDown strokeWidth={2.2} aria-hidden="true" />
+        {en ? "Download for macOS" : "下载 macOS 版"}
+      </a>
+      <a class="text-link" href="#features" data-section-link="features">
+        {en ? "Explore the tide" : "了解潮汐交互"}
+        <ChevronRight strokeWidth={2.2} aria-hidden="true" />
+      </a>
+    </div>
+    <p class="hero-meta">{en ? "macOS 14+ · Accessibility only · Open source" : "macOS 14+ · 仅需辅助功能 · 开源"}</p>
+  </section>
+
+  <section class="window" id="features" data-window="features" aria-labelledby="features-title">
+    <div class="window-titlebar">
+      <button class="window-close" type="button" data-close aria-label={en ? "Close window" : "关闭窗口"}>
+        <X strokeWidth={2.6} aria-hidden="true" />
+      </button>
+      <span class="window-dot yellow" aria-hidden="true"></span>
+      <span class="window-dot green" aria-hidden="true"></span>
+      <span class="window-title">{titles.features}</span>
+    </div>
+    <div class="window-body">
+      <p class="eyebrow">{en ? "The tide in four movements" : "四种潮汐状态"}</p>
+      <h2 id="features-title">
         {en
-          ? "TideBar disappears to the bottom edge until you need it, then brings every window within reach."
-          : "汐平时隐入屏幕底边，需要时展开而来，让每个窗口触手可及。"}
-      </p>
-      <div class="hero-actions">
-        <a class="button button-primary" href="#download">
-          <ArrowDown size={17} strokeWidth={2} aria-hidden="true" />
-          {en ? "Download for macOS" : "下载 macOS 版"}
-        </a>
-        <a class="text-link" href="#features">{en ? "Explore the tide" : "了解潮汐交互"}</a>
-      </div>
-      <p class="hero-meta">{en ? "macOS 14+ · Accessibility only · Open source" : "macOS 14+ · 仅需辅助功能 · 开源"}</p>
-    </div>
-    <div class="hero-demo">
-      <MockDemo />
-      <p class="demo-note">{en ? "The final product recording will replace this placeholder." : "最终产品录制将替换此占位区域。"}</p>
-    </div>
-  </section>
-
-  <section class="section-band feature-band" id="features" aria-labelledby="features-title">
-    <div class="section-shell">
-      <div class="section-heading">
-        <p class="eyebrow">{en ? "The tide in four movements" : "四种潮汐状态"}</p>
-        <h2 id="features-title">{en ? "Quiet by default. Complete when called." : "默认安静，需要时完整出现。"}</h2>
-      </div>
+          ? <>Quiet by default. <span class="headline-dim">Complete when called.</span></>
+          : <>默认安静，<span class="headline-dim">需要时完整出现。</span></>}
+      </h2>
       <div class="feature-grid">
-        <article class="feature-item">
-          <span class="feature-index">01</span>
+        <article class="feature-card">
+          <span class="feature-chip"><Waves strokeWidth={1.8} aria-hidden="true" /></span>
           <h3>{en ? "Tide Line" : "汐线"}</h3>
-          <p>{en ? "A 2–3pt line hugs the bottom edge until your cursor calls it up." : "2–3pt 细线贴着屏幕底边，直到鼠标将它唤起。"}</p>
+          <p>{en
+            ? "A 2–3pt line hugs the bottom edge until your cursor calls it up."
+            : "2–3pt 细线贴着屏幕底边，直到鼠标将它唤起。"}</p>
         </article>
-        <article class="feature-item">
-          <span class="feature-index">02</span>
+        <article class="feature-card">
+          <span class="feature-chip"><CircleDot strokeWidth={1.8} aria-hidden="true" /></span>
           <h3>{en ? "Dots" : "点点"}</h3>
-          <p>{en ? "Window state is visible at a glance: active windows filled, minimized windows hollow." : "窗口状态一眼可见：活跃窗口实心，最小化窗口空心。"}</p>
+          <p>{en
+            ? "Window state is visible at a glance: active windows filled, minimized windows hollow."
+            : "窗口状态一眼可见：活跃窗口实心，最小化窗口空心。"}</p>
         </article>
-        <article class="feature-item">
-          <span class="feature-index">03</span>
+        <article class="feature-card">
+          <span class="feature-chip"><LayoutList strokeWidth={1.8} aria-hidden="true" /></span>
           <h3>{en ? "Surge" : "潮涌"}</h3>
-          <p>{en ? "Press and hold an app to reach any window, including the ones Dock left behind." : "长按应用即可直达任意窗口，包括被 Dock 带走的最小化窗口。"}</p>
+          <p>{en
+            ? "Press and hold an app to reach any window, including the ones Dock left behind."
+            : "长按应用即可直达任意窗口，包括被 Dock 带走的最小化窗口。"}</p>
         </article>
-        <article class="feature-item">
-          <span class="feature-index">04</span>
+        <article class="feature-card">
+          <span class="feature-chip"><Bell strokeWidth={1.8} aria-hidden="true" /></span>
           <h3>{en ? "Ripple" : "涟漪"}</h3>
-          <p>{en ? "Unread badges keep the line gently present, never loud. Opening the bar settles it." : "未读角标让细线保持轻微在场，不抢夺注意力；展开即确认。"}</p>
+          <p>{en
+            ? "Unread badges keep the line gently present, never loud. Opening the bar settles it."
+            : "未读角标让细线保持轻微在场，不抢夺注意力；展开即确认。"}</p>
         </article>
       </div>
     </div>
   </section>
 
-  <section class="section-shell privacy-section" id="privacy" aria-labelledby="privacy-title">
-    <div class="section-heading narrow-heading">
-      <p class="eyebrow">{en ? "Designed with restraint" : "克制的设计"}</p>
-      <h2 id="privacy-title">{en ? "One permission. No screen recording. No network." : "一项权限。不录屏。不联网。"}</h2>
-      <p>{en ? "TideBar uses Accessibility only to list and restore windows and detect fullscreen state. It never reads your screen or sends your data anywhere." : "汐仅使用辅助功能来列出、还原窗口并识别全屏状态。不读取屏幕内容，也不向任何地方发送数据。"}</p>
+  <section class="window" id="privacy" data-window="privacy" aria-labelledby="privacy-title">
+    <div class="window-titlebar">
+      <button class="window-close" type="button" data-close aria-label={en ? "Close window" : "关闭窗口"}>
+        <X strokeWidth={2.6} aria-hidden="true" />
+      </button>
+      <span class="window-dot yellow" aria-hidden="true"></span>
+      <span class="window-dot green" aria-hidden="true"></span>
+      <span class="window-title">{titles.privacy}</span>
     </div>
-    <div class="privacy-list">
-      <div class="privacy-row"><Check size={18} aria-hidden="true" /><span>{en ? "Accessibility only" : "仅需辅助功能"}</span></div>
-      <div class="privacy-row"><Check size={18} aria-hidden="true" /><span>{en ? "No window thumbnails" : "不显示窗口缩略图"}</span></div>
-      <div class="privacy-row"><Check size={18} aria-hidden="true" /><span>{en ? "No tracking or account" : "无追踪、无账号"}</span></div>
+    <div class="window-body">
+      <p class="eyebrow">{en ? "Designed with restraint" : "克制的设计"}</p>
+      <h2 id="privacy-title">
+        {en
+          ? <>One permission. <span class="headline-dim">No screen recording. No network.</span></>
+          : <>一项权限。<span class="headline-dim">不录屏。不联网。</span></>}
+      </h2>
+      <p class="lede">
+        {en
+          ? "TideBar uses Accessibility only to list and restore windows and detect fullscreen state. It never reads your screen or sends your data anywhere."
+          : "汐仅使用辅助功能来列出、还原窗口并识别全屏状态。不读取屏幕内容，也不向任何地方发送数据。"}
+      </p>
+      <div class="privacy-list">
+        <span class="privacy-pill"><Check strokeWidth={2.4} aria-hidden="true" />{en ? "Accessibility only" : "仅需辅助功能"}</span>
+        <span class="privacy-pill"><Check strokeWidth={2.4} aria-hidden="true" />{en ? "No window thumbnails" : "不显示窗口缩略图"}</span>
+        <span class="privacy-pill"><Check strokeWidth={2.4} aria-hidden="true" />{en ? "No tracking or account" : "无追踪、无账号"}</span>
+      </div>
     </div>
   </section>
 
-  <section class="section-band download-band" id="download" aria-labelledby="download-title">
-    <div class="section-shell download-layout">
-      <div>
-        <p class="eyebrow">{en ? "Give the bottom edge back" : "把屏幕底边还给你"}</p>
-        <h2 id="download-title">{en ? "A calmer way to reach every window." : "更安静地抵达每个窗口。"}</h2>
-      </div>
-      <div class="download-action">
+  <section class="window" id="download" data-window="download" aria-labelledby="download-title">
+    <div class="window-titlebar">
+      <button class="window-close" type="button" data-close aria-label={en ? "Close window" : "关闭窗口"}>
+        <X strokeWidth={2.6} aria-hidden="true" />
+      </button>
+      <span class="window-dot yellow" aria-hidden="true"></span>
+      <span class="window-dot green" aria-hidden="true"></span>
+      <span class="window-title">{titles.download}</span>
+    </div>
+    <div class="window-body">
+      <p class="eyebrow">{en ? "Give the bottom edge back" : "把屏幕底边还给你"}</p>
+      <h2 id="download-title">
+        {en
+          ? <>A calmer way to reach <span class="headline-dim">every window.</span></>
+          : <>更安静地抵达<span class="headline-dim">每个窗口。</span></>}
+      </h2>
+      <div class="window-actions">
         <a class="button button-primary" href="https://github.com/d3ara1n/TideBar/releases">
-          <ArrowDown size={17} strokeWidth={2} aria-hidden="true" />
+          <ArrowDown strokeWidth={2.2} aria-hidden="true" />
           {en ? "Download latest release" : "下载最新版本"}
         </a>
-        <p>{en ? "Free and open source under the MIT License." : "MIT 许可证下免费开源。"}</p>
+        <a class="button button-glass" href="https://github.com/d3ara1n/TideBar">
+          <CodeXml strokeWidth={1.8} aria-hidden="true" />
+          {en ? "View on GitHub" : "在 GitHub 查看"}
+        </a>
+      </div>
+      <p class="window-note">{en ? "Free and open source under the MIT License." : "MIT 许可证下免费开源。"}</p>
+    </div>
+  </section>
+
+  <section class="window" id="source" data-window="source" aria-labelledby="source-title">
+    <div class="window-titlebar">
+      <button class="window-close" type="button" data-close aria-label={en ? "Close window" : "关闭窗口"}>
+        <X strokeWidth={2.6} aria-hidden="true" />
+      </button>
+      <span class="window-dot yellow" aria-hidden="true"></span>
+      <span class="window-dot green" aria-hidden="true"></span>
+      <span class="window-title">{titles.source}</span>
+    </div>
+    <div class="window-body">
+      <p class="eyebrow">{en ? "Built in the open" : "开放构建"}</p>
+      <h2 id="source-title">
+        {en
+          ? <>Follow the work <span class="headline-dim">behind the tide.</span></>
+          : <>了解潮汐<span class="headline-dim">背后的构建过程。</span></>}
+      </h2>
+      <p class="lede">
+        {en
+          ? "Read the decisions, inspect the source, or help shape what TideBar becomes next."
+          : "阅读架构决策、查看源码，或一起塑造汐的下一步。"}
+      </p>
+      <div class="window-actions">
+        <a class="button button-glass" href="https://github.com/d3ara1n/TideBar">
+          <CodeXml strokeWidth={1.8} aria-hidden="true" />
+          d3ara1n/TideBar
+        </a>
+        <a class="text-link" style="align-self:center" href="https://github.com/d3ara1n/TideBar/releases">
+          {en ? "Release notes" : "版本记录"}
+          <ChevronRight strokeWidth={2.2} aria-hidden="true" />
+        </a>
       </div>
     </div>
   </section>
 
-  <section class="section-shell source-section" id="source" aria-labelledby="source-title">
-    <div class="source-copy">
-      <p class="eyebrow">{en ? "Built in the open" : "开放构建"}</p>
-      <h2 id="source-title">{en ? "Follow the work behind the tide." : "了解潮汐背后的构建过程。"}</h2>
-      <p>{en ? "Read the decisions, inspect the source, or help shape what TideBar becomes next." : "阅读架构决策、查看源码，或一起塑造汐的下一步。"}</p>
-    </div>
-    <a class="button button-secondary" href="https://github.com/d3ara1n/TideBar">
-      <ExternalLink size={17} strokeWidth={1.8} aria-hidden="true" />
-      {en ? "View on GitHub" : "在 GitHub 查看"}
-    </a>
-  </section>
-
-  <footer class="site-footer section-shell">
-    <span>TideBar · 汐</span>
-    <span>MIT License</span>
-    <a href={en ? "/zh/" : "/"}>{en ? "简体中文" : "English"}</a>
+  <footer class="desktop-corner">
+    <p>{en ? "TideBar · MIT License" : "汐 TideBar · MIT License"}</p>
+    <p class="corner-hint">{en ? "This page is the demo — hover the line below." : "这个页面本身就是演示——悬停下方细线。"}</p>
   </footer>
 </main>
 

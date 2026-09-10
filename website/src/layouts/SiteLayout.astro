@@ -1,5 +1,6 @@
 ---
 import "../styles/global.css";
+import { Languages, Moon, Sun } from "@lucide/astro";
 
 interface Props {
   title: string;
@@ -9,7 +10,7 @@ interface Props {
 
 const { title, description, lang = "en" } = Astro.props;
 const alternatePath = lang === "en" ? "/zh/" : "/";
-const alternateLabel = lang === "en" ? "简体中文" : "English";
+const alternateLabel = lang === "en" ? "中文" : "EN";
 ---
 <!doctype html>
 <html lang={lang === "en" ? "en" : "zh-CN"}>
@@ -17,21 +18,108 @@ const alternateLabel = lang === "en" ? "简体中文" : "English";
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#101319" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#d9edf3" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#061019" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="canonical" href={Astro.url.href} />
     <link rel="alternate" hreflang={lang === "en" ? "zh-CN" : "en"} href={`${Astro.site}${alternatePath}`} />
     <title>{title}</title>
+    <script is:inline>
+      (() => {
+        const root = document.documentElement;
+        root.classList.add("js");
+        const param = new URLSearchParams(location.search).get("theme");
+        const stored = localStorage.getItem("tidebar-theme");
+        const theme =
+          param === "light" || param === "dark"
+            ? param
+            : stored === "light" || stored === "dark"
+              ? stored
+              : matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
+        root.dataset.theme = theme;
+      })();
+    </script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">{lang === "en" ? "Skip to content" : "跳到内容"}</a>
-    <header class="site-header">
-      <a class="wordmark" href={lang === "en" ? "/" : "/zh/"} aria-label="TideBar home">
-        <span class="wordmark-mark" aria-hidden="true">~</span>
-        <span>TideBar</span>
-      </a>
-      <a class="language-link" href={alternatePath}>{alternateLabel}</a>
+    <header class="menubar">
+      <div class="menubar-side">
+        <a class="menubar-app" href="#home" data-section-link="home">
+          <span class="brand-mark" aria-hidden="true">
+            <img class="mark-for-light" src="/brand-light.svg" alt="" width="15" height="15" />
+            <img class="mark-for-dark" src="/brand-dark.svg" alt="" width="15" height="15" />
+          </span>
+          <span id="menubar-app-name">TideBar</span>
+        </a>
+        <a class="menubar-item" href="https://github.com/d3ara1n/TideBar">
+          <span>GitHub</span>
+        </a>
+        <a class="menubar-item" href="https://github.com/d3ara1n/TideBar/releases">
+          <span>{lang === "en" ? "Releases" : "版本"}</span>
+        </a>
+        <a class="menubar-item" href={alternatePath} hreflang={lang === "en" ? "zh-CN" : "en"}>
+          <Languages aria-hidden="true" />
+          <span>{alternateLabel}</span>
+        </a>
+      </div>
+      <div class="menubar-side">
+        <button class="menubar-item theme-toggle" type="button" aria-label={lang === "en" ? "Toggle color theme" : "切换颜色主题"}>
+          <Sun class="icon-sun" size={15} strokeWidth={1.8} aria-hidden="true" />
+          <Moon class="icon-moon" size={15} strokeWidth={1.8} aria-hidden="true" />
+        </button>
+        <span class="menubar-clock" id="menubar-clock" aria-hidden="true"></span>
+      </div>
     </header>
     <slot />
   </body>
 </html>
+
+<script>
+  // 主题切换：持久化到 localStorage，未手动选择时跟随系统
+  const root = document.documentElement;
+  const metas = [
+    document.querySelector<HTMLMetaElement>('meta[name="theme-color"][media*="light"]'),
+    document.querySelector<HTMLMetaElement>('meta[name="theme-color"][media*="dark"]'),
+  ];
+
+  const applyMeta = (theme: string) => {
+    const color = theme === "dark" ? "#061019" : "#d9edf3";
+    metas.forEach((meta) => meta && (meta.content = color));
+  };
+
+  const systemDark = matchMedia("(prefers-color-scheme: dark)");
+  systemDark.addEventListener("change", (event) => {
+    if (localStorage.getItem("tidebar-theme")) return;
+    const theme = event.matches ? "dark" : "light";
+    root.dataset.theme = theme;
+    applyMeta(theme);
+  });
+
+  document.querySelector(".theme-toggle")?.addEventListener("click", () => {
+    const next = root.dataset.theme === "dark" ? "light" : "dark";
+    root.dataset.theme = next;
+    localStorage.setItem("tidebar-theme", next);
+    applyMeta(next);
+  });
+
+  applyMeta(root.dataset.theme === "dark" ? "dark" : "light");
+
+  // 菜单栏时钟
+  const clock = document.getElementById("menubar-clock");
+  if (clock) {
+    const locale = document.documentElement.lang === "zh-CN" ? "zh-CN" : "en-US";
+    const format = () =>
+      new Date().toLocaleString(locale, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    const tick = () => (clock.textContent = format());
+    tick();
+    setInterval(tick, 20_000);
+  }
+</script>

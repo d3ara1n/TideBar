@@ -1,5 +1,5 @@
 ---
-import { Download, GitBranch, House, ShieldCheck, Sparkles } from "@lucide/astro";
+import { ArrowDown, CodeXml, House, ShieldCheck, Sparkles } from "@lucide/astro";
 
 interface Props {
   lang?: "en" | "zh";
@@ -11,60 +11,107 @@ const labels = lang === "en"
   : { home: "首页", features: "特色", privacy: "隐私", download: "下载", source: "源码" };
 ---
 <nav class="tide-nav" aria-label={lang === "en" ? "Main navigation" : "主导航"}>
-  <div class="tide-nav-hit-area">
-    <div class="tide-nav-inner">
-      <a class="tide-nav-item" href={lang === "en" ? "/" : "/zh/"} data-section="home" aria-label={labels.home}>
-        <House size={19} strokeWidth={1.8} aria-hidden="true" />
-        <span>{labels.home}</span>
+  <div class="tide-nav-hit">
+    <div class="tide-nav-line" aria-hidden="true"></div>
+    <div class="tide-nav-bar">
+      <a class="tide-nav-item" style="--i:0" href="#home" data-section="home" aria-label={labels.home}>
+        <span class="nav-icon tile-home"><House strokeWidth={1.9} aria-hidden="true" /></span>
+        <span class="nav-name">{labels.home}</span>
       </a>
-      <a class="tide-nav-item" href="#features" data-section="features" aria-label={labels.features}>
-        <Sparkles size={19} strokeWidth={1.8} aria-hidden="true" />
-        <span>{labels.features}</span>
+      <a class="tide-nav-item" style="--i:1" href="#features" data-section="features" aria-label={labels.features}>
+        <span class="nav-icon tile-features"><Sparkles strokeWidth={1.9} aria-hidden="true" /></span>
+        <span class="nav-name">{labels.features}</span>
       </a>
-      <a class="tide-nav-item" href="#privacy" data-section="privacy" aria-label={labels.privacy}>
-        <ShieldCheck size={19} strokeWidth={1.8} aria-hidden="true" />
-        <span>{labels.privacy}</span>
+      <a class="tide-nav-item" style="--i:2" href="#privacy" data-section="privacy" aria-label={labels.privacy}>
+        <span class="nav-icon tile-privacy"><ShieldCheck strokeWidth={1.9} aria-hidden="true" /></span>
+        <span class="nav-name">{labels.privacy}</span>
       </a>
-      <a class="tide-nav-item tide-nav-download" href="#download" data-section="download" aria-label={labels.download}>
-        <Download size={19} strokeWidth={1.8} aria-hidden="true" />
-        <span>{labels.download}</span>
+      <a class="tide-nav-item" style="--i:3" href="#download" data-section="download" aria-label={labels.download}>
+        <span class="nav-icon tile-download"><ArrowDown strokeWidth={1.9} aria-hidden="true" /></span>
+        <span class="nav-name">{labels.download}</span>
       </a>
-      <a class="tide-nav-item" href="#source" data-section="source" aria-label={labels.source}>
-        <GitBranch size={19} strokeWidth={1.8} aria-hidden="true" />
-        <span>{labels.source}</span>
+      <a class="tide-nav-item" style="--i:4" href="#source" data-section="source" aria-label={labels.source}>
+        <span class="nav-icon tile-source"><CodeXml strokeWidth={1.9} aria-hidden="true" /></span>
+        <span class="nav-name">{labels.source}</span>
       </a>
     </div>
   </div>
 </nav>
 
 <script>
+  const desktopMode = matchMedia("(min-width: 821px)");
   const nav = document.querySelector<HTMLElement>(".tide-nav");
+  const desktop = document.querySelector<HTMLElement>(".desktop");
   const items = [...document.querySelectorAll<HTMLAnchorElement>(".tide-nav-item[data-section]")];
-  const sections = items
-    .map((item) => document.getElementById(item.dataset.section ?? ""))
-    .filter((section): section is HTMLElement => section !== null);
+  const windows = [...document.querySelectorAll<HTMLElement>(".window[data-window]")];
+  const appName = document.getElementById("menubar-app-name");
+  const isZh = document.documentElement.lang === "zh-CN";
+  const appNames: Record<string, string> = isZh
+    ? { home: "汐", features: "特色", privacy: "隐私", download: "下载", source: "源码" }
+    : { home: "TideBar", features: "Features", privacy: "Privacy", download: "Download", source: "Source" };
 
-  const setActive = (id: string) => {
-    items.forEach((item) => item.toggleAttribute("aria-current", item.dataset.section === id));
-  };
+  let current = "home";
 
-  if (nav) {
-    nav.addEventListener("focusin", () => nav.classList.add("is-open"));
-    nav.addEventListener("focusout", (event) => {
-      if (!nav.contains(event.relatedTarget as Node | null)) nav.classList.remove("is-open");
-    });
+  function activate(id: string, syncHash = true) {
+    current = id;
+    const windowOpen = id !== "home";
+    desktop?.classList.toggle("has-window", windowOpen);
+    for (const win of windows) {
+      const active = win.dataset.window === id;
+      win.classList.toggle("is-active", active);
+      win.toggleAttribute("aria-hidden", !active);
+    }
+    for (const item of items) {
+      item.toggleAttribute("aria-current", item.dataset.section === id);
+    }
+    if (appName) {
+      appName.textContent = windowOpen ? `${appNames.home} — ${appNames[id]}` : appNames.home;
+    }
+    if (syncHash && desktopMode.matches) {
+      const url = windowOpen ? `#${id}` : location.pathname;
+      history.replaceState(null, "", url);
+    }
   }
 
-  if ("IntersectionObserver" in window && sections.length > 0) {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (visible) setActive(visible.target.id);
-      },
-      { rootMargin: "-20% 0px -60%", threshold: [0.1, 0.4, 0.7] }
-    );
-    sections.forEach((section) => observer.observe(section));
+  addEventListener("keydown", (event) => {
+    if (event.key === "Escape") activate("home");
+  });
+
+  // 触摸设备：点按汐线展开
+  nav?.querySelector(".tide-nav-line")?.addEventListener("click", () => nav.classList.toggle("is-open"));
+  nav?.addEventListener("focusin", () => nav.classList.add("is-open"));
+  nav?.addEventListener("focusout", (event) => {
+    if (!nav.contains(event.relatedTarget as Node | null)) nav.classList.remove("is-open");
+  });
+
+  // 桌面模式：导航/CTA/红灯点击 = 切换窗口（拦截锚点滚动）
+  document.addEventListener("click", (event) => {
+    const anchor = (event.target as Element).closest<HTMLAnchorElement>("a[href^='#']");
+    const closer = (event.target as Element).closest("[data-close]");
+    if (closer) {
+      activate("home");
+      return;
+    }
+    if (!anchor) return;
+    const id = anchor.dataset.section ?? anchor.getAttribute("href")?.slice(1) ?? "";
+    if (!["home", "features", "privacy", "download", "source"].includes(id)) return;
+    if (!desktopMode.matches) return; // 移动端保持锚点滚动
+    event.preventDefault();
+    activate(id);
+  });
+
+  // 点击桌面空白处回到桌面
+  desktop?.addEventListener("click", (event) => {
+    if (!desktopMode.matches) return;
+    if ((event.target as Element).closest(".window, .tide-nav, a, button")) return;
+    if (current !== "home") activate("home");
+  });
+
+  // hash 直达
+  const initial = location.hash.slice(1);
+  if (["features", "privacy", "download", "source"].includes(initial)) {
+    activate(initial, false);
+  } else {
+    activate("home", false);
   }
 </script>

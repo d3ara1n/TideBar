@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none" width="1024" height="1024">
+  <title>TideBar — Solid Orb</title>
+  <defs>
+    <clipPath id="water-cutout">
+      <path clip-rule="evenodd" d="M0 0H256V256H0Z M188 72a60 60 0 1 0-120 0a60 60 0 1 0 120 0Z"/>
+    </clipPath>
+  </defs>
+  <g id="waves" stroke="currentColor" stroke-width="12" stroke-linecap="round" color="#72C6D0">
+    <path d="M24 100C46 100 54 80 76 80C98 80 106 100 128 100C150 100 158 80 180 80C202 80 210 100 232 100" clip-path="url(#water-cutout)"/>
+    <path d="M24 144C46 144 54 124 76 124C98 124 106 144 128 144C150 144 158 124 180 124C202 124 210 144 232 144"/>
+    <path d="M24 188C46 188 54 168 76 168C98 168 106 188 128 188C150 188 158 168 180 168C202 168 210 188 232 188"/>
+  </g>
+  <g id="orb" fill="currentColor" color="#E7A09A">
+    <circle cx="128" cy="72" r="40"/>
+  </g>
+</svg>

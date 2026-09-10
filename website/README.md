@@ -13,4 +13,6 @@ npm run preview
 
 The site is deployed to GitHub Pages by `.github/workflows/website.yml` when files under `website/` change on `main`.
 
-The first version intentionally uses a CSS demo placeholder. Replace it with the final product recording in `src/components/MockDemo.astro` or a poster/video asset under `public/` without changing the navigation or page structure.
+The page itself is the product demo: a simulated macOS desktop where the bottom TideBar is the navigation that switches content windows — it rests as a breathing hairline and rises on hover, exactly like the app. Viewports ≤820px and no-JS fall back to a stacked scrolling layout with the same DOM.
+
+Useful query params for testing: `?theme=light|dark` overrides the color theme; a `#features`/`#privacy`/`#download`/`#source` hash deep-links into a window.
