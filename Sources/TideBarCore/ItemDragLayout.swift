@@ -12,6 +12,7 @@ public enum ItemDragPreview: Equatable, Sendable {
         case .reorder(let id, let before) where accepted: self = .reorder(id, before: before)
         case .insert(let references, let before) where accepted: self = .insert(count: references.count, before: before)
         case .deliver(_, let id): self = .receive(id, accepted: accepted)
+        case .deliverItem(_, let id): self = .receive(id, accepted: accepted)
         default: self = .none
         }
     }
@@ -51,7 +52,7 @@ public struct ItemDragLayout: Equatable, Sendable {
             let index = before.flatMap { order.firstIndex(of: $0) } ?? order.endIndex
             result.insert(.placeholder(count: count, before: before), at: index)
             slots = result
-        default: slots = order.map(Slot.item)
+        case .receive, .none: slots = order.map(Slot.item)
         }
     }
 

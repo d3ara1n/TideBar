@@ -7,6 +7,8 @@ public struct ItemKind: RawRepresentable, Codable, Hashable, Sendable {
     public static let application = Self(rawValue: "application")
     public static let file = Self(rawValue: "file")
     public static let directory = Self(rawValue: "directory")
+    /// TideBar 内联小工具；具体类型和实例配置由引用 payload 自己解释。
+    public static let widget = Self(rawValue: "widget")
 }
 
 public struct ItemID: RawRepresentable, Codable, Hashable, Sendable {
@@ -69,11 +71,13 @@ public enum ItemDropIntent: Equatable, Sendable {
     case reorder(ItemID, before: ItemID?)
     case insert([ItemReference], before: ItemID?)
     case deliver([ItemReference], to: ItemID)
+    /// 仅供应用条目投递给小工具；是否允许由接收方再次校验。
+    case deliverItem(ItemID, to: ItemID)
 
     public static func route(_ payload: ItemDragPayload, at location: ItemDropLocation) -> Self {
         switch payload {
         case .internalItem(let id):
-            // 内部引用永不转换为外部资源，即使目标拥有接收能力。
+            // 普通内部拖拽仍只做重排；widget 接收应用的窄例外由协调器识别。
             return .reorder(id, before: location.before)
         case .externalReferences(let references):
             if let target = location.target { return .deliver(references, to: target) }

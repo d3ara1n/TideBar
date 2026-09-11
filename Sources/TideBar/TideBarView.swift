@@ -449,6 +449,7 @@ final class TideBarView: NSView {
             expandGeneration += 1
             isExpandedState = true
             hoveredItemID = nil
+            iconRow.setActive(true)
             syncDragContext()
             iconRow.update(apps: apps, rebuildAll: true)
             if Motion.shouldReduceMotion {
@@ -511,6 +512,7 @@ final class TideBarView: NSView {
             expandGeneration += 1
             isExpandedState = false
             hoveredItemID = nil
+            iconRow.setActive(false)
             if immediate {
                 hardReset()
                 return

@@ -15,6 +15,15 @@ struct ItemPresentation {
     let name: String
     let icon: NSImage
     let isAvailable: Bool
+    /// nil 表示普通固定图标槽；小工具可声明自己的展开态宽度。
+    let preferredBarWidth: CGFloat?
+
+    init(name: String, icon: NSImage, isAvailable: Bool, preferredBarWidth: CGFloat? = nil) {
+        self.name = name
+        self.icon = icon
+        self.isAvailable = isAvailable
+        self.preferredBarWidth = preferredBarWidth
+    }
 }
 
 /// 提案只声明结果和执行入口；操作是否需要 resolve 不属于调用方契约。
@@ -40,6 +49,8 @@ extension ItemBehaviorProviding {
     func reveal(_ reference: ItemReference) throws { throw ItemFailure("item.error.reference") }
     func receive(_ references: [ItemReference], at target: ItemReference) -> ItemReceiveProposal? { nil }
     func surgeBody(for entry: ItemEntry, on screen: NSScreen) async -> AnySurgeBody? { nil }
+    /// 栏内自定义展示（小工具的图标位可完全自绘）；nil 走通用图标
+    func barArtwork(for entry: ItemEntry) -> AnyBarArtwork? { nil }
 }
 
 @MainActor
@@ -51,11 +62,21 @@ enum ItemBehaviors {
     ]
     static func provider(for kind: ItemKind) -> (any ItemBehaviorProviding)? { providers[kind] }
 
+    static func provider(for record: PinnedItemRecord) -> (any ItemBehaviorProviding)? {
+        if record.kind == .widget { return widgetProvider(for: record) }
+        return provider(for: record.kind)
+    }
+
+    static func provider(for entry: ItemEntry) -> (any ItemBehaviorProviding)? {
+        provider(for: PinnedItemRecord(id: entry.id, kind: entry.kind,
+                                       reference: entry.reference, fallbackName: entry.name))
+    }
+
     static func presentation(for record: PinnedItemRecord) -> ItemPresentation {
-        provider(for: record.kind)?.presentation(for: record)
+        provider(for: record)?.presentation(for: record)
             ?? ItemPresentation(name: record.fallbackName,
                                 icon: NSImage(systemSymbolName: "questionmark.square", accessibilityDescription: nil) ?? NSImage(),
-                                isAvailable: false)
+                                isAvailable: false, preferredBarWidth: nil)
     }
 }
 
@@ -67,7 +88,7 @@ private struct ApplicationItemBehavior: ItemBehaviorProviding {
         return ItemPresentation(name: url?.deletingPathExtension().lastPathComponent ?? record.fallbackName,
                                 icon: url.map { NSWorkspace.shared.icon(forFile: $0.path) }
                                     ?? NSWorkspace.shared.icon(for: .application),
-                                isAvailable: url != nil)
+                                isAvailable: url != nil, preferredBarWidth: nil)
     }
     func open(_ reference: ItemReference) async throws {
         guard let url = ItemReferences.applicationURL(reference) else { throw ItemFailure("item.error.missing") }
@@ -113,7 +134,7 @@ private struct FileItemBehavior: ItemBehaviorProviding {
         return ItemPresentation(name: url.map { FileManager.default.displayName(atPath: $0.path) } ?? record.fallbackName,
                                 icon: url.map { NSWorkspace.shared.icon(forFile: $0.path) }
                                     ?? NSWorkspace.shared.icon(for: isDirectory ? .folder : .data),
-                                isAvailable: url != nil)
+                                isAvailable: url != nil, preferredBarWidth: nil)
     }
     func open(_ reference: ItemReference) async throws {
         let url = try ItemReferences.fileURL(reference)

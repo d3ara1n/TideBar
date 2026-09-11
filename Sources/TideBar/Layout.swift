@@ -79,6 +79,16 @@ enum Layout {
     static let surgeFooterHeight: CGFloat = 18
     static let surgeFooterFontSize: CGFloat = 10.5
 
+    // 应用收藏夹潮涌体：面板尺寸固定、网格内部滚动；header 改名、footer 提示
+    static let launcherWidth: CGFloat = 300
+    static let launcherColumns = 4
+    static let launcherCellWidth: CGFloat = 72
+    static let launcherCellHeight: CGFloat = 68
+    static let launcherIconSide: CGFloat = 40
+    static let launcherVisibleRows = 3
+    static let launcherHeaderHeight: CGFloat = 34
+    static let launcherFooterHeight: CGFloat = 22
+
     // 接近热区（收起态触发展开）：胶囊外扩范围
     static let hotMarginX: CGFloat = 120
     static let hotMarginBelow: CGFloat = 18

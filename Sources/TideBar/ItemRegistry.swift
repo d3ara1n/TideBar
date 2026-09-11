@@ -13,6 +13,7 @@ struct ItemEntry: Identifiable {
     let reference: ItemReference
     let name: String
     let icon: NSImage
+    let preferredBarWidth: CGFloat?
     let isPinned: Bool
     let content: Content
 
@@ -24,7 +25,7 @@ struct ItemEntry: Identifiable {
         if case .reference(let available) = content { return available }
         return true
     }
-    var capabilities: ItemCapabilities { ItemBehaviors.provider(for: kind)?.capabilities ?? [] }
+    var capabilities: ItemCapabilities { ItemBehaviors.provider(for: self)?.capabilities ?? [] }
     /// 是否提供长按潮涌体（触发门槛查能力，不问条目内容）
     var canSurge: Bool { capabilities.contains(.surgeBody) }
     var canPin: Bool { isPinned || application?.bundleIdentifier != nil }
@@ -32,7 +33,7 @@ struct ItemEntry: Identifiable {
 
     func primaryClick() {
         if let application { application.primaryClick(); return }
-        guard capabilities.contains(.open), let behavior = ItemBehaviors.provider(for: kind) else { return }
+        guard capabilities.contains(.open), let behavior = ItemBehaviors.provider(for: self) else { return }
         Task {
             do { try await behavior.open(reference) }
             catch { ItemErrors.report(error) }
@@ -43,11 +44,12 @@ struct ItemEntry: Identifiable {
             NSWorkspace.shared.activateFileViewerSelecting([url])
             return
         }
-        do { try ItemBehaviors.provider(for: kind)?.reveal(reference) }
+        do { try ItemBehaviors.provider(for: self)?.reveal(reference) }
         catch { ItemErrors.report(error) }
     }
     func sameContent(as other: Self) -> Bool {
         id == other.id && kind == other.kind && reference == other.reference && name == other.name
+            && preferredBarWidth == other.preferredBarWidth
             && isPinned == other.isPinned && isAvailable == other.isAvailable
             && application?.contentRevision == other.application?.contentRevision && icon.isEqual(other.icon)
     }
@@ -117,7 +119,8 @@ final class ItemRegistry {
                 let presentation = presentations[record] ?? ItemBehaviors.presentation(for: record)
                 presentations[record] = presentation
                 result.append(ItemEntry(id: record.id, kind: record.kind, reference: record.reference,
-                                        name: presentation.name, icon: presentation.icon, isPinned: true,
+                                        name: presentation.name, icon: presentation.icon,
+                                        preferredBarWidth: presentation.preferredBarWidth, isPinned: true,
                                         content: .reference(isAvailable: presentation.isAvailable)))
             }
         }
@@ -149,7 +152,8 @@ final class ItemRegistry {
             ?? app.bundleIdentifier.flatMap { try? ItemReferences.application($0) }
             ?? ItemReference(scheme: "running-process", payload: Data(app.identity.description.utf8))
         return ItemEntry(id: .application(app.id), kind: .application, reference: reference,
-                         name: app.name, icon: app.icon, isPinned: record != nil, content: .application(app))
+                         name: app.name, icon: app.icon, preferredBarWidth: nil,
+                         isPinned: record != nil, content: .application(app))
     }
 
     func setPinned(_ pinned: Bool, for id: ItemID) {

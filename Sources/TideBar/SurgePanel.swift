@@ -325,6 +325,8 @@ final class AppSurgeView: NSView, SurgeBody {
 /// 无需成为 key：方向键由 app 级 local monitor 拦截，不依赖潮涌面板的 key 状态。
 @MainActor
 final class SurgePanel: NSPanel {
+    var allowsKey = false
+
     init(contentRect: NSRect) {
         super.init(contentRect: contentRect,
                    styleMask: [.borderless, .nonactivatingPanel],
@@ -341,13 +343,17 @@ final class SurgePanel: NSPanel {
         ignoresMouseEvents = false
     }
 
-    override var canBecomeKey: Bool { false }
+    override var canBecomeKey: Bool { allowsKey }
 }
 
 /// 潮涌容器视图：玻璃底（或回退深色卡）+ 体内容；材质归容器，体只画内容。
 @MainActor
 final class SurgeContainerView: NSView {
     let body: AnySurgeBody
+    var onDragEntered: ((any NSDraggingInfo) -> NSDragOperation)?
+    var onDragUpdated: ((any NSDraggingInfo) -> NSDragOperation)?
+    var onDragExited: ((any NSDraggingInfo)?) -> Void = { _ in }
+    var onPerformDrop: ((any NSDraggingInfo) -> Bool)?
     private let glass: NSView?
 
     init(body: AnySurgeBody) {
@@ -358,6 +364,7 @@ final class SurgeContainerView: NSView {
         if let glass {
             addSubview(glass)
         }
+        registerForDraggedTypes([.fileURL, ItemDragCoordinator.pasteboardType])
         body.frame = bounds
         addSubview(body)
     }
@@ -368,6 +375,26 @@ final class SurgeContainerView: NSView {
     override func layout() {
         super.layout()
         glass?.frame = bounds
+    }
+
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        onDragEntered?(sender) ?? []
+    }
+
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        onDragUpdated?(sender) ?? []
+    }
+
+    override func draggingExited(_ sender: (any NSDraggingInfo)?) {
+        onDragExited(sender)
+    }
+
+    override func prepareForDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        onPerformDrop != nil
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        onPerformDrop?(sender) ?? false
     }
 
     override func draw(_ dirtyRect: NSRect) {

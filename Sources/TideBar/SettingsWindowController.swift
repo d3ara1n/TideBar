@@ -332,25 +332,93 @@ private final class SettingsModel: ObservableObject {
         refreshPinnedApps()
     }
 
+    var widgets: [PinnedItemInfo] {
+        pinnedItems.filter { $0.record.kind == .widget }
+    }
+
+    var nonWidgetPinnedItems: [PinnedItemInfo] {
+        pinnedItems.filter { $0.record.kind != .widget }
+    }
+
+    func addApplicationLauncherWidget() {
+        do {
+            let name = WidgetReferences.defaultApplicationLauncherName()
+            let reference = try WidgetReferences.applicationLauncher(displayName: name)
+            let record = PinnedItemRecord(id: .resource(), kind: .widget,
+                                          reference: reference, fallbackName: name)
+            try PinnedItemStore.shared.replace(PinnedItemStore.shared.records + [record])
+        } catch { ItemErrors.report(error) }
+        refreshPinnedApps()
+    }
+
+    func removeWidget(_ widget: PinnedItemInfo) {
+        do { try PinnedItemStore.shared.remove([widget.id]) }
+        catch { ItemErrors.report(error) }
+        refreshPinnedApps()
+    }
+
+    func moveWidgets(from offsets: IndexSet, to destination: Int) {
+        let widgetIDs = widgets.map(\.id)
+        guard !offsets.isEmpty else { return }
+        let moving = offsets.sorted().compactMap { widgetIDs.indices.contains($0) ? widgetIDs[$0] : nil }
+        let remaining = widgetIDs.enumerated().filter { !offsets.contains($0.offset) }.map(\.element)
+        let adjusted = destination - offsets.filter { $0 < destination }.count
+        var next = remaining
+        next.insert(contentsOf: moving, at: min(max(0, adjusted), next.count))
+        let current = PinnedItemStore.shared.records
+        let byID = Dictionary(uniqueKeysWithValues: current.map { ($0.id, $0) })
+        var cursor = 0
+        var result: [PinnedItemRecord] = []
+        for record in current {
+            if record.kind == .widget {
+                if cursor < next.count, let replacement = byID[next[cursor]] { result.append(replacement) }
+                cursor += 1
+            } else { result.append(record) }
+        }
+        do { try PinnedItemStore.shared.replace(result) }
+        catch { ItemErrors.report(error) }
+        refreshPinnedApps()
+    }
+
     func removePinned(at offsets: IndexSet) {
-        let values = offsets.compactMap { pinnedItems.indices.contains($0) ? pinnedItems[$0].id : nil }
+        let values = offsets.compactMap { nonWidgetPinnedItems.indices.contains($0) ? nonWidgetPinnedItems[$0].id : nil }
         do { try PinnedItemStore.shared.remove(Set(values)) }
         catch { ItemErrors.report(error) }
         refreshPinnedApps()
     }
 
     func movePinned(from offsets: IndexSet, to destination: Int) {
-        AppConfiguration.shared.movePinned(from: offsets, to: destination)
+        let visible = nonWidgetPinnedItems
+        let moving = offsets.sorted().compactMap { visible.indices.contains($0) ? visible[$0].id : nil }
+        guard !moving.isEmpty else { return }
+        var remaining = visible.map(\.id)
+        for id in moving { remaining.removeAll { $0 == id } }
+        let adjusted = min(max(0, destination - offsets.filter { $0 < destination }.count), remaining.count)
+        remaining.insert(contentsOf: moving, at: adjusted)
+        let byID = Dictionary(uniqueKeysWithValues: PinnedItemStore.shared.records.map { ($0.id, $0) })
+        var cursor = 0
+        var result: [PinnedItemRecord] = []
+        for record in PinnedItemStore.shared.records {
+            if record.kind == .widget { result.append(record) }
+            else if cursor < remaining.count, let replacement = byID[remaining[cursor]] {
+                result.append(replacement); cursor += 1
+            }
+        }
+        do { try PinnedItemStore.shared.replace(result) }
+        catch { ItemErrors.report(error) }
         refreshPinnedApps()
     }
 
     func removePinned(_ app: PinnedItemInfo) {
-        guard let index = pinnedItems.firstIndex(where: { $0.id == app.id }) else { return }
-        removePinned(at: IndexSet(integer: index))
+        do { try PinnedItemStore.shared.remove([app.id]) }
+        catch { ItemErrors.report(error) }
+        refreshPinnedApps()
     }
 
     func restoreDefaultPinned() {
-        AppConfiguration.shared.restoreDefaultPinned()
+        do {
+            try PinnedItemStore.shared.restoreDefaultApplicationsPreservingWidgets()
+        } catch { ItemErrors.report(error) }
         refreshPinnedApps()
     }
 
@@ -383,6 +451,7 @@ private struct PinnedApplication: Identifiable, Equatable {
 private enum SettingsPage: String, CaseIterable, Identifiable {
     case overview
     case pinned
+    case widgets
     case windows
     case appearance
     case shortcuts
@@ -398,6 +467,7 @@ private enum SettingsPage: String, CaseIterable, Identifiable {
         switch self {
         case .overview: return "rectangle.grid.1x2"
         case .pinned: return "pin"
+        case .widgets: return "square.grid.2x2"
         case .windows: return "macwindow.on.rectangle"
         case .appearance: return "paintbrush"
         case .shortcuts: return "keyboard"
@@ -419,6 +489,7 @@ private struct SettingsRootView: View {
                 Section(l10n.string("sidebar.section.app", table: .settings)) {
                     pageRow(.overview)
                     pageRow(.pinned)
+                    pageRow(.widgets)
                     pageRow(.windows)
                     pageRow(.appearance)
                     pageRow(.shortcuts)
@@ -438,6 +509,7 @@ private struct SettingsRootView: View {
                 switch selection ?? .overview {
                 case .overview: OverviewPage(model: model)
                 case .pinned: PinnedPage(model: model)
+                case .widgets: WidgetsPage(model: model)
                 case .windows: WindowsPage(model: model)
                 case .appearance: AppearancePage(model: model)
                 case .shortcuts: ShortcutsPage(model: model)
@@ -660,12 +732,12 @@ private struct PinnedPage: View {
                        description: l10n.string("pinned.header.description", table: .settings))
 
             Section {
-                if model.pinnedItems.isEmpty {
+                if model.nonWidgetPinnedItems.isEmpty {
                     Text(l10n.string("pinned.empty", table: .settings))
                         .foregroundStyle(.secondary)
                 } else {
                     List {
-                        ForEach(model.pinnedItems) { app in
+                        ForEach(model.nonWidgetPinnedItems) { app in
                             PinnedRow(app: app) {
                                 model.removePinned(app)
                             }
@@ -698,6 +770,162 @@ private struct PinnedPage: View {
             Button(l10n.string("pinned.reset", table: .settings), role: .destructive, action: model.restoreDefaultPinned)
             Button(l10n.string("action.cancel", table: .settings), role: .cancel) {}
         }
+    }
+}
+
+private struct WidgetsPage: View {
+    @Environment(\.l10n) private var l10n
+    @ObservedObject var model: SettingsModel
+    @State private var pendingRemoval: PinnedItemInfo?
+    @State private var isShowingWidgetPicker = false
+
+    var body: some View {
+        Form {
+            PageHeader(title: l10n.string("page.widgets", table: .settings),
+                       description: l10n.string("widgets.header.description", table: .settings))
+            Section {
+                if model.widgets.isEmpty {
+                    Text(l10n.string("widgets.empty", table: .settings))
+                        .foregroundStyle(.secondary)
+                } else {
+                    List {
+                        ForEach(model.widgets) { widget in
+                            WidgetRow(widget: widget) {
+                                pendingRemoval = widget
+                            }
+                        }
+                        .onMove { offsets, destination in
+                            model.moveWidgets(from: offsets, to: destination)
+                        }
+                    }
+                    .frame(minHeight: 140, maxHeight: 260)
+                }
+                Button(l10n.string("widgets.add", table: .settings), action: { isShowingWidgetPicker = true })
+            } header: {
+                Text(l10n.string("widgets.section.header", table: .settings))
+            } footer: {
+                Text(l10n.string("widgets.section.footer", table: .settings))
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle(l10n.string("page.widgets", table: .settings))
+        .sheet(isPresented: $isShowingWidgetPicker) {
+            WidgetPickerSheet(model: model)
+        }
+        .confirmationDialog(l10n.string("widgets.removeConfirmTitle", table: .settings),
+                            isPresented: Binding(get: { pendingRemoval != nil },
+                                                 set: { if !$0 { pendingRemoval = nil } })) {
+            if let widget = pendingRemoval {
+                Button(l10n.string("widgets.removeConfirmAction", table: .settings), role: .destructive) {
+                    model.removeWidget(widget)
+                    pendingRemoval = nil
+                }
+            }
+            Button(l10n.string("action.cancel", table: .settings), role: .cancel) { pendingRemoval = nil }
+        } message: {
+            Text(l10n.string("widgets.removeConfirmMessage", table: .settings,
+                             arguments: pendingRemoval?.name ?? ""))
+        }
+    }
+}
+
+/// 小工具行：与固定项目行同一交互范式（悬停显移除、拖把排序、右键移除）。
+private struct WidgetRow: View {
+    @Environment(\.l10n) private var l10n
+    let widget: PinnedItemInfo
+    let onRemove: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(nsImage: widget.icon)
+                .resizable()
+                .frame(width: 28, height: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(widget.name)
+                Text(l10n.string("widgets.applicationLauncher", table: .settings))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if isHovered {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 18, height: 18)
+                        .background(Circle().fill(.red))
+                }
+                .buttonStyle(.plain)
+                .help(l10n.string("action.remove", table: .settings))
+                .transition(.opacity)
+            }
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.tertiary)
+                .onHover { hovering in
+                    if hovering {
+                        NSCursor.openHand.push()
+                    } else {
+                        NSCursor.pop()
+                    }
+                }
+                .help(l10n.string("pinned.dragHelp", table: .settings))
+        }
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.12)) { isHovered = hovering }
+        }
+        .contextMenu {
+            Button(l10n.string("action.remove", table: .settings), role: .destructive, action: onRemove)
+        }
+    }
+}
+
+private struct WidgetPickerSheet: View {
+    @Environment(\.l10n) private var l10n
+    @ObservedObject var model: SettingsModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(l10n.string("widgets.picker.title", table: .settings))
+                .font(.title3.weight(.semibold))
+            Button {
+                model.addApplicationLauncherWidget()
+                dismiss()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "square.grid.2x2")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 36, height: 36)
+                        .background(Color.accentColor.opacity(0.12),
+                                    in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(l10n.string("widgets.applicationLauncher", table: .settings))
+                        Text(l10n.string("widgets.applicationLauncher.description", table: .settings))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(.quaternary.opacity(0.5),
+                            in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            Spacer()
+            Text(l10n.string("widgets.picker.footer", table: .settings))
+                .font(.callout).foregroundStyle(.secondary)
+        }
+        .padding(20)
+        .frame(width: 360, height: 190)
     }
 }
 

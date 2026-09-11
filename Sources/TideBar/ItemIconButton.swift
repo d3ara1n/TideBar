@@ -189,6 +189,7 @@ private final class BadgeOverlayView: PassthroughView {
 @MainActor
 final class ItemIconButton: NSView {
     private(set) var entry: ItemEntry
+    var preferredWidth: CGFloat { customArtworkView?.preferredWidth ?? entry.preferredBarWidth ?? Layout.iconSlot }
     var onClick: ((ItemEntry) -> Void)?
     /// 调用方拥有拖拽 source；按钮只处理手势，不承载跨收起／重建的会话。
     var onBeginDrag: ((ItemIconButton, NSEvent) -> Bool)?
@@ -209,9 +210,12 @@ final class ItemIconButton: NSView {
     private let visualContainer = PassthroughView(frame: .zero)
     private let haloView = HoverHaloView(frame: .zero)
     private let artworkView: IconArtworkView
+    private let customArtworkView: AnyBarArtwork?
     private let statusIndicatorView: AppStatusIndicatorView
     private let badgeView: BadgeOverlayView
     private var dragState: ItemDragIconState = .idle
+    /// 自定义 artwork 可关闭共享悬停特效（浮起/压下/光晕），完全自绘反馈
+    private var usesSharedHoverEffects: Bool { customArtworkView?.usesSharedHoverEffects ?? true }
     private var hovering = false
     private var keyboardSelected = false
     private var pressed = false
@@ -225,9 +229,11 @@ final class ItemIconButton: NSView {
     init(entry: ItemEntry) {
         self.entry = entry
         self.artworkView = IconArtworkView(icon: entry.icon)
+        self.customArtworkView = entry.kind == .widget
+            ? ItemBehaviors.provider(for: entry)?.barArtwork(for: entry) : nil
         self.statusIndicatorView = AppStatusIndicatorView(entry: entry.application)
         self.badgeView = BadgeOverlayView(value: entry.badge)
-        super.init(frame: NSRect(x: 0, y: 0, width: Layout.iconSlot, height: Layout.expandedHeight))
+        super.init(frame: NSRect(x: 0, y: 0, width: entry.preferredBarWidth ?? Layout.iconSlot, height: Layout.expandedHeight))
         wantsLayer = true   // 根层只承担整栏错峰升降，hover 使用独立视觉层避免 transform 争用
         motionPivot.wantsLayer = true
         motionPivot.layer?.masksToBounds = false
@@ -235,7 +241,11 @@ final class ItemIconButton: NSView {
         artworkView.wantsLayer = true
         visualContainer.addSubview(haloView)
         visualContainer.addSubview(artworkView)
+        if let customArtworkView { visualContainer.addSubview(customArtworkView) }
         visualContainer.addSubview(badgeView)
+        artworkView.isHidden = customArtworkView != nil
+        statusIndicatorView.isHidden = customArtworkView != nil
+        badgeView.isHidden = customArtworkView != nil
         motionPivot.addSubview(visualContainer)
         addSubview(statusIndicatorView)
         addSubview(motionPivot)
@@ -254,11 +264,16 @@ final class ItemIconButton: NSView {
         let badgeChanged = newEntry.badge != entry.badge
         entry = newEntry
         if iconChanged { artworkView.icon = newEntry.icon }
+        customArtworkView?.update(entry: newEntry)
         statusIndicatorView.update(entry: newEntry.application, animated: statusChanged)
         if badgeChanged { badgeView.update(newEntry.badge, animated: true) }
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    func setActive(_ active: Bool) {
+        customArtworkView?.setActive(active)
+    }
 
     func refreshLayout() {
         needsLayout = true
@@ -271,17 +286,19 @@ final class ItemIconButton: NSView {
     override func layout() {
         super.layout()
         statusIndicatorView.frame = bounds
-        let side = Layout.iconVisualSide
+        let side = customArtworkView == nil ? Layout.iconVisualSide : max(bounds.height - 8, 1)
+        let contentWidth = customArtworkView == nil ? side : min(bounds.width, preferredWidth)
         motionPivot.frame = NSRect(x: bounds.midX,
                                    y: (bounds.height - side) / 2,
                                    width: 1,
                                    height: 1)
-        visualContainer.frame = NSRect(x: -side / 2,
+        visualContainer.frame = NSRect(x: -contentWidth / 2,
                                        y: 0,
-                                       width: side,
+                                       width: contentWidth,
                                        height: side)
         haloView.frame = visualContainer.bounds
         artworkView.frame = visualContainer.bounds
+        customArtworkView?.frame = visualContainer.bounds
         badgeView.frame = visualContainer.bounds
     }
 
@@ -308,7 +325,7 @@ final class ItemIconButton: NSView {
     func setKeyboardSelected(_ on: Bool) {
         guard keyboardSelected != on else { return }
         keyboardSelected = on
-        guard !dragState.suppressesHover, let layer = haloView.layer else { return }
+        guard usesSharedHoverEffects, !dragState.suppressesHover, let layer = haloView.layer else { return }
         let opacity: Float = on ? 0.72 : (hovering ? (pressed ? 0.82 : 1) : 0)
         Motion.basic(layer, keyPath: "opacity", to: opacity,
                      duration: Motion.shouldReduceMotion ? Motion.reducedMotionFadeDuration : Motion.hoverEnterDuration)
@@ -320,7 +337,8 @@ final class ItemIconButton: NSView {
             ItemDragStyle.suppressHover(pivot: visualLayer, halo: haloLayer)
             return
         }
-        let haloOpacity: Float = hovering ? (pressed ? 0.82 : 1) : (keyboardSelected ? 0.72 : 0)
+        let haloOpacity: Float = usesSharedHoverEffects
+            ? (hovering ? (pressed ? 0.82 : 1) : (keyboardSelected ? 0.72 : 0)) : 0
 
         if Motion.shouldReduceMotion {
             visualLayer.removeAnimation(forKey: "motion.transform.translation.y")
@@ -343,8 +361,8 @@ final class ItemIconButton: NSView {
         let scale: CGFloat
         switch transition {
         case .enter:
-            offset = Motion.hoverLift
-            scale = Motion.hoverScale
+            offset = usesSharedHoverEffects ? Motion.hoverLift : 0
+            scale = usesSharedHoverEffects ? Motion.hoverScale : 1
             Motion.spring(visualLayer, keyPath: "transform.translation.y", to: offset,
                           stiffness: Motion.hoverStiffness, damping: Motion.hoverDamping,
                           minDuration: Motion.hoverEnterDuration)
@@ -363,8 +381,8 @@ final class ItemIconButton: NSView {
             Motion.basic(haloLayer, keyPath: "opacity", to: haloOpacity,
                          duration: Motion.hoverExitDuration, curve: .easeIn)
         case .press:
-            offset = Motion.pressOffset
-            scale = Motion.pressScale
+            offset = usesSharedHoverEffects ? Motion.pressOffset : 0
+            scale = usesSharedHoverEffects ? Motion.pressScale : 1
             Motion.basic(visualLayer, keyPath: "transform.translation.y", to: offset,
                          duration: Motion.pressDuration)
             Motion.basic(visualLayer, keyPath: "transform.scale", to: scale,
@@ -401,7 +419,8 @@ final class ItemIconButton: NSView {
         if !surged, let origin = mouseDownScreenPoint,
            let point = window?.convertPoint(toScreen: event.locationInWindow),
            hypot(point.x - origin.x, point.y - origin.y) >= Layout.itemDragThreshold,
-           let onBeginDrag {
+           let onBeginDrag, entry.kind != .widget {
+            // widget 实例只能在设置页添加/移除；其内部内容另由潮涌体编辑。
             // 先撤销长按和点击，再进入可能嵌套事件追踪的 AppKit 拖拽调用。
             dragAttempted = true
             pressTimer?.invalidate()
@@ -443,6 +462,8 @@ final class ItemIconButton: NSView {
     // MARK: 右键菜单
 
     override func menu(for event: NSEvent) -> NSMenu? {
+        // widget 实例的存在性只能由设置页管理，避免出现“固定/取消固定”歧义菜单。
+        guard entry.kind != .widget else { return nil }
         let menu = NSMenu()
         menuActions.removeAll()
         let identity = entry.id

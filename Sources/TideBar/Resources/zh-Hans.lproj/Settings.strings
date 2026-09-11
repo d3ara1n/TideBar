@@ -15,6 +15,7 @@
 "sidebar.section.system" = "系统";
 "page.overview" = "概览";
 "page.pinned" = "固定项目";
+"page.widgets" = "小工具";
 "page.windows" = "窗口管理";
 "page.appearance" = "外观与交互";
 "page.shortcuts" = "快捷键";
@@ -73,6 +74,18 @@
 "pinned.selectedCount" = "已选 %ld 项";
 "pinned.addShort" = "添加";
 "pinned.pinnedBadge" = "已固定";
+"widgets.header.description" = "添加和移除汐的小工具。每个小工具的数据都保存在自己的汐条目中。";
+"widgets.empty" = "还没有小工具。";
+"widgets.add" = "添加小工具…";
+"widgets.section.header" = "汐上的小工具";
+"widgets.section.footer" = "在这里调整小工具顺序。小工具内容在各自的潮涌面板中编辑。";
+"widgets.applicationLauncher" = "应用收藏夹";
+"widgets.applicationLauncher.description" = "把常用应用收进潮涌里，一点即用。";
+"widgets.picker.title" = "添加小工具";
+"widgets.picker.footer" = "小工具的内容和名称在各自的潮涌面板中编辑。";
+"widgets.removeConfirmTitle" = "移除这个小工具？";
+"widgets.removeConfirmAction" = "移除小工具";
+"widgets.removeConfirmMessage" = "移除 %@ 并清除它保存的内容？";
 
 // 窗口管理
 "windows.header.description" = "汐的核心能力：让最小化窗口和多个窗口都能被直接找到。";

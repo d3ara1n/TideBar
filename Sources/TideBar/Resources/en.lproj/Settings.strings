@@ -15,6 +15,7 @@
 "sidebar.section.system" = "System";
 "page.overview" = "Overview";
 "page.pinned" = "Pinned Items";
+"page.widgets" = "Widgets";
 "page.windows" = "Window Management";
 "page.appearance" = "Appearance & Interaction";
 "page.shortcuts" = "Shortcuts";
@@ -73,6 +74,18 @@
 "pinned.selectedCount" = "%ld selected";
 "pinned.addShort" = "Add";
 "pinned.pinnedBadge" = "Pinned";
+"widgets.header.description" = "Add and remove TideBar widgets. Each widget keeps its own data inside the TideBar item.";
+"widgets.empty" = "No widgets yet.";
+"widgets.add" = "Add Widget…";
+"widgets.section.header" = "Widgets on TideBar";
+"widgets.section.footer" = "Reorder widgets here. Widget contents are edited inline in their Surge panel.";
+"widgets.applicationLauncher" = "Application Launcher";
+"widgets.applicationLauncher.description" = "Keep favorite applications one surge away.";
+"widgets.picker.title" = "Add a Widget";
+"widgets.picker.footer" = "Widget contents and names are edited inline in each widget's Surge panel.";
+"widgets.removeConfirmTitle" = "Remove this widget?";
+"widgets.removeConfirmAction" = "Remove Widget";
+"widgets.removeConfirmMessage" = "Remove %@ and clear its saved contents?";
 
 // 窗口管理
 "windows.header.description" = "TideBar's core skill: minimized windows and extra windows all become directly reachable.";

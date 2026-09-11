@@ -34,6 +34,10 @@ final class ItemRowView: NSView {
     private var hitLatch = ItemDragHitLatch()
     private var projected: ItemDragLayout { ItemDragLayout(order: buttons.map(\.entry.id), preview: preview) }
     var extraPreviewSlots: Int { max(0, projected.slots.count - buttons.count) }
+    var preferredContentWidth: CGFloat {
+        guard preview == .none else { return CGFloat(projected.slots.count) * Layout.iconSlot }
+        return buttons.reduce(0) { $0 + $1.preferredWidth }
+    }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -131,8 +135,13 @@ final class ItemRowView: NSView {
         let button = ItemIconButton(entry: app)
         button.onBeginDrag = onBeginDrag
         button.onClick = { [weak self] entry in
-            self?.onUserLaunch?()
-            self?.onLaunch?(entry)
+            guard let self else { return }
+            self.onUserLaunch?()
+            if entry.kind == .widget {
+                self.onSurge?(entry, button.frame)
+            } else {
+                self.onLaunch?(entry)
+            }
         }
         button.onSetHidden = { [weak self] identity, hidden in self?.onSetHidden?(identity, hidden) }
         button.onTerminate = { [weak self] identity in self?.onTerminate?(identity) }
@@ -204,6 +213,23 @@ final class ItemRowView: NSView {
     func dropLocation(at point: NSPoint) -> ItemDropLocation {
         let screenPoint = screenRect(NSRect(origin: point, size: .zero)).origin
         if let retained = hitLatch.retained(at: screenPoint) { return retained }
+        let internalApplicationCanDeliver = liftedSource.flatMap { sourceID in
+            buttons.first(where: { $0.entry.id == sourceID })?.entry.kind == .application
+        } == true
+        if case .receive(let targetID, _) = preview, internalApplicationCanDeliver {
+            return ItemDropLocation(target: targetID, before: nil)
+        }
+        if preview == .none, !buttons.isEmpty {
+            let candidates = buttons.sorted { $0.frame.minX < $1.frame.minX }
+            if let target = candidates.first(where: { candidate in
+                guard candidate.frame.contains(point) else { return false }
+                return liftedSource == nil || (internalApplicationCanDeliver && candidate.entry.kind == .widget)
+            }) {
+                return ItemDropLocation(target: target.entry.id, before: nil)
+            }
+            let right = candidates.first { point.x < $0.frame.midX }
+            return ItemDropLocation(target: nil, before: right?.entry.id)
+        }
         let layout = projected
         let origin = bounds.midX - CGFloat(layout.slots.count) * Layout.iconSlot / 2
         let overArtwork = abs(point.y - bounds.midY) <= Layout.iconSize / 2
@@ -237,6 +263,10 @@ final class ItemRowView: NSView {
         }
     }
 
+    func setActive(_ active: Bool) {
+        for button in buttons { button.setActive(active) }
+    }
+
     func refreshLayout() {
         for button in buttons + Array(departingButtons.values) {
             button.refreshLayout()
@@ -255,14 +285,17 @@ final class ItemRowView: NSView {
     override func layout() {
         super.layout()
         let layout = projected
-        let total = CGFloat(layout.slots.count) * Layout.iconSlot
-        let originX = (bounds.width - total) / 2
+        let dynamic = preview == .none
+        let widths = dynamic ? buttons.map(\.preferredWidth) : Array(repeating: Layout.iconSlot, count: layout.slots.count)
+        let total = widths.reduce(0, +)
+        var cursor = (bounds.width - total) / 2
         let byID = Dictionary(uniqueKeysWithValues: buttons.map { ($0.entry.id, $0) })
         var placeholderFrame: NSRect?
         var count = 1
         for (index, slot) in layout.slots.enumerated() {
-            let frame = NSRect(x: originX + CGFloat(index) * Layout.iconSlot,
-                               y: 0, width: Layout.iconSlot, height: bounds.height)
+            let width = widths.indices.contains(index) ? widths[index] : Layout.iconSlot
+            let frame = NSRect(x: cursor, y: 0, width: width, height: bounds.height)
+            cursor += width
             switch slot {
             case .item(let id): byID[id]?.frame = frame
             case .placeholder(let amount, _):

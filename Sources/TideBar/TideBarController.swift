@@ -589,8 +589,10 @@ final class TideBarController {
     }
 
     private func barFrame(for screen: NSScreen, extraSlots: Int = 0) -> NSRect {
-        let count = max(items.entries.count + extraSlots, 1)
-        let width = min(Layout.barHPadding * 2 + CGFloat(count) * Layout.iconSlot,
+        let contentWidth = items.entries.reduce(0) { total, entry in
+            total + (entry.preferredBarWidth ?? Layout.iconSlot)
+        }
+        let width = min(Layout.barHPadding * 2 + contentWidth + CGFloat(extraSlots) * Layout.iconSlot,
                         screen.frame.width * 0.9)
         return NSRect(x: screen.frame.midX - width / 2,
                       y: barBottom(for: screen),
@@ -911,6 +913,9 @@ final class TideBarController {
             let current = items.entries.first(where: { $0.id == surgeItemID })
             if current == nil || current?.application?.windowRevision != surgeWindowRevision {
                 dismissSurge(animated: true)
+            } else if let current,
+                      let launcher = (surgePanel?.contentView as? SurgeContainerView)?.body as? ApplicationLauncherSurgeView {
+                launcher.update(reference: current.reference)
             }
         }
         for state in screens.values {
@@ -994,7 +999,7 @@ final class TideBarController {
     private func showSurge(entry: ItemEntry, state: ScreenState, iconFrame: NSRect,
                            fromKeyboard: Bool = false) {
         guard allowsExpansion(state), entry.canSurge,
-              let provider = ItemBehaviors.provider(for: entry.kind) else { return }
+              let provider = ItemBehaviors.provider(for: entry) else { return }
         surgeRequestGeneration += 1
         let generation = surgeRequestGeneration
         Task {
@@ -1026,8 +1031,22 @@ final class TideBarController {
         let panel = SurgePanel(contentRect: NSRect(x: x, y: y,
                                                    width: size.width,
                                                    height: min(size.height, visible.maxY - y)))
-        panel.contentView = SurgeContainerView(body: body)
+        let container = SurgeContainerView(body: body)
+        if live.kind == .widget {
+            panel.allowsKey = true
+            container.onDragEntered = { [weak self] sender in
+                self?.dragCoordinator.widgetDropOperation(sender, target: live) ?? []
+            }
+            container.onDragUpdated = { [weak self] sender in
+                self?.dragCoordinator.widgetDropOperation(sender, target: live) ?? []
+            }
+            container.onPerformDrop = { [weak self] sender in
+                self?.dragCoordinator.performWidgetDrop(sender, target: live) ?? false
+            }
+        }
+        panel.contentView = container
         panel.orderFrontRegardless()
+        if live.kind == .widget { panel.makeKey() }
         surgePanel = panel
         surgeItemID = live.id
         surgeWindowRevision = live.application?.windowRevision
@@ -1066,7 +1085,62 @@ final class TideBarController {
                     self.cancelBarSession()
                 }
             }
+        } else if let launcherBody = body as? ApplicationLauncherSurgeView {
+            let widgetID = entry.id
+            launcherBody.onApplicationsChange = { [weak self] applications in
+                self?.updateLauncherApplications(applications, for: widgetID)
+            }
+            launcherBody.onExternalDropOperation = { [weak self] sender in
+                self?.dragCoordinator.widgetDropOperation(sender, target: entry) ?? []
+            }
+            launcherBody.onPerformExternalDrop = { [weak self] sender in
+                self?.dragCoordinator.performWidgetDrop(sender, target: entry) ?? false
+            }
+            launcherBody.onOpen = { [weak self] url in
+                guard let self else { return }
+                _ = NSWorkspace.shared.open(url)
+                self.dismissSurge(animated: false)
+            }
+            launcherBody.onRename = { [weak self] name in
+                guard let self else { return }
+                self.renameWidget(widgetID, to: name)
+            }
         }
+    }
+
+    private func updateLauncherApplications(_ applications: [ItemReference], for widgetID: ItemID) {
+        guard let record = PinnedItemStore.shared.records.first(where: { $0.id == widgetID }),
+              let updated = try? WidgetReferences.replacing(record.reference, applications: applications) else { return }
+        var records = PinnedItemStore.shared.records
+        guard let index = records.firstIndex(where: { $0.id == widgetID }) else { return }
+        records[index].reference = updated
+        do { try PinnedItemStore.shared.replace(records) }
+        catch { ItemErrors.report(error) }
+    }
+
+    private func renameWidget(_ widgetID: ItemID, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let record = PinnedItemStore.shared.records.first(where: { $0.id == widgetID }),
+              let updated = try? WidgetReferences.replacing(record.reference, displayName: trimmed) else { return }
+        var records = PinnedItemStore.shared.records
+        guard let index = records.firstIndex(where: { $0.id == widgetID }) else { return }
+        records[index].reference = updated
+        records[index].fallbackName = trimmed
+        do { try PinnedItemStore.shared.replace(records) }
+        catch { ItemErrors.report(error) }
+    }
+
+    private func removeLauncherApplication(_ reference: ItemReference, from entry: ItemEntry) {
+        guard let currentRecord = PinnedItemStore.shared.records.first(where: { $0.id == entry.id }),
+              let current = WidgetReferences.applicationLauncherConfiguration(for: currentRecord.reference) else { return }
+        let next = current.applications.filter { $0 != reference }
+        guard let updated = try? WidgetReferences.replacing(currentRecord.reference, applications: next) else { return }
+        var records = PinnedItemStore.shared.records
+        guard let index = records.firstIndex(where: { $0.id == entry.id }) else { return }
+        records[index].reference = updated
+        do { try PinnedItemStore.shared.replace(records) }
+        catch { ItemErrors.report(error) }
     }
 
     private func dismissSurge(animated: Bool) {

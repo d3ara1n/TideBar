@@ -93,4 +93,15 @@ final class PinnedItemStore {
         records = result
         NotificationCenter.default.post(name: Self.didChange, object: self)
     }
+
+    /// 固定项目页的“恢复默认”只重置普通应用，保留 widget 实例及其独立配置。
+    func restoreDefaultApplicationsPreservingWidgets() throws {
+        guard loadError == nil else {
+            try restoreDefaults()
+            return
+        }
+        let widgets = records.filter { $0.kind == .widget }
+        let applications = try Self.applicationRecords(AppConfiguration.defaultPinnedBundleIDs)
+        try replace(applications + widgets)
+    }
 }

@@ -81,7 +81,7 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
 
     func draggingSession(_ session: NSDraggingSession,
                          sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
-        context == .withinApplication && active?.invalidated == false ? .private : []
+        context == .withinApplication && active?.invalidated == false ? [.private, .copy] : []
     }
     func ignoreModifierKeys(for session: NSDraggingSession) -> Bool { true }
     func draggingSession(_ session: NSDraggingSession, movedTo screenPoint: NSPoint) {
@@ -126,7 +126,8 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
             targetView = view
         }
         guard let payload = payload(for: sender) else { view.setDropFeedback(nil); return [] }
-        let intent = ItemDropIntent.route(payload, at: view.dropLocation(for: sender))
+        let location = view.dropLocation(for: sender)
+        let intent = routedIntent(payload, at: location)
         let latestTarget = targetReference(for: intent)
         // 在同一目标内移动不重复查询 Launch Services 或文件系统；提交时强制重验。
         if previewIntent != intent || previewTargetReference != latestTarget
@@ -177,10 +178,48 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
         if externalCache?.sequence == sender.draggingSequenceNumber { externalCache = nil }
     }
 
+    /// 潮涌小工具专用接收：只接受应用引用，不参与栏内重排。
+    func widgetDropOperation(_ sender: any NSDraggingInfo, target: ItemEntry) -> NSDragOperation {
+        guard target.kind == .widget, target.capabilities.contains(.receive),
+              let references = widgetApplicationReferences(for: sender),
+              let receiver = ItemBehaviors.provider(for: target),
+              receiver.receive(references, at: target.reference) != nil else { return [] }
+        return .copy
+    }
+
+    func performWidgetDrop(_ sender: any NSDraggingInfo, target: ItemEntry) -> Bool {
+        guard let references = widgetApplicationReferences(for: sender),
+              let receiver = ItemBehaviors.provider(for: target),
+              let proposal = receiver.receive(references, at: target.reference) else { return false }
+        do { try proposal.execute(); registry.refresh(); return true }
+        catch { ItemErrors.report(error); return false }
+    }
+
+    private func widgetApplicationReferences(for sender: any NSDraggingInfo) -> [ItemReference]? {
+        if let payload = payload(for: sender) {
+            if case .internalItem(let sourceID) = payload,
+               let source = registry.entries.first(where: { $0.id == sourceID }),
+               source.kind == .application,
+               let bundleIdentifier = source.application?.bundleIdentifier,
+               let reference = try? ItemReferences.application(bundleIdentifier) {
+                return [reference]
+            }
+            if case .externalReferences(let references) = payload {
+                let converted = references.compactMap { reference -> ItemReference? in
+                    if ItemReferences.applicationLocator(reference) != nil { return reference }
+                    guard let record = try? ItemReferences.record(for: reference), record.kind == .application else { return nil }
+                    return record.reference
+                }
+                return converted.count == references.count && !converted.isEmpty ? converted : nil
+            }
+        }
+        return nil
+    }
+
     private func validatedProposal(_ sender: any NSDraggingInfo, in view: TideBarView) -> Proposal? {
         guard targetView === view, view.isExpandedState, view.window?.isVisible == true,
               let payload = payload(for: sender) else { return nil }
-        let intent = ItemDropIntent.route(payload, at: view.dropLocation(for: sender))
+        let intent = routedIntent(payload, at: view.dropLocation(for: sender))
         // 模型或几何变化不能把用户看到的意图替换成另一个操作。
         guard intent == previewIntent, preview != nil else { return nil }
         return proposal(for: intent, allowed: sender.draggingSourceOperationMask)
@@ -203,8 +242,23 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
         case .deliver(let references, let id):
             guard let item = registry.entries.first(where: { $0.id == id }),
                   item.isAvailable, item.capabilities.contains(.receive),
-                  let receiver = ItemBehaviors.provider(for: item.kind),
+                  let receiver = ItemBehaviors.provider(for: item),
                   let receive = receiver.receive(references, at: item.reference),
+                  allowed.contains(receive.operation) else { return nil }
+            return Proposal(operation: receive.operation) { [registry] in
+                defer { registry.refresh() }
+                try receive.execute()
+            }
+        case .deliverItem(let sourceID, let targetID):
+            guard let source = registry.entries.first(where: { $0.id == sourceID }),
+                  source.kind == .application,
+                  let target = registry.entries.first(where: { $0.id == targetID }),
+                  target.kind == .widget,
+                  target.capabilities.contains(.receive),
+                  let bundleIdentifier = source.application?.bundleIdentifier,
+                  let appReference = try? ItemReferences.application(bundleIdentifier),
+                  let receiver = ItemBehaviors.provider(for: target),
+                  let receive = receiver.receive([appReference], at: target.reference),
                   allowed.contains(receive.operation) else { return nil }
             return Proposal(operation: receive.operation) { [registry] in
                 defer { registry.refresh() }
@@ -214,8 +268,24 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
     }
 
     private func targetReference(for intent: ItemDropIntent) -> ItemReference? {
-        guard case .deliver(_, let id) = intent else { return nil }
+        let id: ItemID
+        switch intent {
+        case .deliver(_, let target), .deliverItem(_, let target): id = target
+        default: return nil
+        }
         return registry.entries.first(where: { $0.id == id })?.reference
+    }
+
+    private func routedIntent(_ payload: ItemDragPayload, at location: ItemDropLocation) -> ItemDropIntent {
+        if case .internalItem(let sourceID) = payload,
+           let targetID = location.target,
+           let source = registry.entries.first(where: { $0.id == sourceID }),
+           source.kind == .application,
+           let target = registry.entries.first(where: { $0.id == targetID }),
+           target.kind == .widget {
+            return .deliverItem(sourceID, to: targetID)
+        }
+        return ItemDropIntent.route(payload, at: location)
     }
     private func isInternal(_ sender: any NSDraggingInfo) -> Bool {
         guard let active, let source = sender.draggingSource as? ItemDragCoordinator, source === self else { return false }

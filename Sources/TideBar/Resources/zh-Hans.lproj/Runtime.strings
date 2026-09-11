@@ -20,3 +20,9 @@
 "surge.directory.empty" = "空文件夹";
 "surge.directory.unreadable" = "无法读取此文件夹";
 "surge.directory.truncated" = "项目过多，仅显示部分列表";
+
+"surge.launcher.empty" = "将应用拖到这里";
+"surge.launcher.footer" = "拖拽排序 · 右键或拖出以移除";
+"surge.launcher.rename" = "改名";
+"surge.launcher.remove" = "移除";
+"surge.launcher.unavailable" = "不可用";

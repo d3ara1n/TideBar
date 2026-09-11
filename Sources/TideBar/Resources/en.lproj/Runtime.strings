@@ -20,3 +20,9 @@
 "surge.directory.empty" = "Empty folder";
 "surge.directory.unreadable" = "Can't read this folder";
 "surge.directory.truncated" = "Large folder — showing a partial list";
+
+"surge.launcher.empty" = "Drop applications here";
+"surge.launcher.footer" = "Drag to reorder · Right-click or drag out to remove";
+"surge.launcher.rename" = "Rename";
+"surge.launcher.remove" = "Remove";
+"surge.launcher.unavailable" = "Unavailable";

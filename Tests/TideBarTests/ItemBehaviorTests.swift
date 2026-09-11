@@ -38,9 +38,12 @@ private struct ReferenceOnlyBehavior: ItemBehaviorProviding {
 }
 
 /// 潮涌体能力矩阵：应用与目录提供，文件条目的伪预览体是下一阶段目标。
-@Test @MainActor func surgeBodyCapabilityFollowsKind() {
+@Test @MainActor func surgeBodyCapabilityFollowsKind() throws {
     #expect(ItemBehaviors.provider(for: .application)?.capabilities.contains(.surgeBody) == true)
     #expect(ItemBehaviors.provider(for: .directory)?.capabilities.contains(.surgeBody) == true)
     #expect(ItemBehaviors.provider(for: .file)?.capabilities.contains(.surgeBody) == false)
-    #expect(ItemBehaviors.provider(for: ItemKind(rawValue: "widget"))?.capabilities.contains(.surgeBody) != true)
+    let reference = try WidgetReferences.applicationLauncher(displayName: "Test")
+    let record = PinnedItemRecord(id: .resource(), kind: .widget,
+                                  reference: reference, fallbackName: "Test")
+    #expect(ItemBehaviors.provider(for: record)?.capabilities.contains(.surgeBody) == true)
 }
