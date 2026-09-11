@@ -26,3 +26,9 @@
 "surge.launcher.rename" = "改名";
 "surge.launcher.remove" = "移除";
 "surge.launcher.unavailable" = "不可用";
+
+// 小工具移除（栏内右键菜单确认弹窗）
+"widget.removeTitle" = "移除这个小工具？";
+"widget.removeMessage" = "移除「%@」并清除它保存的内容？";
+"widget.removeAction" = "移除小工具";
+"widget.removeCancel" = "取消";

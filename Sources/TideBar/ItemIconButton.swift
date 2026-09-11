@@ -198,6 +198,8 @@ final class ItemIconButton: NSView {
     var onSetPinned: ((ItemID, Bool) -> Void)?
     /// 潮涌触发，携图标 frame（位于 ItemRowView 坐标系，即面板内容坐标）
     var onSurge: ((ItemEntry, NSRect) -> Void)?
+    /// 小工具右键菜单的「移除小工具」；执行方负责确认弹窗
+    var onRemoveWidget: ((ItemEntry) -> Void)?
 
     private enum VisualTransition {
         case enter
@@ -478,8 +480,7 @@ final class ItemIconButton: NSView {
     // MARK: 右键菜单
 
     override func menu(for event: NSEvent) -> NSMenu? {
-        // widget 实例的存在性只能由设置页管理，避免出现“固定/取消固定”歧义菜单。
-        guard entry.kind != .widget else { return nil }
+        if entry.kind == .widget { return widgetMenu() }
         let menu = NSMenu()
         menuActions.removeAll()
         let identity = entry.id
@@ -492,7 +493,7 @@ final class ItemIconButton: NSView {
                                  keyEquivalent: "")
             let shouldPin = !entry.isPinned
             let setPinned = onSetPinned
-            let pinAction = MenuAction { setPinned?(identity, shouldPin) }
+            let pinAction = MenuAction(pin.title) { setPinned?(identity, shouldPin) }
             menuActions.append(pinAction)
             pin.target = pinAction
             menu.addItem(pin)
@@ -503,7 +504,7 @@ final class ItemIconButton: NSView {
                                     action: #selector(MenuAction.run),
                                     keyEquivalent: "")
             let item = entry
-            let action = MenuAction { item.reveal() }
+            let action = MenuAction(reveal.title) { item.reveal() }
             menuActions.append(action)
             reveal.target = action
             menu.addItem(reveal)
@@ -519,7 +520,7 @@ final class ItemIconButton: NSView {
                                         keyEquivalent: shouldHide ? "h" : "")
             if shouldHide { visibility.keyEquivalentModifierMask = .command }
             let setHidden = onSetHidden
-            let action = MenuAction { setHidden?(app.id, shouldHide) }
+            let action = MenuAction(visibility.title) { setHidden?(app.id, shouldHide) }
             menuActions.append(action)
             visibility.target = action
             menu.addItem(visibility)
@@ -527,7 +528,7 @@ final class ItemIconButton: NSView {
             let open = NSMenuItem(title: L10nManager.shared.current.string("appMenu.open", table: .menus), action: #selector(MenuAction.run), keyEquivalent: "")
             let entry = entry
             let launch = onClick
-            let action = MenuAction { launch?(entry) }
+            let action = MenuAction(open.title) { launch?(entry) }
             menuActions.append(action)
             open.target = action
             menu.addItem(open)
@@ -537,23 +538,37 @@ final class ItemIconButton: NSView {
             let quit = NSMenuItem(title: L10nManager.shared.current.string("appMenu.quit", table: .menus), action: #selector(MenuAction.run), keyEquivalent: "q")
             quit.keyEquivalentModifierMask = .command
             let terminate = onTerminate
-            let action = MenuAction { terminate?(app.id) }
+            let action = MenuAction(quit.title) { terminate?(app.id) }
             menuActions.append(action)
             quit.target = action
             menu.addItem(quit)
         }
         return menu
     }
-}
 
-/// 菜单项闭包靶：菜单追踪期间由按钮持有（NSMenuItem 不保留 target）
-@MainActor
-private final class MenuAction: NSObject {
-    private let handler: () -> Void
-
-    init(_ handler: @escaping () -> Void) {
-        self.handler = handler
+    /// 小工具菜单：类型自定义项在前，末位恒为「移除小工具」（移除执行方负责确认）。
+    private func widgetMenu() -> NSMenu {
+        let menu = NSMenu()
+        menuActions.removeAll()
+        if let provider = ItemBehaviors.provider(for: entry) {
+            for action in provider.menuActions(for: entry) {
+                let item = NSMenuItem(title: action.title,
+                                      action: #selector(MenuAction.run), keyEquivalent: "")
+                menuActions.append(action)
+                item.target = action
+                menu.addItem(item)
+            }
+        }
+        if !menu.items.isEmpty { menu.addItem(.separator()) }
+        let entry = self.entry
+        let removeHandler = onRemoveWidget
+        let remove = MenuAction(L10nManager.shared.current.string("widgetMenu.remove", table: .menus)) {
+            removeHandler?(entry)
+        }
+        let item = NSMenuItem(title: remove.title, action: #selector(MenuAction.run), keyEquivalent: "")
+        menuActions.append(remove)
+        item.target = remove
+        menu.addItem(item)
+        return menu
     }
-
-    @objc func run() { handler() }
 }

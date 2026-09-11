@@ -102,7 +102,7 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
             else if event.type == .keyDown, event.keyCode == 53 { evidence = .cancelled }
             else { evidence = .unknown }
         } else { evidence = .unknown }
-        guard evidence.permitsRemoval(accepted: state.committed || !operation.isEmpty,
+        guard evidence.permitsRemoval(accepted: state.committed,
                                       invalidated: state.invalidated,
                                       outsideBar: allowsRemovalAt?(screenPoint) == true,
                                       leftButtonStillDown: NSEvent.pressedMouseButtons & 1 != 0) else {

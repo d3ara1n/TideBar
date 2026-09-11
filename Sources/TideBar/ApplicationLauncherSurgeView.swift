@@ -217,13 +217,14 @@ final class ApplicationLauncherSurgeView: NSView, SurgeBody, NSDraggingSource, N
                                             y: (Layout.launcherFooterHeight - size.height) / 2),
                                 withAttributes: attributes)
 
-        // 内部排序的落点指示（强调色短线，插在目标槽位前缘）
+        // 内部排序的落点指示（强调色短线）：追加到末位画末槽后缘，其余画目标槽前缘
         if let dropIndex, dragSourceIndex != nil {
             let totalWidth = CGFloat(Layout.launcherColumns) * Layout.launcherCellWidth
             let left = max(0, (scrollView.contentSize.width - totalWidth) / 2)
             let slot = cellFrame(at: min(dropIndex, max(0, applicationReferences.count - 1)),
                                  left: left)
-            let marker = convert(NSRect(x: slot.minX - 1.5, y: slot.minY + 8,
+            let edge = dropIndex >= applicationReferences.count ? slot.maxX : slot.minX
+            let marker = convert(NSRect(x: edge - 1.5, y: slot.minY + 8,
                                         width: 3, height: slot.height - 16),
                                  from: documentView)
             let clip = scrollView.frame.insetBy(dx: 0, dy: 1)
@@ -368,8 +369,9 @@ final class ApplicationLauncherSurgeView: NSView, SurgeBody, NSDraggingSource, N
         let point = documentView.convert(sender.draggingLocation, from: nil)
         let totalWidth = CGFloat(Layout.launcherColumns) * Layout.launcherCellWidth
         let left = max(0, (documentView.bounds.width - totalWidth) / 2)
-        let rowFromTop = max(0, Int((documentView.bounds.maxY - point.y) / Layout.launcherCellHeight))
-        let column = min(max(0, Int((point.x - left) / Layout.launcherCellWidth)), Layout.launcherColumns - 1)
+        // 半格分界：悬停在格右/下半区 = 插到该项之后，落点线与拖拽体所重量的位置一致
+        let rowFromTop = max(0, Int((documentView.bounds.maxY - point.y) / Layout.launcherCellHeight + 0.5))
+        let column = min(max(0, Int((point.x - left) / Layout.launcherCellWidth + 0.5)), Layout.launcherColumns)
         let next = min(rowFromTop * Layout.launcherColumns + column, applicationReferences.count)
         if next != dropIndex {
             dropIndex = next

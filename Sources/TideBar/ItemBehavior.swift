@@ -33,6 +33,18 @@ struct ItemReceiveProposal {
     let execute: () throws -> Void
 }
 
+/// 栏内菜单动作：标题与执行闭包；菜单追踪期间由发起视图持有靶对象
+@MainActor
+final class MenuAction: NSObject {
+    let title: String
+    private let handler: () -> Void
+    init(_ title: String, _ handler: @escaping () -> Void) {
+        self.title = title
+        self.handler = handler
+    }
+    @objc func run() { handler() }
+}
+
 @MainActor
 protocol ItemBehaviorProviding {
     var capabilities: ItemCapabilities { get }
@@ -45,6 +57,8 @@ protocol ItemBehaviorProviding {
     /// 栏内自定义展示（小工具的图标位可完全自绘）；nil 走通用图标。
     /// 必须是 requirement：经 any 存在类型调用，extension 默认实现只给不实现者用。
     func barArtwork(for entry: ItemEntry) -> AnyBarArtwork?
+    /// 栏内右键菜单的类型自定义项；容器在其后追加分隔线与「移除小工具」。
+    func menuActions(for entry: ItemEntry) -> [MenuAction]
 }
 
 extension ItemBehaviorProviding {
@@ -54,6 +68,7 @@ extension ItemBehaviorProviding {
     func surgeBody(for entry: ItemEntry, on screen: NSScreen) async -> AnySurgeBody? { nil }
     /// 栏内自定义展示（小工具的图标位可完全自绘）；nil 走通用图标
     func barArtwork(for entry: ItemEntry) -> AnyBarArtwork? { nil }
+    func menuActions(for entry: ItemEntry) -> [MenuAction] { [] }
 }
 
 @MainActor

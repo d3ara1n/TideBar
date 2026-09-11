@@ -13,3 +13,4 @@
 "appMenu.show" = "显示窗口";
 "appMenu.open" = "打开";
 "appMenu.quit" = "退出";
+"widgetMenu.remove" = "移除小工具…";

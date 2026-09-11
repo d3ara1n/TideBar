@@ -22,6 +22,11 @@ final class ItemRowView: NSView {
     var onTerminate: ((AppIdentity) -> Void)?
     var onSetPinned: ((ItemID, Bool) -> Void)?
     var onSurge: ((ItemEntry, NSRect) -> Void)?
+    var onRemoveWidget: ((ItemEntry) -> Void)? {
+        didSet {
+            for button in buttons { button.onRemoveWidget = onRemoveWidget }
+        }
+    }
     private var buttons: [ItemIconButton] = []
     /// 离场项保留到动画结束，避免列表真值先删除导致视图瞬间消失。
     private var departingButtons: [ItemID: ItemIconButton] = [:]
@@ -147,6 +152,7 @@ final class ItemRowView: NSView {
         button.onTerminate = { [weak self] identity in self?.onTerminate?(identity) }
         button.onSetPinned = { [weak self] identity, pinned in self?.onSetPinned?(identity, pinned) }
         button.onSurge = { [weak self] entry, frame in self?.onSurge?(entry, frame) }
+        button.onRemoveWidget = { [weak self] entry in self?.onRemoveWidget?(entry) }
         return button
     }
 

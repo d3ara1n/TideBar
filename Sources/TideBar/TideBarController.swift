@@ -564,6 +564,9 @@ final class TideBarController {
                 guard let self, let state else { return }
                 self.showSurge(entry: entry, state: state, iconFrame: iconFrame)
             }
+            view.onRemoveWidget = { [weak self] entry in
+                self?.confirmRemoveWidget(entry)
+            }
             view.onHoverItem = { [weak self, weak state] entry, iconFrame in
                 guard let self, let state else { return }
                 self.updateNameBubble(entry: entry, iconFrame: iconFrame, state: state)
@@ -1115,6 +1118,20 @@ final class TideBarController {
         guard let index = records.firstIndex(where: { $0.id == widgetID }) else { return }
         records[index].reference = updated
         do { try PinnedItemStore.shared.replace(records) }
+        catch { ItemErrors.report(error) }
+    }
+
+    /// 栏内「移除小工具」：与设置页同语义，确认后清除实例及内容。
+    private func confirmRemoveWidget(_ entry: ItemEntry) {
+        let l10n = L10nManager.shared.current
+        let alert = NSAlert()
+        alert.messageText = l10n.string("widget.removeTitle", table: .runtime)
+        alert.informativeText = l10n.string("widget.removeMessage", table: .runtime, arguments: entry.name)
+        alert.addButton(withTitle: l10n.string("widget.removeAction", table: .runtime))
+        alert.addButton(withTitle: l10n.string("widget.removeCancel", table: .runtime))
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do { try PinnedItemStore.shared.remove([entry.id]) }
         catch { ItemErrors.report(error) }
     }
 

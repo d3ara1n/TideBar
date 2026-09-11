@@ -13,3 +13,4 @@
 "appMenu.show" = "Show";
 "appMenu.open" = "Open";
 "appMenu.quit" = "Quit";
+"widgetMenu.remove" = "Remove Widget…";
