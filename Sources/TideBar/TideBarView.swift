@@ -13,6 +13,8 @@ final class StableBlurBackgroundView: NSView {
     init(cornerRadius: CGFloat? = nil) {
         self.fixedCornerRadius = cornerRadius
         super.init(frame: .zero)
+        // 玻璃容器自身也需 layer：展开/收起的透明度编舞直接驱动该层 opacity
+        wantsLayer = true
         effect.material = .hudWindow
         effect.blendingMode = .behindWindow
         // 效果视图默认随宿主窗口 key 状态切换外观；固定 active 避免失焦变色。
@@ -454,6 +456,7 @@ final class TideBarView: NSView {
                 silhouette.isHidden = glass != nil
                 silhouette.transform = CATransform3DIdentity
                 silhouette.opacity = glass == nil ? 1 : 0
+                glass?.layer?.removeAllAnimations()
                 glass?.alphaValue = 1
                 tideline.removeAllAnimations()
                 tideline.opacity = 0
@@ -479,9 +482,16 @@ final class TideBarView: NSView {
                           stiffness: Motion.swellStiffness, damping: Motion.swellDamping,
                           minDuration: Motion.swellDuration)
             // 3) 玻璃与水体交叉淡化，且水体同步调成玻璃色调——
-            //    淡出时已是玻璃的颜色，「黑矩形消失」隐形（仅玻璃路径；无玻璃回退时潮体即背景）
+            //    淡出时已是玻璃的颜色，「黑矩形消失」隐形（仅玻璃路径；无玻璃回退时潮体即背景）。
+            //    玻璃淡入同样 CA 提交（beginTime 内嵌）：主线程被展开同步触发的
+            //    AX 重枚举等重活拖住时，编舞各环节仍由渲染服务器照常走
             if let glass {
-                fade(glass, to: 1, delay: Motion.glassFadeDelay, duration: Motion.glassFadeDuration)
+                if let glassLayer = glass.layer {
+                    Motion.basic(glassLayer, keyPath: "opacity", to: 1.0,
+                                 duration: Motion.glassFadeDuration, delay: Motion.glassFadeDelay)
+                } else {
+                    glass.alphaValue = 1
+                }
                 Motion.basic(silhouette, keyPath: "backgroundColor", to: glassToneColor,
                              duration: Motion.waterTintDuration, delay: Motion.waterTintDelay)
                 Motion.basic(silhouette, keyPath: "opacity", from: peak, to: 0.0,
@@ -511,6 +521,7 @@ final class TideBarView: NSView {
                 silhouette.isHidden = false
                 silhouette.transform = collapsedTransform
                 silhouette.opacity = 0
+                glass?.layer?.removeAllAnimations()
                 glass?.alphaValue = 0
                 tideline.removeAllAnimations()
                 tideline.opacity = 1
@@ -522,7 +533,12 @@ final class TideBarView: NSView {
             silhouette.isHidden = false
             let retreatOpacity: Float = glass != nil ? Motion.retreatOpacity : 1.0
             if let glass {
-                fade(glass, to: 0, delay: 0, duration: Motion.glassFadeOut)
+                if let glassLayer = glass.layer {
+                    Motion.basic(glassLayer, keyPath: "opacity", to: 0.0,
+                                 duration: Motion.glassFadeOut)
+                } else {
+                    glass.alphaValue = 0
+                }
                 Motion.basic(silhouette, keyPath: "backgroundColor", to: Self.waterColor,
                              duration: Motion.glassFadeOut)
                 Motion.basic(silhouette, keyPath: "opacity", from: 0.0,
@@ -581,28 +597,11 @@ final class TideBarView: NSView {
         silhouette.isHidden = false
         silhouette.transform = collapsedTransform
         silhouette.opacity = 0
+        glass?.layer?.removeAllAnimations()
         glass?.alphaValue = 0
         iconRow.alphaValue = 0
         tideline.removeAllAnimations()
         tideline.opacity = 1
         tideline.transform = CATransform3DIdentity
-    }
-
-    private func fade(_ view: NSView, to: CGFloat, delay: TimeInterval, duration: TimeInterval) {
-        let generation = expandGeneration
-        let bridge = MainThreadBridge { [weak self, weak view] in
-            guard let self, let view, self.expandGeneration == generation else { return }
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = duration
-                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                view.animator().alphaValue = to
-            }
-        }
-        let work = DispatchWorkItem { bridge() }
-        if delay > 0 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
-        } else {
-            work.perform()
-        }
     }
 }
