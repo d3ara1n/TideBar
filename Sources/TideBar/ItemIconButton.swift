@@ -271,6 +271,20 @@ final class ItemIconButton: NSView {
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    /// 拖拽跟随图：自定义 artwork（widget 缩略网格等）截取当前展示，普通条目退回图标。
+    func dragPreviewImage() -> NSImage {
+        guard let customArtworkView else { return entry.icon }
+        let side = Layout.iconSize
+        let rect = NSRect(x: (customArtworkView.bounds.width - side) / 2,
+                          y: (customArtworkView.bounds.height - side) / 2,
+                          width: side, height: side)
+        guard rect.intersects(customArtworkView.bounds),
+              let rep = customArtworkView.bitmapImageRepForCachingDisplay(in: rect) else { return entry.icon }
+        customArtworkView.cacheDisplay(in: rect, to: rep)
+        guard let cgImage = rep.cgImage else { return entry.icon }
+        return NSImage(cgImage: cgImage, size: NSSize(width: side, height: side))
+    }
+
     func setActive(_ active: Bool) {
         customArtworkView?.setActive(active)
     }
@@ -325,6 +339,7 @@ final class ItemIconButton: NSView {
     func setKeyboardSelected(_ on: Bool) {
         guard keyboardSelected != on else { return }
         keyboardSelected = on
+        customArtworkView?.setHighlightState(hovered: hovering, selected: keyboardSelected)
         guard usesSharedHoverEffects, !dragState.suppressesHover, let layer = haloView.layer else { return }
         let opacity: Float = on ? 0.72 : (hovering ? (pressed ? 0.82 : 1) : 0)
         Motion.basic(layer, keyPath: "opacity", to: opacity,
@@ -332,6 +347,7 @@ final class ItemIconButton: NSView {
     }
 
     private func animateVisualState(_ transition: VisualTransition) {
+        customArtworkView?.setHighlightState(hovered: hovering, selected: keyboardSelected)
         guard let visualLayer = motionPivot.layer, let haloLayer = haloView.layer else { return }
         if dragState.suppressesHover {
             ItemDragStyle.suppressHover(pivot: visualLayer, halo: haloLayer)
@@ -419,8 +435,8 @@ final class ItemIconButton: NSView {
         if !surged, let origin = mouseDownScreenPoint,
            let point = window?.convertPoint(toScreen: event.locationInWindow),
            hypot(point.x - origin.x, point.y - origin.y) >= Layout.itemDragThreshold,
-           let onBeginDrag, entry.kind != .widget {
-            // widget 实例只能在设置页添加/移除；其内部内容另由潮涌体编辑。
+           let onBeginDrag {
+            // 重排对所有条目一致；widget 的添加/移除仍归设置页。
             // 先撤销长按和点击，再进入可能嵌套事件追踪的 AppKit 拖拽调用。
             dragAttempted = true
             pressTimer?.invalidate()

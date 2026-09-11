@@ -42,6 +42,9 @@ protocol ItemBehaviorProviding {
     func receive(_ references: [ItemReference], at target: ItemReference) -> ItemReceiveProposal?
     /// 构造潮涌体；无内容返回 nil。按需计算（目录枚举等）可离主线程。
     func surgeBody(for entry: ItemEntry, on screen: NSScreen) async -> AnySurgeBody?
+    /// 栏内自定义展示（小工具的图标位可完全自绘）；nil 走通用图标。
+    /// 必须是 requirement：经 any 存在类型调用，extension 默认实现只给不实现者用。
+    func barArtwork(for entry: ItemEntry) -> AnyBarArtwork?
 }
 
 extension ItemBehaviorProviding {

@@ -55,7 +55,7 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
         let item = NSDraggingItem(pasteboardWriter: writer)
         item.setDraggingFrame(NSRect(x: button.bounds.midX - Layout.iconSize / 2,
                                      y: button.bounds.midY - Layout.iconSize / 2,
-                                     width: Layout.iconSize, height: Layout.iconSize), contents: button.entry.icon)
+                                     width: Layout.iconSize, height: Layout.iconSize), contents: button.dragPreviewImage())
         active = state
         onBegin?()
         let session = button.beginDraggingSession(with: [item], event: event, source: self)
@@ -111,6 +111,8 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
         }
         guard let latest = registry.entries.first(where: { $0.id == state.itemID }),
               latest.isPinned == state.wasPinned else { return }
+        // 小工具实例删除需经设置页确认；栏内拖出只回位，不做删除。
+        guard latest.kind != .widget else { return }
         if !state.wasPinned,
            Set(latest.application?.runningAppsByPID.keys.map { $0 } ?? []) != state.originalPIDs { return }
         do {

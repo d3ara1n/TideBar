@@ -357,58 +357,6 @@ private final class SettingsModel: ObservableObject {
         refreshPinnedApps()
     }
 
-    func moveWidgets(from offsets: IndexSet, to destination: Int) {
-        let widgetIDs = widgets.map(\.id)
-        guard !offsets.isEmpty else { return }
-        let moving = offsets.sorted().compactMap { widgetIDs.indices.contains($0) ? widgetIDs[$0] : nil }
-        let remaining = widgetIDs.enumerated().filter { !offsets.contains($0.offset) }.map(\.element)
-        let adjusted = destination - offsets.filter { $0 < destination }.count
-        var next = remaining
-        next.insert(contentsOf: moving, at: min(max(0, adjusted), next.count))
-        let current = PinnedItemStore.shared.records
-        let byID = Dictionary(uniqueKeysWithValues: current.map { ($0.id, $0) })
-        var cursor = 0
-        var result: [PinnedItemRecord] = []
-        for record in current {
-            if record.kind == .widget {
-                if cursor < next.count, let replacement = byID[next[cursor]] { result.append(replacement) }
-                cursor += 1
-            } else { result.append(record) }
-        }
-        do { try PinnedItemStore.shared.replace(result) }
-        catch { ItemErrors.report(error) }
-        refreshPinnedApps()
-    }
-
-    func removePinned(at offsets: IndexSet) {
-        let values = offsets.compactMap { nonWidgetPinnedItems.indices.contains($0) ? nonWidgetPinnedItems[$0].id : nil }
-        do { try PinnedItemStore.shared.remove(Set(values)) }
-        catch { ItemErrors.report(error) }
-        refreshPinnedApps()
-    }
-
-    func movePinned(from offsets: IndexSet, to destination: Int) {
-        let visible = nonWidgetPinnedItems
-        let moving = offsets.sorted().compactMap { visible.indices.contains($0) ? visible[$0].id : nil }
-        guard !moving.isEmpty else { return }
-        var remaining = visible.map(\.id)
-        for id in moving { remaining.removeAll { $0 == id } }
-        let adjusted = min(max(0, destination - offsets.filter { $0 < destination }.count), remaining.count)
-        remaining.insert(contentsOf: moving, at: adjusted)
-        let byID = Dictionary(uniqueKeysWithValues: PinnedItemStore.shared.records.map { ($0.id, $0) })
-        var cursor = 0
-        var result: [PinnedItemRecord] = []
-        for record in PinnedItemStore.shared.records {
-            if record.kind == .widget { result.append(record) }
-            else if cursor < remaining.count, let replacement = byID[remaining[cursor]] {
-                result.append(replacement); cursor += 1
-            }
-        }
-        do { try PinnedItemStore.shared.replace(result) }
-        catch { ItemErrors.report(error) }
-        refreshPinnedApps()
-    }
-
     func removePinned(_ app: PinnedItemInfo) {
         do { try PinnedItemStore.shared.remove([app.id]) }
         catch { ItemErrors.report(error) }
@@ -742,9 +690,6 @@ private struct PinnedPage: View {
                                 model.removePinned(app)
                             }
                         }
-                        .onMove { offsets, destination in
-                            model.movePinned(from: offsets, to: destination)
-                        }
                     }
                     .frame(minHeight: 180, maxHeight: 300)
                 }
@@ -794,9 +739,6 @@ private struct WidgetsPage: View {
                                 pendingRemoval = widget
                             }
                         }
-                        .onMove { offsets, destination in
-                            model.moveWidgets(from: offsets, to: destination)
-                        }
                     }
                     .frame(minHeight: 140, maxHeight: 260)
                 }
@@ -829,7 +771,7 @@ private struct WidgetsPage: View {
     }
 }
 
-/// 小工具行：与固定项目行同一交互范式（悬停显移除、拖把排序、右键移除）。
+/// 小工具行：与固定项目行同一交互范式（悬停显移除、右键移除）。
 private struct WidgetRow: View {
     @Environment(\.l10n) private var l10n
     let widget: PinnedItemInfo
@@ -861,17 +803,6 @@ private struct WidgetRow: View {
                 .help(l10n.string("action.remove", table: .settings))
                 .transition(.opacity)
             }
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.tertiary)
-                .onHover { hovering in
-                    if hovering {
-                        NSCursor.openHand.push()
-                    } else {
-                        NSCursor.pop()
-                    }
-                }
-                .help(l10n.string("pinned.dragHelp", table: .settings))
         }
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.12)) { isHovered = hovering }
@@ -962,17 +893,6 @@ private struct PinnedRow: View {
                 .help(l10n.string("action.remove", table: .settings))
                 .transition(.opacity)
             }
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.tertiary)
-                .onHover { hovering in
-                    if hovering {
-                        NSCursor.openHand.push()
-                    } else {
-                        NSCursor.pop()
-                    }
-                }
-                .help(l10n.string("pinned.dragHelp", table: .settings))
         }
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.12)) { isHovered = hovering }

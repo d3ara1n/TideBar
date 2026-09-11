@@ -379,8 +379,9 @@ final class ApplicationLauncherSurgeView: NSView, SurgeBody, NSDraggingSource, N
     }
 
     func setHover(at point: NSPoint) {
+        // 确定性帧命中：hitTest 会落到图标/文字子视图，拿不到单元格本体
         let documentPoint = documentView.convert(point, from: self)
-        let hit = documentView.hitTest(documentPoint) as? LauncherItemView
+        let hit = itemViews.first { $0.frame.contains(documentPoint) }
         for item in itemViews { item.setHovered(item === hit) }
     }
 
@@ -481,6 +482,8 @@ private final class LauncherItemView: NSView {
         label.stringValue = name
         self.unavailable = unavailable
         imageView.image = icon
+        // 失效条目的 template 回退符号需显式着色随主题，否则暗色下几乎不可见
+        imageView.contentTintColor = unavailable ? NSColor.labelColor.withAlphaComponent(0.45) : nil
         alphaValue = unavailable ? 0.55 : 1
         refreshColors()
     }

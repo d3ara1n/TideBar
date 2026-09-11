@@ -4,32 +4,47 @@ import TideBarCore
 /// 小工具在图标栏中的自定义展示：表现形式与悬停特效都归 widget 自己决定。
 /// - preferredWidth：条目占用宽度（普通应用条目为 Layout.iconSlot）
 /// - usesSharedHoverEffects：false 时栏不再施加共享的浮起/压下/光晕，widget 自绘反馈
+/// - setHighlightState：悬停/键盘选中转发，自绘反馈的 artwork 据此点亮（如底板变亮）
 /// - setActive：栏展开/收起生命周期，动态 widget 在此启停刷新
 /// - update：条目刷新（引用、名称变化），widget 按 entry 重建内容
 @MainActor
 protocol ItemBarArtwork: AnyObject {
     var preferredWidth: CGFloat { get }
+    /// 必须是 requirement：经 any 存在类型调用，重写者需动态派发生效
     var usesSharedHoverEffects: Bool { get }
     func setActive(_ active: Bool)
     func update(entry: ItemEntry)
+    /// 必须是 requirement，同上；默认无操作。
+    func setHighlightState(hovered: Bool, selected: Bool)
 }
 
 extension ItemBarArtwork {
     var usesSharedHoverEffects: Bool { true }
+    func setHighlightState(hovered: Bool, selected: Bool) {}
 }
 
 typealias AnyBarArtwork = NSView & ItemBarArtwork
 
 /// 应用收藏夹的栏内图标：内容前 4 个应用的 2x2 缩略网格（单应用居中、空态用类型符号）。
-/// 表现与应用条目同族，故沿用共享悬停特效。
+/// 悬停/选中为底板变亮，不上浮、不画圆环：点击是展开潮涌，不是启动应用。
 @MainActor
 final class ApplicationLauncherTileView: NSView, ItemBarArtwork {
     var preferredWidth: CGFloat { Layout.iconSlot }
+    var usesSharedHoverEffects: Bool { false }
     private var icons: [NSImage] = []
+    /// 失效条目（无 URL）用 template 符号回退，绘制前需显式设色随主题
+    private var unavailableFlags: [Bool] = []
+    private let highlightLayer = CALayer()
+    private var artHovered = false
+    private var artSelected = false
 
     init(entry: ItemEntry) {
         super.init(frame: .zero)
         wantsLayer = true
+        highlightLayer.cornerCurve = .continuous
+        highlightLayer.opacity = 0
+        layer?.addSublayer(highlightLayer)
+        refreshHighlightColor()
         reload(from: entry.reference)
     }
 
@@ -46,18 +61,56 @@ final class ApplicationLauncherTileView: NSView, ItemBarArtwork {
 
     private func reload(from reference: ItemReference) {
         let references = WidgetReferences.applicationLauncherConfiguration(for: reference)?.applications ?? []
-        icons = references.prefix(4).map { reference in
+        var nextIcons: [NSImage] = []
+        var nextFlags: [Bool] = []
+        for reference in references.prefix(4) {
             if let url = ItemReferences.applicationURL(reference) {
-                return NSWorkspace.shared.icon(forFile: url.path)
+                nextIcons.append(NSWorkspace.shared.icon(forFile: url.path))
+                nextFlags.append(false)
+            } else {
+                nextIcons.append(NSImage(systemSymbolName: "questionmark.app", accessibilityDescription: nil) ?? NSImage())
+                nextFlags.append(true)
             }
-            return NSImage(systemSymbolName: "questionmark.app", accessibilityDescription: nil) ?? NSImage()
         }
+        icons = nextIcons
+        unavailableFlags = nextFlags
         needsDisplay = true
     }
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
+        refreshHighlightColor()
         needsDisplay = true
+    }
+
+    func setHighlightState(hovered: Bool, selected: Bool) {
+        guard hovered != artHovered || selected != artSelected else { return }
+        let wasLit = artHovered || artSelected
+        artHovered = hovered
+        artSelected = selected
+        let lit = hovered || selected
+        guard lit != wasLit else { return }
+        Motion.basic(highlightLayer, keyPath: "opacity", to: lit ? Float(1) : Float(0),
+                     duration: lit ? Motion.hoverEnterDuration : Motion.hoverExitDuration)
+    }
+
+    /// 高亮层目标透明度（模型值，动画即时设定）；供测试验证反馈链路
+    var highlightOpacity: Float { highlightLayer.opacity }
+
+    private func refreshHighlightColor() {
+        highlightLayer.backgroundColor = AppearanceColors.cgColor(
+            .labelColor, alpha: 0.12, for: effectiveAppearance)
+    }
+
+    override func layout() {
+        super.layout()
+        let side = Layout.iconSize
+        highlightLayer.frame = NSRect(x: (bounds.width - side) / 2, y: (bounds.height - side) / 2,
+                                      width: side, height: side)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        highlightLayer.cornerRadius = side * 0.225
+        CATransaction.commit()
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -86,7 +139,9 @@ final class ApplicationLauncherTileView: NSView, ItemBarArtwork {
         }
 
         if icons.count == 1 {
-            let iconSide = side * 0.62
+            // 单应用占满底板主体：小尺寸下仍可辨认是哪个应用，底板保留 widget 身份
+            let iconSide = side * 0.8
+            if unavailableFlags[0] { NSColor.labelColor.withAlphaComponent(0.45).set() }
             icons[0].draw(in: NSRect(x: tile.midX - iconSide / 2, y: tile.midY - iconSide / 2,
                                      width: iconSide, height: iconSide),
                           from: .zero, operation: .sourceOver, fraction: 1)
@@ -102,6 +157,9 @@ final class ApplicationLauncherTileView: NSView, ItemBarArtwork {
             let rect = NSRect(x: tile.minX + inset + CGFloat(column) * (mini + gap),
                               y: tile.maxY - inset - CGFloat(row + 1) * mini - CGFloat(row) * gap,
                               width: mini, height: mini)
+            if unavailableFlags.indices.contains(index), unavailableFlags[index] {
+                NSColor.labelColor.withAlphaComponent(0.45).set()
+            }
             icon.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
         }
     }

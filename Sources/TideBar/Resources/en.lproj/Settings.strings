@@ -65,10 +65,9 @@
 "pinned.addResources" = "Add Files or Folders…";
 "pinned.reset" = "Restore Defaults";
 "pinned.section.header" = "Pinned to TideBar";
-"pinned.section.footer" = "Drag to reorder; right-click or hover to remove. Removing a pinned reference never deletes its resource or quits its app.";
+"pinned.section.footer" = "Reorder by dragging items on TideBar. Right-click or hover to remove; removing a pinned reference never deletes its resource or quits its app.";
 "pinned.resetConfirmTitle" = "Replace all pinned items with defaults?";
 "pinned.notInstalled" = "Resource unavailable";
-"pinned.dragHelp" = "Drag to reorder";
 "pinned.searchPlaceholder" = "Search apps";
 "pinned.scanning" = "Scanning installed apps…";
 "pinned.selectedCount" = "%ld selected";
@@ -78,7 +77,7 @@
 "widgets.empty" = "No widgets yet.";
 "widgets.add" = "Add Widget…";
 "widgets.section.header" = "Widgets on TideBar";
-"widgets.section.footer" = "Reorder widgets here. Widget contents are edited inline in their Surge panel.";
+"widgets.section.footer" = "Reorder by dragging on TideBar. Widget contents are edited inline in their Surge panel.";
 "widgets.applicationLauncher" = "Application Launcher";
 "widgets.applicationLauncher.description" = "Keep favorite applications one surge away.";
 "widgets.picker.title" = "Add a Widget";
