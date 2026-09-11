@@ -104,3 +104,13 @@ public enum ItemOrdering {
         return result
     }
 }
+
+/// 固定项的重排锚点不越过临时区：临时项恒居最右，
+/// 固定项落到临时区（含越过全部）时收敛到临时区首项之前（即固定项末位）。
+public enum ItemReorderBoundary {
+    public static func clampPinnedAnchor(_ anchor: ItemID?, temps: [ItemID]) -> ItemID? {
+        guard let first = temps.first else { return anchor }
+        guard let anchor else { return first }
+        return anchor == first || !temps.contains(anchor) ? anchor : first
+    }
+}

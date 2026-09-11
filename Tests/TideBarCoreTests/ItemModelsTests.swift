@@ -57,3 +57,19 @@ private let itemC = ItemID(rawValue: "resource:C")
     #expect(!ItemDragEndEvidence.mouseReleased.permitsRemoval(accepted: false, invalidated: false,
                                                               outsideBar: true, leftButtonStillDown: true))
 }
+
+/// 固定项锚点收敛：临时区恒居最右，固定项落到临时区（含越过全部）收敛到临时首项之前。
+@Test func pinnedAnchorClampsToTempBoundary() {
+    let pinnedA = ItemID.resource(), pinnedB = ItemID.resource()
+    let temp1 = ItemID.resource(), temp2 = ItemID.resource()
+    // 越过全部（nil）→ 临时区首项之前
+    #expect(ItemReorderBoundary.clampPinnedAnchor(nil, temps: [temp1, temp2]) == temp1)
+    // 指向临时区内后续项 → 收敛临时首项
+    #expect(ItemReorderBoundary.clampPinnedAnchor(temp2, temps: [temp1, temp2]) == temp1)
+    // 恰为临时首项（固定项末位边界）→ 保持
+    #expect(ItemReorderBoundary.clampPinnedAnchor(temp1, temps: [temp1, temp2]) == temp1)
+    // 指向固定项 → 不动
+    #expect(ItemReorderBoundary.clampPinnedAnchor(pinnedB, temps: [temp1]) == pinnedB)
+    // 无临时项 → 自由（nil 仍为末尾）
+    #expect(ItemReorderBoundary.clampPinnedAnchor(nil, temps: []) == nil)
+}

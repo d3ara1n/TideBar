@@ -228,7 +228,7 @@ final class ItemRowView: NSView {
                 return ItemDropLocation(target: target.entry.id, before: nil)
             }
             let right = candidates.first { point.x < $0.frame.midX }
-            return ItemDropLocation(target: nil, before: right?.entry.id)
+            return pinnedBoundaryClamp(ItemDropLocation(target: nil, before: right?.entry.id))
         }
         let layout = projected
         let origin = bounds.midX - CGFloat(layout.slots.count) * Layout.iconSlot / 2
@@ -240,8 +240,24 @@ final class ItemRowView: NSView {
         let upper = hit.upper.isFinite ? origin + CGFloat(hit.upper) * Layout.iconSlot : bounds.maxX
         let y = hit.location.target == nil ? bounds.minY : bounds.midY - Layout.iconSize / 2
         let height = hit.location.target == nil ? bounds.height : Layout.iconSize
-        hitLatch.capture(hit.location, region: screenRect(NSRect(x: lower, y: y, width: max(0, upper - lower), height: height)))
-        return hit.location
+        let location = pinnedBoundaryClamp(hit.location)
+        hitLatch.capture(location, region: screenRect(NSRect(x: lower, y: y, width: max(0, upper - lower), height: height)))
+        return location
+    }
+
+    /// 固定项的重排锚点不越过临时区：临时项恒居最右，
+    /// 固定项落到临时区时收敛到临时区首项之前（固定项末位）。
+    private func pinnedBoundaryClamp(_ location: ItemDropLocation) -> ItemDropLocation {
+        guard location.target == nil,
+              let sourceID = liftedSource,
+              let source = buttons.first(where: { $0.entry.id == sourceID }),
+              source.entry.isPinned else { return location }
+        let tempIDs = buttons
+            .filter { !$0.entry.isPinned }
+            .sorted { $0.frame.minX < $1.frame.minX }
+            .map(\.entry.id)
+        return ItemDropLocation(target: nil,
+                                before: ItemReorderBoundary.clampPinnedAnchor(location.before, temps: tempIDs))
     }
 
     private func screenRect(_ rect: NSRect) -> NSRect {

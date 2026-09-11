@@ -59,7 +59,7 @@ struct ItemEntry: Identifiable {
 @MainActor
 final class ItemRegistry {
     let applications = AppRegistry()
-    private let store = PinnedItemStore.shared
+    private let store: PinnedItemStore
     private(set) var entries: [ItemEntry] = []
     var onChange: (() -> Void)?
     private var observer: NSObjectProtocol?
@@ -71,6 +71,10 @@ final class ItemRegistry {
     private var dismissed: [AppIdentity: Set<pid_t>] = [:]
     private var lastPinnedOrder: [ItemID] = []
     private var committingOrder = false
+
+    init(store: PinnedItemStore = .shared) {
+        self.store = store
+    }
 
     func start() {
         applications.onChange = { [weak self] in self?.rebuild() }
@@ -194,6 +198,8 @@ final class ItemRegistry {
         defer { committingOrder = false }
         do { try store.replace(order.compactMap { pinnedByID[$0] }) }
         catch { sessionOrder = oldOrder; usesSessionOrder = wasUsingSessionOrder; throw error }
+        NSLog("TideBar item reorder committed: %@ before %@", id.rawValue,
+              anchor?.rawValue ?? "<end>")
         rebuild()
     }
 

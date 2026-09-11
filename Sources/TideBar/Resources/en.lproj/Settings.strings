@@ -78,7 +78,7 @@
 "widgets.add" = "Add Widget…";
 "widgets.section.header" = "Widgets on TideBar";
 "widgets.section.footer" = "Reorder by dragging on TideBar. Widget contents are edited inline in their Surge panel.";
-"widgets.applicationLauncher" = "Application Launcher";
+"widgets.applicationLauncher" = "App Collection";
 "widgets.applicationLauncher.description" = "Keep favorite applications one surge away.";
 "widgets.picker.title" = "Add a Widget";
 "widgets.picker.footer" = "Widget contents and names are edited inline in each widget's Surge panel.";

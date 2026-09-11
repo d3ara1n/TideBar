@@ -132,8 +132,8 @@ final class ApplicationLauncherTileView: NSView, ItemBarArtwork {
             if let symbol {
                 let rect = NSRect(x: tile.midX - symbolSide / 2, y: tile.midY - symbolSide / 2,
                                   width: symbolSide, height: symbolSide)
-                NSColor.labelColor.withAlphaComponent(0.45).set()
-                symbol.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+                tinted(symbol, color: NSColor.labelColor.withAlphaComponent(0.45))
+                    .draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
             }
             return
         }
@@ -141,10 +141,10 @@ final class ApplicationLauncherTileView: NSView, ItemBarArtwork {
         if icons.count == 1 {
             // 单应用占满底板主体：小尺寸下仍可辨认是哪个应用，底板保留 widget 身份
             let iconSide = side * 0.8
-            if unavailableFlags[0] { NSColor.labelColor.withAlphaComponent(0.45).set() }
-            icons[0].draw(in: NSRect(x: tile.midX - iconSide / 2, y: tile.midY - iconSide / 2,
-                                     width: iconSide, height: iconSide),
-                          from: .zero, operation: .sourceOver, fraction: 1)
+            let icon = unavailableFlags[0] ? unavailableIcon(icons[0]) : icons[0]
+            icon.draw(in: NSRect(x: tile.midX - iconSide / 2, y: tile.midY - iconSide / 2,
+                                 width: iconSide, height: iconSide),
+                      from: .zero, operation: .sourceOver, fraction: 1)
             return
         }
 
@@ -157,10 +157,25 @@ final class ApplicationLauncherTileView: NSView, ItemBarArtwork {
             let rect = NSRect(x: tile.minX + inset + CGFloat(column) * (mini + gap),
                               y: tile.maxY - inset - CGFloat(row + 1) * mini - CGFloat(row) * gap,
                               width: mini, height: mini)
-            if unavailableFlags.indices.contains(index), unavailableFlags[index] {
-                NSColor.labelColor.withAlphaComponent(0.45).set()
-            }
-            icon.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+            let isUnavailable = unavailableFlags.indices.contains(index) && unavailableFlags[index]
+            let image = isUnavailable ? unavailableIcon(icon) : icon
+            image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
         }
+    }
+
+    /// template 符号着色：NSImage.draw 不吃当前填充色，须 sourceIn 合成后随主题
+    private func tinted(_ image: NSImage, color: NSColor) -> NSImage {
+        let size = image.size
+        let result = NSImage(size: size)
+        result.lockFocus()
+        image.draw(in: NSRect(origin: .zero, size: size), from: .zero, operation: .sourceOver, fraction: 1)
+        color.set()
+        NSRect(origin: .zero, size: size).fill(using: .sourceIn)
+        result.unlockFocus()
+        return result
+    }
+
+    private func unavailableIcon(_ fallback: NSImage) -> NSImage {
+        tinted(fallback, color: NSColor.labelColor.withAlphaComponent(0.45))
     }
 }

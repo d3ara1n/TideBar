@@ -851,12 +851,17 @@ private struct WidgetPickerSheet: View {
                             in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             .buttonStyle(.plain)
+            HStack {
+                Spacer()
+                Button(l10n.string("action.cancel", table: .settings)) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+            }
             Spacer()
             Text(l10n.string("widgets.picker.footer", table: .settings))
                 .font(.callout).foregroundStyle(.secondary)
         }
         .padding(20)
-        .frame(width: 360, height: 190)
+        .frame(width: 360, height: 220)
     }
 }
 

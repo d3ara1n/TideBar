@@ -150,7 +150,12 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
 
     func perform(_ sender: any NSDraggingInfo, in view: TideBarView) -> Bool {
         guard committedSequence != sender.draggingSequenceNumber,
-              let proposal = validatedProposal(sender, in: view) else { return false }
+              let proposal = validatedProposal(sender, in: view) else {
+            NSLog("TideBar item drop rejected: sequence=%ld previewIntent=%@",
+                  sender.draggingSequenceNumber,
+                  previewIntent.map { String(describing: $0) } ?? "nil")
+            return false
+        }
         do {
             try proposal.execute()
             committedSequence = sender.draggingSequenceNumber
