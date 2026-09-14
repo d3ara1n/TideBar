@@ -152,9 +152,9 @@
 
 // 关于
 "about.header.title" = "About TideBar";
-"about.header.description" = "A hairline at rest, every window at hand.";
+"about.header.description" = "Launch apps, switch windows, and open pinned files and folders.";
 "about.name" = "TideBar";
-"about.tagline" = "A zero-footprint window taskbar";
+"about.tagline" = "An open-source window taskbar for macOS";
 "about.version" = "Version %@ (Build %@)";
 "about.devVersion" = "development build";
 "about.systemRequirements" = "Requirements";

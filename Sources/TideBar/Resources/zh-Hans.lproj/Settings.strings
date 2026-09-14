@@ -152,9 +152,9 @@
 
 // 关于
 "about.header.title" = "关于汐";
-"about.header.description" = "平时是一条线，需要时每个窗口触手可及。";
+"about.header.description" = "启动应用、切换窗口，以及打开固定的文件和文件夹。";
 "about.name" = "汐 TideBar";
-"about.tagline" = "不占屏幕的窗口任务栏";
+"about.tagline" = "开源的 macOS 窗口任务栏";
 "about.version" = "版本 %@（Build %@）";
 "about.devVersion" = "开发版本";
 "about.systemRequirements" = "系统要求";

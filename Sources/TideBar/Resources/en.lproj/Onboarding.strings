@@ -8,9 +8,9 @@
 
 // 第 1 步：认识汐
 "intro.title" = "Welcome to TideBar";
-"intro.message" = "TideBar is a hairline tucked against the bottom edge of your screen — nearly invisible at rest. Move the cursor close and it rises into an icon bar; click and hold any icon to reach every window of that app, minimized ones included.";
+"intro.message" = "TideBar is a macOS window taskbar that collapses to a line when idle. Move the pointer near it to launch apps or open pinned files and folders. Hold an app icon to choose a window, including minimized windows.";
 "intro.demoTitle" = "Demo: tide line → icon bar → Surge";
-"intro.demoCaption" = "Move close and the hairline rises into the icon bar; click and hold (or ⌥-click) an icon and Surge lays out all of that app's windows";
+"intro.demoCaption" = "Move the pointer near the line to expand the bar. Hold or Option-click an app icon to open its window list.";
 "intro.privacyNote" = "TideBar shows no window content thumbnails and never requests screen recording.";
 
 // 第 2 步：窗口管理权限
@@ -61,7 +61,7 @@
 "finish.windowsPending" = "Pending; you can grant it later in Settings";
 "finish.gesturesTitle" = "Gestures";
 "finish.gesture.approachTitle" = "Approach";
-"finish.gesture.approachDetail" = "The tide line rises to meet you";
+"finish.gesture.approachDetail" = "Expand the icon bar";
 "finish.gesture.clickTitle" = "Click";
 "finish.gesture.clickDetail" = "Launch or switch apps";
 "finish.gesture.holdTitle" = "Click & hold";

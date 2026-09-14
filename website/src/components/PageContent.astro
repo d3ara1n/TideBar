@@ -1,5 +1,5 @@
 ---
-import { ArrowDown, Bell, Check, ChevronRight, CircleDot, CodeXml, LayoutList, Waves, X } from "@lucide/astro";
+import { ArrowDown, Bell, Check, ChevronRight, CodeXml, Folder, LayoutList, Waves, X } from "@lucide/astro";
 import TideBarNav from "./TideBarNav.astro";
 
 interface Props {
@@ -10,23 +10,23 @@ const { lang = "en" } = Astro.props;
 const en = lang === "en";
 
 const titles = en
-  ? { features: "Features", demo: "Demo", privacy: "Privacy", download: "Download", source: "Source" }
-  : { features: "特色", demo: "演示", privacy: "隐私", download: "下载", source: "源码" };
+  ? { features: "Features", privacy: "Privacy", download: "Download", source: "Source" }
+  : { features: "功能", privacy: "隐私", download: "下载", source: "源码" };
 ---
 <main class="desktop" id="main-content">
   <div class="desktop-wallpaper" aria-hidden="true"></div>
 
   <section class="desktop-hero" id="home" aria-labelledby="hero-title">
-    <p class="eyebrow">{en ? "A zero-footprint window taskbar for macOS" : "macOS 不占屏幕的窗口任务栏"}</p>
+    <p class="eyebrow">{en ? "TideBar · Free and open source" : "汐 TideBar · 免费开源"}</p>
     <h1 id="hero-title">
       {en
-        ? <>A hairline at rest, <span class="headline-dim">every window at hand.</span></>
-        : <>平时是一条线，<span class="headline-dim">需要时每个窗口触手可及。</span></>}
+        ? <>A macOS taskbar <span class="headline-dim">that collapses to a line.</span></>
+        : <>macOS 窗口任务栏，<span class="headline-dim">闲置时收成一条线。</span></>}
     </h1>
     <p class="lede">
       {en
-        ? "TideBar tucks into the bottom edge as a hairline until you need it — then apps and every window are one move away. Turn on takeover and the Dock steps aside, giving a small MacBook a full row back."
-        : "汐平时收成屏幕底边的一条细线，需要时展开为图标栏——应用与每个窗口都一触即达。开启接管，系统 Dock 隐去，小屏 MacBook 多出一整行空间。"}
+        ? "Move the pointer near the bottom of your screen to launch apps, switch windows, or open pinned files and folders. Move away and the bar collapses."
+        : "鼠标靠近屏幕底部时展开，可启动应用、切换窗口，以及打开固定的文件和文件夹。鼠标移开后自动收起。"}
     </p>
     <div class="hero-actions">
       <a class="button button-primary" href="#download" data-section-link="download">
@@ -34,11 +34,11 @@ const titles = en
         {en ? "Download for macOS" : "下载 macOS 版"}
       </a>
       <a class="text-link" href="#features" data-section-link="features">
-        {en ? "Explore the tide" : "了解潮汐交互"}
+        {en ? "View features" : "查看功能"}
         <ChevronRight strokeWidth={2.2} aria-hidden="true" />
       </a>
     </div>
-    <p class="hero-meta">{en ? "macOS 14+ · Accessibility only · Open source" : "macOS 14+ · 仅需辅助功能 · 开源"}</p>
+    <p class="hero-meta">{en ? "macOS 14+ · MIT License" : "macOS 14+ · MIT 许可证"}</p>
   </section>
 
   <section class="window" id="features" data-window="features" aria-labelledby="features-title">
@@ -51,67 +51,45 @@ const titles = en
       <span class="window-title">{titles.features}</span>
     </div>
     <div class="window-body">
-      <p class="eyebrow">{en ? "The tide in four movements" : "四种潮汐状态"}</p>
+      <p class="eyebrow">{titles.features}</p>
       <h2 id="features-title">
         {en
-          ? <>Quiet by default. <span class="headline-dim">Ready when called.</span></>
-          : <>平时安静，<span class="headline-dim">唤之即来。</span></>}
+          ? <>Manage apps, windows, <span class="headline-dim">files, and folders.</span></>
+          : <>启动应用、切换窗口，<span class="headline-dim">打开文件和文件夹。</span></>}
       </h2>
       <div class="feature-grid">
         <article class="feature-card">
           <span class="feature-chip"><Waves strokeWidth={1.8} aria-hidden="true" /></span>
-          <h3>{en ? "Tide Line" : "汐线"}</h3>
+          <h3>{en ? "Expand on hover" : "靠近展开"}</h3>
           <p>{en
-            ? "A 2–3pt hairline hugs the bottom edge until your cursor calls up the icon bar."
-            : "2–3pt 细线贴着屏幕底边，光标靠近即展开为图标栏。"}</p>
-        </article>
-        <article class="feature-card">
-          <span class="feature-chip"><CircleDot strokeWidth={1.8} aria-hidden="true" /></span>
-          <h3>{en ? "Dots" : "点点"}</h3>
-          <p>{en
-            ? "Window state is visible at a glance: active windows filled, minimized windows hollow."
-            : "窗口状态一眼可见：活跃窗口实心，最小化窗口空心。"}</p>
+            ? "The bar collapses to a thin line when idle. Move the pointer near it to expand. Appearance and animation settings are adjustable."
+            : "闲置时收起为细线，鼠标靠近时展开。外观和动画可在设置中调整。"}</p>
         </article>
         <article class="feature-card">
           <span class="feature-chip"><LayoutList strokeWidth={1.8} aria-hidden="true" /></span>
-          <h3>{en ? "Surge" : "潮涌"}</h3>
+          <h3>{en ? "Switch windows" : "切换窗口"}</h3>
           <p>{en
-            ? "Click and hold an app to reach any window — minimized ones included, one click to restore."
-            : "按住应用即可直达任意窗口——最小化的也在列表里，点击即还原。"}</p>
+            ? "Hold or Option-click an app to select a window by title, including minimized windows. Filled dots mean non-minimized; hollow dots mean minimized."
+            : "长按或 Option-click 应用，按标题选择窗口，最小化窗口也可恢复。图标下实心点表示未最小化，空心点表示已最小化。"}</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-chip"><Folder strokeWidth={1.8} aria-hidden="true" /></span>
+          <h3>{en ? "Pin apps and files" : "固定应用与文件"}</h3>
+          <p>{en
+            ? "Pin apps, files, and folders, then drag to reorder them. Hold a folder to list recently modified items, or create an app collection for grouped launch shortcuts."
+            : "固定应用、文件和文件夹，拖拽调整顺序。长按文件夹查看最近修改的项目，也可创建应用收藏夹来分组保存启动入口。"}</p>
         </article>
         <article class="feature-card">
           <span class="feature-chip"><Bell strokeWidth={1.8} aria-hidden="true" /></span>
-          <h3>{en ? "Ripple" : "涟漪"}</h3>
+          <h3>{en ? "Notification badges" : "通知角标"}</h3>
           <p>{en
-            ? "Unread badges keep the line gently present, never loud. Opening the bar settles it."
-            : "未读角标让细线保持轻微在场，不抢夺注意力；展开即确认。"}</p>
+            ? "App badges are read from the system Dock. New badges trigger a line animation; expanding the bar stops it without marking messages as read."
+            : "从系统 Dock 读取应用角标。有新角标时细线播放提醒动画，展开图标栏后停止，不会把原应用的消息标为已读。"}</p>
         </article>
       </div>
       <p class="window-note">{en
         ? "In fullscreen apps the line opens on a click by default; hover-to-open and fully hidden modes are in Settings."
         : "全屏应用下默认点击汐线展开；悬停展开与完全隐藏可在设置中选择。"}</p>
-    </div>
-  </section>
-
-  <section class="window" id="demo" data-window="demo" aria-label={titles.demo}>
-    <div class="window-titlebar">
-      <button class="window-close" type="button" data-close aria-label={en ? "Close window" : "关闭窗口"}>
-        <X strokeWidth={2.6} aria-hidden="true" />
-      </button>
-      <span class="window-dot yellow" aria-hidden="true"></span>
-      <span class="window-dot green" aria-hidden="true"></span>
-      <span class="window-title">{titles.demo}</span>
-    </div>
-    <div class="window-body">
-      <img
-        class="demo-shot"
-        src="/demo.webp"
-        width="1600"
-        height="1000"
-        alt={en
-          ? "The hairline resting at the bottom edge, the icon bar risen from it, and the Surge window list of a single app."
-          : "屏幕底边的细线、由它展开的图标栏，以及某个应用的潮涌窗口列表。"}
-      />
     </div>
   </section>
 
@@ -125,22 +103,25 @@ const titles = en
       <span class="window-title">{titles.privacy}</span>
     </div>
     <div class="window-body">
-      <p class="eyebrow">{en ? "Designed with restraint" : "克制的设计"}</p>
+      <p class="eyebrow">{en ? "Permissions and privacy" : "权限与隐私"}</p>
       <h2 id="privacy-title">
         {en
-          ? <>One permission. <span class="headline-dim">No screen recording. No telemetry.</span></>
-          : <>一项权限。<span class="headline-dim">不申请屏幕录制。无遥测。</span></>}
+          ? <>Window management <span class="headline-dim">uses Accessibility access.</span></>
+          : <>通过辅助功能权限<span class="headline-dim">管理窗口。</span></>}
       </h2>
       <p class="lede">
         {en
-          ? "TideBar uses Accessibility only to list and restore windows and detect fullscreen state. It shows no window thumbnails, asks for no Screen Recording permission, and collects nothing about you."
-          : "汐仅使用辅助功能来列出、还原窗口并识别全屏状态。不显示窗口缩略图，不申请屏幕录制权限，也不收集你的任何信息。"}
+          ? "Accessibility access lets TideBar read window titles and states, focus and restore windows, detect fullscreen apps, and read Dock badges. File access follows macOS access controls."
+          : "辅助功能权限用于读取窗口标题与状态、聚焦和恢复窗口、识别全屏应用，以及读取 Dock 角标。文件访问遵循 macOS 的访问控制。"}
       </p>
       <div class="privacy-list">
-        <span class="privacy-pill"><Check strokeWidth={2.4} aria-hidden="true" />{en ? "Accessibility only" : "仅需辅助功能"}</span>
+        <span class="privacy-pill"><Check strokeWidth={2.4} aria-hidden="true" />{en ? "No Screen Recording permission" : "不申请屏幕录制"}</span>
         <span class="privacy-pill"><Check strokeWidth={2.4} aria-hidden="true" />{en ? "No window thumbnails" : "不显示窗口缩略图"}</span>
-        <span class="privacy-pill"><Check strokeWidth={2.4} aria-hidden="true" />{en ? "No tracking or account" : "无追踪、无账号"}</span>
+        <span class="privacy-pill"><Check strokeWidth={2.4} aria-hidden="true" />{en ? "No usage analytics or account" : "无使用情况分析、无账号"}</span>
       </div>
+      <p class="window-note">{en
+        ? "Packaged builds use Sparkle to check GitHub Releases for updates. Turn off automatic checks in Settings → About."
+        : "打包版通过 Sparkle 从 GitHub Releases 检查更新，可在「设置 → 关于」中关闭自动检查。"}</p>
     </div>
   </section>
 
@@ -154,11 +135,11 @@ const titles = en
       <span class="window-title">{titles.download}</span>
     </div>
     <div class="window-body">
-      <p class="eyebrow">{en ? "Give the bottom edge back" : "把屏幕底边还给你"}</p>
+      <p class="eyebrow">{en ? "macOS 14 or later" : "macOS 14 或更高版本"}</p>
       <h2 id="download-title">
         {en
-          ? <>A calmer way to reach <span class="headline-dim">every window.</span></>
-          : <>更安静地抵达<span class="headline-dim">每个窗口。</span></>}
+          ? <>Install <span class="headline-dim">TideBar.</span></>
+          : <>安装 <span class="headline-dim">TideBar。</span></>}
       </h2>
       <div class="window-actions">
         <a class="button button-primary" href="https://github.com/d3ara1n/TideBar/releases">
@@ -170,7 +151,16 @@ const titles = en
           {en ? "View on GitHub" : "在 GitHub 查看"}
         </a>
       </div>
-      <p class="window-note">{en ? "Free and open source under the MIT License." : "MIT 许可证下免费开源。"}</p>
+      <p class="window-note">{en
+        ? "Extract the release ZIP and move TideBar.app to Applications. Builds are not notarized by Apple; if macOS blocks the app, use Open Anyway in System Settings → Privacy & Security after trying to launch it."
+        : "解压发布 ZIP，将 TideBar.app 移到「应用程序」。构建未经 Apple 公证；若 macOS 阻止打开，请在尝试启动后，到「系统设置 → 隐私与安全性」选择「仍要打开」。"}</p>
+      <p class="window-note">{en
+        ? "The setup guide asks for Accessibility access and Dock takeover. Takeover saves and changes your Dock settings, then restarts the Dock to hide it. The taskbar appears while takeover is enabled; normal quit restores the saved settings."
+        : "首次启动引导包含辅助功能授权和 Dock 接管。接管会保存并修改 Dock 设置，重启 Dock 以隐藏它。启用接管后才显示任务栏，正常退出时恢复保存的设置。"}</p>
+      <a class="text-link" href={en ? "https://github.com/d3ara1n/TideBar#install" : "https://github.com/d3ara1n/TideBar/blob/main/README.zh-CN.md#安装"}>
+        {en ? "Setup, recovery, and usage instructions" : "安装、恢复与使用说明"}
+        <ChevronRight strokeWidth={2.2} aria-hidden="true" />
+      </a>
     </div>
   </section>
 
@@ -184,24 +174,24 @@ const titles = en
       <span class="window-title">{titles.source}</span>
     </div>
     <div class="window-body">
-      <p class="eyebrow">{en ? "Built in the open" : "开放构建"}</p>
+      <p class="eyebrow">{en ? "Source and feedback" : "源码与反馈"}</p>
       <h2 id="source-title">
         {en
-          ? <>Follow the work <span class="headline-dim">behind the tide.</span></>
-          : <>了解潮汐<span class="headline-dim">背后的构建过程。</span></>}
+          ? <>Build from source <span class="headline-dim">or report an issue.</span></>
+          : <>从源码构建，<span class="headline-dim">或反馈问题。</span></>}
       </h2>
       <p class="lede">
         {en
-          ? "Read the decisions, inspect the source, or help shape what TideBar becomes next."
-          : "阅读架构决策、查看源码，或一起塑造汐的下一步。"}
+          ? "TideBar is written in Swift and released under the MIT License. Build it on macOS with Swift 6.2 or later. For bug reports, include your macOS version, TideBar version, and steps to reproduce."
+          : "TideBar 使用 Swift 编写，采用 MIT 许可证。可在 macOS 上通过 Swift 6.2 或更高版本构建。报告问题时，请附上 macOS 版本、TideBar 版本和复现步骤。"}
       </p>
       <div class="window-actions">
         <a class="button button-glass" href="https://github.com/d3ara1n/TideBar">
           <CodeXml strokeWidth={1.8} aria-hidden="true" />
           d3ara1n/TideBar
         </a>
-        <a class="text-link" style="align-self:center" href="https://github.com/d3ara1n/TideBar/releases">
-          {en ? "Release notes" : "版本记录"}
+        <a class="text-link" style="align-self:center" href="https://github.com/d3ara1n/TideBar/issues">
+          {en ? "Report an issue" : "问题反馈"}
           <ChevronRight strokeWidth={2.2} aria-hidden="true" />
         </a>
       </div>
@@ -210,7 +200,7 @@ const titles = en
 
   <footer class="desktop-corner">
     <p>{en ? "TideBar · MIT License" : "汐 TideBar · MIT License"}</p>
-    <p class="corner-hint">{en ? "This page is the demo — hover the line below." : "这个页面本身就是演示——悬停下方细线。"}</p>
+    <p class="corner-hint">{en ? "Move the pointer near the line below to open this site's navigation." : "鼠标靠近下方细线可展开网站导航。"}</p>
   </footer>
 </main>
 
