@@ -1,6 +1,6 @@
 # 升级 Xcode 27 后采用原生 reorderable API
 
-> 状态：延后立案，待 Xcode 27 正式版。
+> 状态：已结案，无 SwiftUI 拖拽排序消费点。固定项目页未立项，设置页为增删改查不排序；AppKit 图标栏拖拽归 `todo-2026-09-09-items-and-drag.md` 管辖。将来若出现 SwiftUI 容器排序需求，重新立案。
 
 ## 背景
 
