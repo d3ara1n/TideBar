@@ -1,6 +1,6 @@
 # 已定决策
 
-决策真值，描述最终状态。演进过程看 git log 与 `plans/archived/`；推翻决策时改写对应条目并同步受影响文档。每条决策就地附调研来源与实测依据。
+决策真值，描述最终状态。演进过程看 git log 与 `plans/archived/`；推翻决策时改写对应条目并同步受影响文档。
 
 ## 架构：藏 UI、留进程
 
@@ -18,14 +18,9 @@ defaults write com.apple.dock mineffect -string scale           # genie 动画�
 killall Dock
 ```
 
-标配快照/恢复：接管前快照原始值，恢复时对原本不存在的键用 `CFPreferencesSetAppValue(key, nil, …)` 删回默认。配置漂移只在启动、接管/恢复操作、设置页打开或用户主动检查时发现，不做常驻自愈。
+标配快照/恢复：接管前快照原始值，恢复时对原本不存在的键用 `CFPreferencesSetAppValue(key, nil, …)` 删回默认。
 
 这是对用户系统的修改，由 App 内首次启动向导引导用户执行，不静默改。
-
-来源：
-- uBar 官方文档 https://ubarapp.com/documentation/
-- Focus Dock 源码注释（tilesize/mineffect 理由）：https://github.com/The-Portland-Company/focus-dock-for-macos
-- 同类实现横评见 [research-dock-alternatives.md](research-dock-alternatives.md) §二
 
 ## 为什么不能真禁用 Dock 进程
 
@@ -37,10 +32,6 @@ killall Dock
 | Mission Control / App Exposé | 失效（由 Dock 进程渲染） |
 | 窗口最小化 | 应用请求最小化时挂起（genie 动画由 Dock 渲染） |
 | Launchpad | 失效 |
-
-来源：
-- https://512pixels.net/2022/04/fix-mission-control-and-app-switcher-crashes-in-macos-monterey/
-- https://stackoverflow.com/questions/9778688/
 
 ## 功能可行性边界
 
@@ -60,14 +51,9 @@ killall Dock
 
 **已明确不做**（产品边界见 [product.md](product.md)，此处留可行性依据）：
 
-- 废纸篓：不做。若将来重启，kqueue（`DispatchSourceFileSystemObject` + `O_EVTONLY`）是同类项目验证过的更轻事件驱动路线，无项目用 FSEvents；「放回原处」无公开 API，需解析 `.DS_Store` 私有 `ptbN`/`ptbL` 记录。
+- 废纸篓：不做。将来重启的话，kqueue（`DispatchSourceFileSystemObject` + `O_EVTONLY`）是同类项目验证过的轻量事件路线；「放回原处」无公开 API，需解析 `.DS_Store` 私有 `ptbN`/`ptbL` 记录。
 - 窗口实时预览：不做，见「窗口画面与 ScreenCaptureKit」。
-- App 任务进度反馈：不做。TideBar 不读取 App 内部 UI、通知内容或进程内 `NSProgress`，也不要求第三方 App 提供适配；macOS 没有公开的跨 App 统一进度 API。现有 Dock AX 镜像仅限 `AXStatusLabel` 角标，不扩展为进度扫描。
-
-来源：
-- DockDoor（AX + 抓图参考实现）：https://github.com/ejbills/DockDoor
-- Put Back 的 .DS_Store 私有格式：https://stackoverflow.com/questions/18707618/
-- 调研横评见 [research-dock-alternatives.md](research-dock-alternatives.md) §四
+- App 任务进度反馈：不做，见「App 任务进度反馈」。
 
 ## 权限策略
 
@@ -78,19 +64,16 @@ killall Dock
 ## 窗口层级与避让
 
 1. **优先高层级顶置，接受展开态遮盖**：汐线面板与全屏点击入口用 `NSWindow.Level.statusBar`，潮涌面板高一级，展开态覆盖最大化窗口是预期体验；不使用 `.screenSaver`，避免压住系统级安全界面。若后续发现 statusBar 层级干扰菜单、弹窗或全屏 Space，回退普通悬浮层（仍不做窗口避让）。
-2. **遮盖是产品特色，一切避让路线不立项**：核心交换是「收起态零占用 + 展开态按需盖在内容之上」；AX 窗口重排（uBar 路线）、SkyLight 空间预留等一旦立项，产品退化为「另一条常驻任务栏」。窗口 level 压过系统 Dock 有 IME 风险（Ghostty PR #5361），statusBar 层级 + 隐藏系统 Dock 的组合无此问题。
+2. **遮盖是产品特色，一切避让路线不立项**：核心交换是「收起态零占用 + 展开态按需盖在内容之上」；AX 窗口重排（uBar 路线）、SkyLight 空间预留等一旦立项，产品退化为「另一条常驻任务栏」。窗口 level 压过系统 Dock 有 IME 风险，statusBar 层级 + 隐藏系统 Dock 的组合无此问题。
 3. **全屏观感由设置解决**：FullscreenBehavior 三档（clickToExpand 点击展开 / normal 正常展开 / hidden 完全隐藏），不引入避让机制。
 4. **不采用私有 CoreDock API**：不把私有 API 作为长期基础设施（系统版本兼容性与维护成本不可控）；短期实验可单独验证。
 5. **接管态与测试态分离**：接管态由配置模式驱动，贴底运行（offsetY = 0）；测试态使用悬浮高度（默认 140pt）。
 6. **不做常驻自动自愈**：不运行 Dock 配置轮询计时器，不引入后台 helper 或 LaunchAgent；漂移只告警，设置界面显示警告信息条，用户点击「立即检查并修复」后才重新应用接管参数。
 
-来源：
-- Ghostty PR #5361（窗口 level 与 IME）：https://github.com/ghostty-org/ghostty/pull/5361
-
 ## 交互与鼠标态约定
 
 - **窗口层组合**：borderless + nonactivating + canJoinAllSpaces + fullScreenAuxiliary；level 见「窗口层级与避让」。收起态靠 `ignoresMouseEvents` 点击穿透，进入交互翻回 false。
-- **鼠标态统一采样器驱动（非激活悬浮窗上 NSTrackingArea 不可靠）**：实测 entered/exited 合成有稳定复现的状态机失步。图标悬停、潮涌行悬停、离场判定全部由接近检测采样器（mouseMoved 事件 + 40ms 节流 + 0.25s 兜底轮询）做命中测试驱动；点击/长按仍走 mouseDown/Up 事件流（该路径可靠）。离场收起防抖 300ms，期间 re-enter 取消。
+- **鼠标态统一采样器驱动（非激活悬浮窗上 NSTrackingArea 不可靠）**：图标悬停、潮涌行悬停、离场判定全部由接近检测采样器（mouseMoved 事件 + 40ms 节流 + 0.25s 兜底轮询）做命中测试驱动；点击/长按仍走 mouseDown/Up 事件流（该路径可靠）。离场收起防抖 300ms，期间 re-enter 取消。
 - **接近检测主路线**：全局 `NSEvent.addGlobalMonitorForEvents` 监听 mouseMoved / leftMouseDragged（鼠标类零权限），local monitor 兜底自家激活态，低频轮询 `NSEvent.mouseLocation` 兜底。左键按住期间的真实位置变化属于移动，静止轮询不解除菜单保持或键盘展开抑制。NSTrackingArea 仅用于展开面板内部 hover。
 - **key 只服务键盘会话**：材质质量与窗口 key 状态无关（NSVisualEffectView 以 `.state = .active` 固定渲染）；`makeKey()` 仅在键盘会话开始时调用（local monitor 只能看到投递给本 app 的键盘事件，潮涌面板自身无需 key），鼠标展开不改变 frontmost。
 - **悬停名 = 名字气泡（所有条目通用）**：替代系统 tooltip 的标准交互。悬停图标短暂延迟后图标上方浮出玻璃小泡显示条目名，泡在场时换目标即时切换；宽度随文字自适应、240pt 封顶，封顶后转泡内往返滚动（两端渐隐，减弱动态退化为中截断）。气泡纯展示（ignoresMouseEvents，悬停判定仍由采样器驱动），潮涌展开、收起、拖拽与面板重建时让位隐藏。
@@ -116,26 +99,26 @@ killall Dock
 7. **操作决定是否解释引用**：源与目标都以引用参与提案，拖拽不传递文件内容，也不提供所有类型必须经过的 resolve 管线。行为可以直接处理引用，或自行解析实际对象；widget 不要求对应 URL、文件或进程。创建 item 只存关联，不把资源搬进 TideBar；目录移动等文件操作自行定位和校验源、目标本体。
 8. **提案与执行分离**：接收提案结合来源、payload、目标能力与落点，提供无副作用的意图和反馈；预览与提交消费同一意图，drop 时重新校验目标再执行。hover 不执行系统动作，具体动效独立设计，不用动效反推业务意图。
 9. **移动成功必须对应实际完成**：目录接收限同卷移动，先检查同名、自身／子树和源之间的包含关系；不覆盖、不静默退化复制。原生 move 只有实际完成后才报告成功，批量部分失败明确反馈，不自动回滚。跨卷传输的进度、取消和失败恢复独立立案。
-10. **不猜测拖出终止原因**：source 结束回调中的 operation=none 不能证明用户释放。只在本次明确 mouse-up、按钮已释放、栏外且会话未失效／未提交时移除引用；Esc 或未知事件保留条目。用户实测确认 Pressure 终止事件存在，不能用“没有观察到 Esc”推断删除。
+10. **不猜测拖出终止原因**：source 结束回调中的 operation=none 不能证明用户释放，Esc 之外还存在其他终止事件。只在本次明确 mouse-up、按钮已释放、栏外且会话未失效／未提交时移除引用；Esc 或未知事件保留条目。
 11. **意图、投射与样式分离**：`ItemDragPreview` 只表达展示语义，`ItemDragLayout` 计算稳定身份槽位与命中；`ItemRowView` 协调临时布局与真实列表，预览不写数据。占位形状、图标明暗和让位动画实现在 `ItemDragVisuals.swift`，节奏在 `Motion.swift`。不为尚不存在的样式建设主题或插件框架。
 12. **拖拽反馈不叠加普通 hover**：排序展示目标占位并让邻项移动，接收提亮目标 artwork，拒绝压暗而不退化插入。拖拽期间抑制普通圆环；命中容错与布局投射分开，几何变化不能自行切换静止鼠标下的意图。内部会话开始即禁止系统失败回位，取消仅恢复列表投射，成功移除在原地结束，不创建额外特效窗口。
 
 ## UI 技术栈分工
 
-1. **窗口层恒为 AppKit**：borderless/nonactivating、level、collectionBehavior、makeKey 语义只有 NSPanel/NSWindow 能表达；SwiftUI Window scene 服务常规应用模型，不适用于零存在感悬浮窗（DockDoor 等同类同样只在 NSPanel 内宿主 SwiftUI）。
+1. **窗口层恒为 AppKit**：borderless/nonactivating、level、collectionBehavior、makeKey 语义只有 NSPanel/NSWindow 能表达；SwiftUI Window scene 服务常规应用模型，不适用于零存在感悬浮窗。
 2. **画布层（汐线/图标栏/潮涌）用 NSView + CALayer**：编舞需要 keyPath 级控制（anchorPoint 钉底边、同层正交动画、精确 from-value、spring 参数与错峰 delay）；窗口几何由控制器命令式计算；常驻窗口空闲零开销（合成器线程重复动画，无 SwiftUI 宿主 runtime），图标行按 identity 差分复用。
 3. **SwiftUI 用于窗口界面**：设置页、引导页、KeyboardShortcuts 录制器等数据驱动表单，经 `NSHostingController` + `LocalizedContent` 注入语言快照。
 4. **材质直控 NSVisualEffectView**：material/blendingMode/state/appearance 全部可显式钉死（`.active` 固定 + 深浅色覆盖），不套 SwiftUI Material 密封抽象。
 
 ## 潮涌：类型化长按面板
 
-长按或 ⌥+点击条目展开的二级面板。容器（NSPanel、层级、玻璃材质、图标锚定定位、Esc、keep-region 与他处交互判定）归控制器；内容由条目类型的「潮涌体」提供——每个类型有自己的潮涌体与状态呈现，列表、空态、不可读、截断都由体自绘，容器不做统一空态。小组件等未来类型接入自定义潮涌体时只加内容形态，不动容器。应用窗口行与目录文件行恰好形似，共享通用行视图与错峰动画，但这是实现便利，不是契约。AX 能力依据见 [research-dock-alternatives.md](research-dock-alternatives.md) §三坑 3（Focus Dock 源码验证）。
+长按或 ⌥+点击条目展开的二级面板。容器（NSPanel、层级、玻璃材质、图标锚定定位、Esc、keep-region 与他处交互判定）归控制器；内容由条目类型的「潮涌体」提供——每个类型有自己的潮涌体与状态呈现，列表、空态、不可读、截断都由体自绘，容器不做统一空态。小组件等未来类型接入自定义潮涌体时只加内容形态，不动容器。应用窗口行与目录文件行恰好形似，共享通用行视图与错峰动画，但这是实现便利，不是契约。
 
 1. **触发门槛查能力，不问条目内容**：`ItemCapabilities.surgeBody` 声明类型提供潮涌体；图标按钮的长按计时与 ⌥+点击均查此能力。体构造可含按需计算，控制器以请求代数丢弃过期的异步结果。
 2. **应用体（窗口列表）**：应用条目以 app 图标为粒度（不平铺窗口）。图标下方点点 = 窗口状态（实心=活跃数、空心=最小化数，>5 收敛为数字；读不到窗口信息不画）。点击 = 切换最近非最小化窗口（仅剩最小化则还原最近一个；AX 不可用时退化为 activate）；长按或 ⌥+点击 = 展开窗口列表；右键 = 应用管理菜单（见「应用右键菜单」，不列窗口）。行内容：窗口标题（`kAXTitle`）为主 + 文档图标（`kAXDocument` → `NSWorkspace.icon(forFile:)`，失败退回 app 图标）。
-3. **最小化标记双维度正交**：亮度 = 是否本屏可见（他屏与最小化暗显），行尾文字胶囊标签 = 是否最小化（`window.minimizedBadge`：「已最小化」/ Minimized，10.5pt medium，quiet 填充，圆角 5pt 非胶囊；随标题色）。标签仅最小化行出现，宽度按文字实测，出现时标题截断点左移（标签宽 + 8pt 间隙 + 12pt 右缘留白），不为偶发元素常驻留白。符号类标记（minus/菱形/`minus.rectangle`）均被否决：minus 在行语境读作删除动作，菱形读作「注意」标记。
+3. **最小化标记双维度正交**：亮度 = 是否本屏可见（他屏与最小化暗显），行尾文字胶囊标签 = 是否最小化（`window.minimizedBadge`：「已最小化」/ Minimized，10.5pt medium，quiet 填充，圆角 5pt 非胶囊；随标题色）。标签仅最小化行出现，宽度按文字实测，出现时标题截断点左移（标签宽 + 8pt 间隙 + 12pt 右缘留白），不为偶发元素常驻留白。
 4. **还原/聚焦**：`kAXMinimized` 置 false + `kAXRaiseAction` + `activateIgnoringOtherApps`；AX 读不到窗口的 app 降级为纯图标 + activate。
-5. **AX 窗口收录与排序**：`subrole == AXStandardWindow` 或 `minimized == true`。最小化窗口的 subrole 不可靠（实测：访达最小化丢 std 标记、Zen 最小化报 AXDialog），必须 min 兜底；对话框/访达桌面元素两者皆不满足，天然排除。窗口序 = 首见序：kAXWindows 返回 z 序（激活窗口恒在前、最小化恒垫底），不能直接用作展示序；快照沿用已知窗口的相对次序、新窗口按枚举序追加队尾，点点（位置固定，状态变化只改颜色/形状）、点击循环与潮涌列表共用这份顺序。依据见 `plans/archived/todo-2026-09-window-surge.md` 探针结论。
+5. **AX 窗口收录与排序**：`subrole == AXStandardWindow` 或 `minimized == true`，最小化窗口的 subrole 不可靠，必须 min 兜底；对话框/访达桌面元素两者皆不满足，天然排除。窗口序 = 首见序：kAXWindows 返回 z 序（激活窗口恒在前、最小化恒垫底），不能直接用作展示序；快照沿用已知窗口的相对次序、新窗口按枚举序追加队尾，点点（位置固定，状态变化只改颜色/形状）、点击循环与潮涌列表共用这份顺序。
 6. **目录体（最近文件）**：「最近」= 修改时间降序，显示上限 8，隐藏文件跳过，子目录参与排序；行点击经 NSWorkspace 打开。数据源一次 `contentsOfDirectory` 批量预取 mtime——无「按属性取 top-N」的系统 API（目录迭代序与 mtime 无关，Spotlight/NSMetadataQuery 依赖索引不适合瞬时面板）；病态目录按条目预算（20,000）封顶并呈现截断态，枚举离主线程。空目录、不可读/引用失效各自呈现状态行。
 7. **失效模型按类型分**：应用体靠窗口 revision 过期（条目消失、窗口知识降级或任意窗口内容变化即收起）；目录体无观察者，打开时按需计算天然新鲜，只对条目消失收场。不引入 FSEvents、常驻轮询，零空闲成本。
 8. **打开即驻留，不因鼠标离开收场**：潮涌打开后鼠标移走不收起（小工具等类型需要在面板外交互后返回，拖文件入面板是基本路径），汐线照常自收，潮涌悬浮在收起的汐线上方，回到热区再展开时仍接在栏上。收场条件 = 他处完成交互：左键「按下与松开均在面板外」的完整点击（长按触发与拖拽结束的松手豁免，豁免不跨下一次按下存活；按下在外、松手在内 = 拖入面板的丢弃，不收场）、右/中键在面板外按下、Esc、行拾取、应用体窗口修订失效、键盘会话结束、接管关闭/全屏隐藏/面板重建。拖动条目是动作的起点而非目标动作：拖动开始不收场，潮涌面板不是拖出移除的有效落点（拖到潮涌上松手不视为栏外取消固定）。悬停采样只驱动行高亮；名字气泡与潮涌同层级，潮涌在场时气泡让位。
@@ -166,10 +149,6 @@ killall Dock
 3. **动作统一校验**：显示、隐藏和退出执行前均刷新模型并校验运行实例身份；显示会解除隐藏并激活首选实例。受保护应用（Finder）不提供退出。
 4. **只承诺通用菜单，不继承应用自定义 Dock 菜单**：`applicationDockMenu(_:)` 只允许应用向系统 Dock 提供自己的菜单，无公开 API 供第三方读取；不把 Dock 私有 API 或瞬态 AX 菜单抓取作为基础设施。最近项目、特定应用专属动作属未来可选能力，若立项需重新评估数据来源、权限与稳定性。
 
-来源：
-- Apple `NSApplicationDelegate.applicationDockMenu(_:)`：https://developer.apple.com/documentation/appkit/nsapplicationdelegate/applicationdockmenu(_:)
-- Apple `NSDockTilePlugIn`：https://developer.apple.com/documentation/appkit/nsdocktileplugin
-
 ## 应用状态与列表动画
 
 1. **动画跟随模型真值**：窗口点变化、应用新增与应用删除均由 Registry/AX 已确认的数据变化触发，不在点击、启动请求或退出请求发生时提前假设结果。
@@ -187,7 +166,7 @@ killall Dock
 ## 统一轮询与通知角标
 
 1. **PollScheduler 是常驻轮询唯一入口**：单一基频 Timer（= 需求最小间隔）承载全部需求；按名注册/注销，相位错开分片，容差 1/5 基频允许系统合并唤醒；主线程 tick 只做触发，重活（AX 读取）由需求自调度后台队列回桥。接近检测兜底、Dock 角标、设置页权限轮询全部迁入；设置页开窗注册、关窗注销。
-2. **角标路线（本机实测成立）**：接管态（autohide-delay 1000 + tilesize 16）下 `com.apple.dock` 进程 AX 树可枚举全部 `AXDockItem`，`AXStatusLabel` 实时携带角标字符串；无变更推送，只能轮询。覆盖面 = Dock 角标镜像，与系统设置中各 app 的角标开关天然一致。uBar、SketchyBar、simple-bar、BadgeBar、Focus Dock 同路线。
+2. **角标路线（Dock AX 镜像）**：接管态（autohide-delay 1000 + tilesize 16）下 `com.apple.dock` 进程 AX 树可枚举全部 `AXDockItem`，`AXStatusLabel` 实时携带角标字符串；无变更推送，只能轮询。覆盖面 = Dock 角标镜像，与系统设置中各 app 的角标开关天然一致。
 3. **BadgeStore 落地**：后台读 Dock AX 树，展开 1s/收起 4s 自适应、展开瞬间立即全量读、接管关闭时不轮询（系统 Dock 可见时镜像无意义）；badge 进 AppEntry 模型真值，不触发潮涌失效；Dock 标题与应用显示名小写规范化对位，匹配不到静默忽略。
 4. **汐线通知语言：轻涌 + 持久涟漪，展开即确认**：新角标一次轻涌，未确认期间双环错相涟漪循环（线源扁椭圆形态，横向 1.3 倍线宽、终态波高 14pt）；停止条件 = 任意一次展开（用户已知）或全部角标消失（从横幅读完）；减少动态效果时脉冲退化为短淡化、不做常驻循环。动机：一次性提醒与系统横幅注意力重复，持久动效表达「未被知晓」状态而非「事件发生」瞬间。
 5. **解析与展示约定**：AXStatusLabel 正整数→计数角标（99+ 封顶）、非空非数字→小圆点、空/零→不显示；连续读取失败 3 轮才清值，Dock 重启期间保留旧值防闪烁。
@@ -223,14 +202,10 @@ killall Dock
 
 1. **资源格式用经典 .strings（SE-0278），不用 String Catalogs**：xcstrings 的编译与符号生成绑定 Xcode/xcodebuild 链路，`swift build` 不原生支持。词条按功能域分 table（Onboarding/Settings/Menus/Runtime/Labels），en + zh-Hans 双语人工维护，key 点分层命名。
 2. **应用内切换 = 自定义 lproj bundle 查找**：`L10nManager` 按用户偏好从 Bundle.module 加载对应 lproj 子 bundle，全部文案查找显式指定该 bundle，不依赖系统 preferred localization；「跟随系统」按系统语言 zh 前缀归 zh-Hans，其余归 en。
-3. **SPM 把 lproj 目录名规范化为小写（zh-Hans.lproj → zh-hans.lproj），而 `path(forResource:)` 按精确名匹配**——自定义加载必须精确名查不到时按小写回查，否则非英文 bundle 加载失败静默回退、界面恒为英文（首次实现即踩此坑，GUI 验收暴露）。
+3. **SPM 把 lproj 目录名规范化为小写（zh-Hans.lproj → zh-hans.lproj），而 `path(forResource:)` 按精确名匹配**——自定义加载必须精确名查不到时按小写回查，否则非英文 bundle 加载失败静默回退、界面恒为英文。
 4. **语言以不可变快照接入依赖图**：`@Observable L10nManager` 原子替换包含偏好、实际语言和 bundle 的 `Localization`。每个 hosting root 通过 `LocalizedContent` 注入快照和 locale，消费视图声明 `@Environment(\.l10n)`；不用语言作为 `.id`（会重置 UI 状态）。枚举标签持 key（UI 层 extension 提供 `titleKey`），由独立读取环境的 `LocalizedText` 解析；两个语言选择器共用组件与状态写入路径。
 5. **状态保存语义，展示时翻译**：自有 Dock 错误以 `DockFailure` 保留错误类型与参数，向导和设置页展示时解析词条；只有外部系统错误才保存系统描述（`error.localizedDescription` 保持系统本地化直通）。AppKit 处（状态栏菜单、设置窗标题、已展开潮涌回退文案）监听语言通知重建。NSLog 运行时日志保持英文可 grep。
 6. **验收必须覆盖原生控件与独立子视图**：资源和状态单测不能替代 GUI 验收；权限轮询仅在权限值变化时发布，语言刷新不能依赖不相关的轮询或用户操作。
-
-来源：
-- Apple，SwiftUI 依赖图与视图值比较：https://developer.apple.com/videos/play/wwdc2021/10022/
-- Apple，`id(_:)` 的状态重置语义：https://developer.apple.com/documentation/swiftui/view/id(_:)
 
 ## 全屏检测与点击展开
 
@@ -241,12 +216,10 @@ killall Dock
 5. **独立非激活点击窗口**：主汐线面板维持展开尺寸及收起穿透；另用同屏紧凑 NSPanel（TidelineClickPanel）接收点击，窗口边界即命中边界，不做全局点击监听、事件拦截或转发。左键在区域内按下并松开才展开；点击入口不成为 key / main 窗口。
 6. **所有展开入口共享全屏状态**：鼠标、持久快捷键、应用切换快捷键和潮涌入口消费同一全屏状态；点击档要求点击，normal 正常交互，hidden 隐藏面板并停止命中。全屏限制生效时结束该屏键盘会话。只改变收起态的展开条件：点击后沿用图标、潮涌、键盘导航和离场收起，下一次收起再要求点击；进入点击模式时收起已有栏，后续全屏轮询不重复收起；展开、完全隐藏、退出全屏、停用和重建时撤销点击入口。
 
-依据：本机显示器 CG bounds 为 1710×1112pt、safeAreaInsets.top 为 38pt；Apple [NSScreen.safeAreaInsets](https://developer.apple.com/documentation/appkit/nsscreen/safeareainsets) 描述原生全屏内容位于安全区域内；[Logoer PR #31](https://github.com/lihaoyun6/Logoer/pull/31) 记录 macOS 26 上最大化与全屏窗口尺寸不可区分的实测。
-
 ## 窗口画面与 ScreenCaptureKit
 
 1. **不做悬停窗口实时预览**：ScreenCaptureKit 逐窗抓图的成本高于收益；可行性表相关行仅作技术路线留档。
-2. **ScreenCaptureKit 永不引入**：任何窗口画面能力不走 SCK，权限面永久收敛到辅助功能一项。缩略图类能力若立项，走私有 CGS（SkyLight）抓图——不触发 TCC、可截最小化窗口；调研文档 §四留有同类应用现状（纯 SCK 在 macOS 14/15 有崩溃/bug，AltTab 至 macOS 26 才全量 SCK；逐窗抓图主流是私有 `CGSHWCaptureWindowList`）。
+2. **ScreenCaptureKit 永不引入**：任何窗口画面能力不走 SCK，权限面永久收敛到辅助功能一项。缩略图类能力若立项，走私有 CGS（SkyLight）抓图——不触发 TCC、可截最小化窗口。
 3. **隐私话术受益**：不显示缩略图坐实「不读屏幕内容、永远不请求屏幕录制权限」的对外承诺。
 
 ## 部署基线
