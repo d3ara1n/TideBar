@@ -74,15 +74,33 @@ struct AppEntry: Identifiable {
         }.joined(separator: ",")
     }
 
-    /// 主点击：仅剩最小化窗口 → 还原最近一个；否则 activate
-    /// （activate 隐含 raise 最近窗口，与 Dock 一致；无 AX 信息时退化为纯激活）
+    /// 主点击 = 窗口循环，无外部状态，由前台 app 与窗口聚焦即时推导：
+    /// 前台不属于该 app → activate（系统切换最近窗口；全窗口最小化时还原一个，对齐 Dock）；
+    /// 前台已属该 app → 按窗口序（即点点序）切换下一个，最小化窗口无差别还原激活，
+    /// 无聚焦窗口则从头开始；窗口知识不可用或为空时退化为 activate + reopen
+    @MainActor
     func primaryClick() {
         if let app = runningApp {
             // 垂死实例（挂起期间进程已死、刷新未及消费）：不动作，等对账清场
             guard app.isProcessAlive else { return }
-            if let windows, !windows.isEmpty, windows.allSatisfy(\.isMinimized),
-               let window = windows.last, let owner = runningApp(for: window) {
-                AXReader.raise(window, app: owner)
+            if let windows, !windows.isEmpty {
+                let isFrontmost = NSWorkspace.shared.frontmostApplication
+                    .map { runningAppsByPID[$0.processIdentifier] != nil } ?? false
+                if isFrontmost {
+                    let index = windows.firstIndex(where: \.isActive)
+                        .map { ($0 + 1) % windows.count } ?? 0
+                    if let owner = runningApp(for: windows[index]) {
+                        AXReader.raise(windows[index], app: owner)
+                        return
+                    }
+                } else if windows.allSatisfy(\.isMinimized),
+                          let window = windows.first, let owner = runningApp(for: window) {
+                    // Dock 同款兜底：一个可见窗口都没有时先还原一个
+                    AXReader.raise(window, app: owner)
+                    return
+                }
+                // 已知有窗口时不补发 reopen，避免个别 app 借 reopen 误开新窗口
+                activate(reopenIfNeeded: false)
                 return
             }
             activate()
@@ -91,14 +109,14 @@ struct AppEntry: Identifiable {
         }
     }
 
-    /// 点击：运行中 → 激活 + 补发 reopen（对齐 Dock：无窗口时 app 会新开窗口）；
+    /// 点击：运行中 → 激活，无已知窗口时补发 reopen（对齐 Dock：无窗口时 app 会新开窗口）；
     /// 固定未运行 → 启动。reopen 事件若需 TCC 授权则静默跳过（零权限原则）
-    func activate() {
+    func activate(reopenIfNeeded: Bool = true) {
         if let app = runningApp {
             // 垂死实例：不激活、不发事件，避免向死 pid 报 procNotFound
             guard app.isProcessAlive else { return }
             _ = app.activate()
-            sendReopen(to: app)
+            if reopenIfNeeded { sendReopen(to: app) }
         } else if let applicationURL {
             launch(applicationURL)
         }

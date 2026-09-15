@@ -369,6 +369,11 @@ final class WindowStore {
             return
         }
 
+        // 窗口序稳定化：kAXWindows 返回 z 序（激活窗口恒在前、最小化恒垫底），
+        // 直接沿用会让点点随焦点跳动、点击循环顺序漂移；沿用上一轮快照中已知
+        // 窗口的相对次序，新窗口按枚举序追加队尾（点点、点击循环与潮涌共用）。
+        snapshots = Self.stableOrdered(snapshots, preservingOrderOf: watch.snapshots)
+
         let changed = watch.snapshots.map { Self.signature($0) } != Self.signature(snapshots)
         watch.snapshots = snapshots
         watches[pid] = watch
@@ -388,6 +393,23 @@ final class WindowStore {
                   watch.identity.bundleIdentifier, pid, snapshots.count, mini)
             onUpdate?(watch.identity)
         }
+    }
+
+    /// 窗口序稳定化：已知窗口沿用上轮次序，新窗口按本轮枚举序续到队尾；无上轮时保持枚举序
+    private static func stableOrdered(_ snapshots: [WindowSnapshot],
+                                      preservingOrderOf previous: [WindowSnapshot]?) -> [WindowSnapshot] {
+        guard let previous, !previous.isEmpty else { return snapshots }
+        let currentByID = Dictionary(snapshots.map { ($0.elementIdentifier, $0) },
+                                     uniquingKeysWith: { first, _ in first })
+        var matched = Set<Int>()
+        var ordered: [WindowSnapshot] = []
+        for snapshot in previous {
+            guard let current = currentByID[snapshot.elementIdentifier] else { continue }
+            ordered.append(current)
+            matched.insert(snapshot.elementIdentifier)
+        }
+        ordered.append(contentsOf: snapshots.filter { !matched.contains($0.elementIdentifier) })
+        return ordered
     }
 
     /// frame 变动不触发；窗口身份、标题、文档、最小化态、聚焦态与屏归属共同决定内容修订。

@@ -4,6 +4,8 @@ import QuartzCore
 /// 应用运行与窗口状态标记：灰色短线、窗口圆点和数量之间连续过渡。
 /// 圆点三通道单一含义：颜色 = 聚焦（强调色）/普通，形状 = 实心/空心 = 未最小化/最小化，
 /// 透明度 = 窗口归属别屏；通道正交组合，无优先级裁决。
+/// 圆点位置固定为窗口序（首见序）：状态变化只改颜色/形状，不重排位置，
+/// 点点顺序即点击循环的顺序。
 @MainActor
 final class AppStatusIndicatorView: NSView {
     /// isOnOtherScreen = 窗口归属不在本屏（归属未知时按本屏处理，不淡化）
@@ -12,13 +14,6 @@ final class AppStatusIndicatorView: NSView {
         let isMinimized: Bool
         let isOnOtherScreen: Bool
         let isActive: Bool
-
-        /// 聚焦 > 本屏未最小化 > 别屏未最小化 > 本屏最小化 > 别屏最小化
-        var order: Int {
-            if isMinimized { return 3 + (isOnOtherScreen ? 1 : 0) }
-            if isActive { return 0 }
-            return 1 + (isOnOtherScreen ? 1 : 0)
-        }
     }
 
     private enum State: Equatable {
@@ -92,7 +87,7 @@ final class AppStatusIndicatorView: NSView {
                           return screenID != viewDisplayID
                       }(),
                       isActive: window.isActive)
-        }.sorted { $0.order < $1.order }
+        }
         return .windows(dots)
     }
 
