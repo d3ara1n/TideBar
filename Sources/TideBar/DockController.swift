@@ -78,7 +78,7 @@ final class DockController {
         .mineffect: .string("scale"),
     ]
 
-    private let defaults = UserDefaults.standard
+    private let defaults = RuntimeEnvironment.defaults
     private(set) var state: State = .notEnabled {
         didSet { NotificationCenter.default.post(name: Self.didChange, object: self) }
     }
@@ -86,12 +86,17 @@ final class DockController {
     private init() {}
 
     func start() {
+        guard RuntimeEnvironment.isProduction else {
+            state = .notEnabled
+            return
+        }
         checkStatus()
     }
 
     /// 仅在设置界面或用户主动操作时检查，不常驻轮询。
     func checkStatus() {
-        guard AppConfiguration.shared.isTakeoverEnabled else {
+        guard RuntimeEnvironment.isProduction,
+              AppConfiguration.shared.isTakeoverEnabled else {
             state = .notEnabled
             return
         }
@@ -103,6 +108,10 @@ final class DockController {
     }
 
     func applyTakeover() {
+        guard RuntimeEnvironment.isProduction else {
+            state = .notEnabled
+            return
+        }
         guard !AppConfiguration.shared.isTakeoverEnabled else {
             checkStatus()
             return
@@ -122,6 +131,10 @@ final class DockController {
     }
 
     func restore() {
+        guard RuntimeEnvironment.isProduction else {
+            state = .notEnabled
+            return
+        }
         guard snapshotData() != nil else {
             state = .manualRecoveryRequired
             return
@@ -140,7 +153,8 @@ final class DockController {
 
     /// 用户在设置界面明确触发的修复操作。
     func repair() {
-        guard AppConfiguration.shared.isTakeoverEnabled else {
+        guard RuntimeEnvironment.isProduction,
+              AppConfiguration.shared.isTakeoverEnabled else {
             state = .notEnabled
             return
         }

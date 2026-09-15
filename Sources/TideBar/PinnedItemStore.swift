@@ -13,7 +13,7 @@ final class PinnedItemStore {
     private(set) var records: [PinnedItemRecord] = []
     private(set) var loadError: Error?
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = RuntimeEnvironment.defaults) {
         self.defaults = defaults
         do {
             if let object = defaults.object(forKey: Self.key) {

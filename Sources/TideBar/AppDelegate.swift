@@ -19,10 +19,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DockController.shared.start()
         UpdateCoordinator.shared.start()
         controller.start()
-        shortcutManager.onAction = { [weak self] action in
-            self?.controller.handleShortcut(action)
+        if RuntimeEnvironment.isProduction {
+            shortcutManager.onAction = { [weak self] action in
+                self?.controller.handleShortcut(action)
+            }
+            shortcutManager.start()
         }
-        shortcutManager.start()
         configurationObserver = NotificationCenter.default.addObserver(
             forName: AppConfiguration.didChange, object: nil, queue: .main
         ) { [weak self] _ in
@@ -55,16 +57,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }.call()
         }
 
-        if !AppConfiguration.shared.onboardingCompleted {
+        if RuntimeEnvironment.isProduction,
+           !AppConfiguration.shared.onboardingCompleted {
             showOnboarding()
         }
-        NSLog("TideBar application shell ready")
+        NSLog("TideBar application shell ready (%@)",
+              RuntimeEnvironment.isDevelopment ? "development" : "production")
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         shortcutManager.stop()
         controller.stop()
-        if AppConfiguration.shared.isTakeoverEnabled {
+        if RuntimeEnvironment.isProduction,
+           AppConfiguration.shared.isTakeoverEnabled {
             DockController.shared.restore()
         }
         if let configurationObserver {

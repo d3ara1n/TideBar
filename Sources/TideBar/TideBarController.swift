@@ -53,6 +53,8 @@ final class TideBarController {
     private let fullscreenDetector = FullscreenDetector()
     private var fullscreenStates: [CGDirectDisplayID: FullscreenState] = [:]
 
+    private var isDevelopment: Bool { RuntimeEnvironment.isDevelopment }
+
     // 潮涌：同一时刻只存在一个，归属于触发它的屏；内容是条目类型的潮涌体
     private var surgePanel: SurgePanel?
     private var surgeItemID: ItemID?
@@ -88,7 +90,8 @@ final class TideBarController {
             for state in self.screens.values { state.view.syncDragContext() }
         }
         dragCoordinator.allowsRemovalAt = { [weak self] point in
-            guard let self, AppConfiguration.shared.isTakeoverEnabled, !self.screens.isEmpty else { return false }
+            guard let self, !self.screens.isEmpty,
+                  self.isDevelopment || AppConfiguration.shared.isTakeoverEnabled else { return false }
             // 潮涌面板不是拖出移除的有效落点（拖到潮涌上松手不视为栏外取消固定）
             if let surge = self.surgePanel, surge.frame.contains(point) { return false }
             return self.screens.values.allSatisfy {
@@ -101,7 +104,7 @@ final class TideBarController {
         registry.onBadgePulse = { [weak self] name in self?.badgePulse(named: name) }
         registry.onApplicationsStarted = { [weak self] in self?.applicationsStarted() }
         items.start()
-        if AppConfiguration.shared.isTakeoverEnabled {
+        if isDevelopment || AppConfiguration.shared.isTakeoverEnabled {
             rebuildPanels()
         }
 
@@ -267,7 +270,7 @@ final class TideBarController {
     private var switcherTimeout: TimeInterval { AppConfiguration.shared.switcherCommitDelay }
 
     private func togglePersistentSession() {
-        guard AppConfiguration.shared.isTakeoverEnabled,
+        guard (isDevelopment || AppConfiguration.shared.isTakeoverEnabled),
               let state = targetScreenState(),
               allowsExpansion(state) else { return }
         if let session = barSession {
@@ -281,7 +284,7 @@ final class TideBarController {
     }
 
     private func cycleSwitcherSession() {
-        guard AppConfiguration.shared.isTakeoverEnabled else { return }
+        guard isDevelopment || AppConfiguration.shared.isTakeoverEnabled else { return }
         let state: ScreenState?
         if let session = barSession {
             state = screens[session.displayID]
@@ -488,6 +491,8 @@ final class TideBarController {
 
     /// 接管状态变化时启动或停止底部面板；固定列表变化则刷新现有模型。
     func configurationDidChange() {
+        // 开发运行使用内存配置，面板生命周期不由 takeover 开关驱动。
+        guard !isDevelopment else { return }
         guard AppConfiguration.shared.isTakeoverEnabled else {
             dragCoordinator.invalidate(reason: "takeover-disabled")
             endBarSession(collapse: false, suppressMouse: false)
@@ -511,7 +516,7 @@ final class TideBarController {
     }
 
     private func rebuildPanels() {
-        guard AppConfiguration.shared.isTakeoverEnabled else { return }
+        guard isDevelopment || AppConfiguration.shared.isTakeoverEnabled else { return }
         dragCoordinator.invalidate(reason: "panels-rebuilt")
         endBarSession(collapse: false, suppressMouse: false)
         dismissSurge(animated: false)
@@ -527,7 +532,7 @@ final class TideBarController {
 
         for screen in NSScreen.screens {
             guard let displayID = displayID(of: screen) else { continue }
-            let frame = barFrame(for: screen)
+                let frame = barFrame(for: screen)
             let panel = TidePanel(contentRect: frame)
             let view = TideBarView(frame: NSRect(origin: .zero, size: frame.size))
             view.dragCoordinator = dragCoordinator
@@ -573,6 +578,12 @@ final class TideBarController {
             }
             view.onHoverClear = { [weak self] in self?.hideNameBubble() }
             panel.orderFrontRegardless()
+            if isDevelopment {
+                // 调试栏始终以展开态显示，便于直接观察最新 UI；不参与底部热区/全屏策略。
+                state.isExpanded = true
+                state.panel.ignoresMouseEvents = false
+                state.view.setExpanded(true, apps: items.entries, immediate: true)
+            }
             screens[displayID] = state
         }
         behaviorDidChange()
@@ -588,7 +599,11 @@ final class TideBarController {
     }
 
     private func barBottom(for screen: NSScreen) -> CGFloat {
-        screen.frame.minY
+        if isDevelopment {
+            // `swift run` 只做悬浮预览：整栏位于屏幕中央，不与正式底栏重叠。
+            return screen.frame.midY - Layout.expandedHeight / 2
+        }
+        return screen.frame.minY
     }
 
     private func barFrame(for screen: NSScreen, extraSlots: Int = 0) -> NSRect {
@@ -818,7 +833,8 @@ final class TideBarController {
     /// 返回 true 表示整屏面板隐藏，不参与鼠标采样；点击模式展开后仍走正常离场收起。
     private func applyFullscreenBehavior(_ state: ScreenState, fullscreen: FullscreenState) -> Bool {
         // 持续未知时保持普通交互可用；检测真值仍为 unknown。
-        let behavior = fullscreen == .fullscreen ? AppConfiguration.shared.fullscreenBehavior : .normal
+        let behavior = isDevelopment ? .normal
+            : (fullscreen == .fullscreen ? AppConfiguration.shared.fullscreenBehavior : .normal)
         let previous = state.effectiveFullscreenBehavior
         state.effectiveFullscreenBehavior = behavior
         if behavior != previous, behavior != .normal {

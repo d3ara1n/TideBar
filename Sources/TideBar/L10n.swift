@@ -70,7 +70,7 @@ struct Localization: Equatable, Sendable {
 @MainActor
 @Observable
 final class L10nManager {
-    static let shared = L10nManager(defaults: .standard)
+    static let shared = L10nManager(defaults: RuntimeEnvironment.defaults)
     static let languageDidChange = Notification.Name("TideBar.languageDidChange")
     private static let languageKey = "tidebar.language"
 

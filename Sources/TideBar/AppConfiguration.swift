@@ -36,7 +36,7 @@ final class AppConfiguration {
         "com.apple.Terminal",
     ]
 
-    private let defaults = UserDefaults.standard
+    private let defaults = RuntimeEnvironment.defaults
     private let enabledKey = "tidebar.enabled"
     private let onboardingKey = "tidebar.onboardingCompleted"
     private let appearanceKey = "tidebar.appearance"

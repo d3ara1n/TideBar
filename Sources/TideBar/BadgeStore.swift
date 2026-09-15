@@ -61,8 +61,9 @@ final class BadgeStore {
     // MARK: 轮询执行
 
     private func poll() {
-        // 系统 Dock 可见时自带角标，镜像无意义，不花这份足迹
-        guard AppConfiguration.shared.isTakeoverEnabled else { return }
+        // 开发预览不读取系统 Dock；正式接管态才镜像角标。
+        guard RuntimeEnvironment.isProduction,
+              AppConfiguration.shared.isTakeoverEnabled else { return }
         guard !busy else { return }
         if dockPID == nil {
             dockPID = NSWorkspace.shared.runningApplications
