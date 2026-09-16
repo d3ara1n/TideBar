@@ -116,11 +116,47 @@ enum AXReader {
     }
 }
 
+// MARK: - 后台采集契约（纯值进出，主线程 ↔ axQueue）
+
+/// 调度时的采集输入快照：除 refcon 外全为纯值；AXUIElement 在采集现场创建，
+/// 不跨线程产生。refcon 为指回 WindowStore 的不透明指针（与 AXObserver refcon
+/// 同源，仅在回传时取回），以 @unchecked 承载。
+private struct AXEnumerationRequest: @unchecked Sendable {
+    let pid: pid_t
+    let generation: Int
+    let identity: AppIdentity
+    /// 前台基准命中（聚焦窗口仅前台 app 读取）
+    let isFrontmost: Bool
+    /// 上一轮收录次序（elementIdentifier 序列，窗口序稳定化用）
+    let previousOrder: [Int]
+    /// 上一轮屏归属（缺键 = 未知，最小化/不可读帧沿用）
+    let previousScreens: [Int: CGDirectDisplayID]
+    let displays: [FullscreenDisplay]
+    /// 指回 WindowStore 的裸指针（与 AXObserver refcon 同源，回传时取回）
+    let refcon: UnsafeMutableRawPointer
+}
+
+/// 采集结果：快照与 observer 为 AX 引用，跨线程传递安全（AX API 线程安全），
+/// 以 @unchecked Sendable 承载；责任边界 = 引用仅作透传。
+private struct AXEnumerationOutcome: @unchecked Sendable {
+    enum Content {
+        /// kAXWindows 列表不可读（observer 为空窗口兜底，仅 windowCreated）
+        case unreadable(observer: AXObserver?)
+        /// 属性采集不完整（observer 同上）
+        case incomplete(observer: AXObserver?)
+        /// 采集完成；observer nil = 通知安装失败
+        case snapshots([WindowSnapshot], observer: AXObserver?)
+    }
+    let content: Content
+}
+
 // MARK: - 窗口数据层
 
 /// 按 pid 观测各 app 的窗口集合：kAXWindows 惰性枚举 + AXObserver 订阅变更，
 /// 收录规则 = subrole 标准或 minimized（最小化窗口 subrole 不可靠，实测）。
 /// 无法完整确认窗口集合与最小化态的 app 标记 degraded（交互退化为纯图标 + 激活）。
+/// AX IPC 全部在后台串行队列执行（忙碌目标 app 烧满超时不再冻结主线程），
+/// 调度与结果应用在主线程，以代数丢弃过期结果。
 @MainActor
 final class WindowStore {
     private struct Watch {
@@ -130,9 +166,16 @@ final class WindowStore {
         var snapshots: [WindowSnapshot]?
         var reenumerateWork: DispatchWorkItem?
         var retryAttempt = 0
+        /// 调度代数：每次 scheduleReenumerate 递增；后台结果带回代数，不匹配即丢弃
+        var generation = 0
     }
 
     private static let retryDelays: [TimeInterval] = [0.25, 0.5, 1, 2, 4]
+
+    /// AX IPC 串行采集队列（逐 app 一轮，不并发：避免 AX 风暴进一步压垮忙碌目标）。
+    /// 全部 AX 调用（属性采集与 observer 通知安装）在此执行，主线程只做调度与应用。
+    private nonisolated static let axQueue = DispatchQueue(
+        label: "dev.dearain.TideBar.ax", qos: .userInitiated)
 
     private var watches: [pid_t: Watch] = [:]
     private var observers: [NSObjectProtocol] = []
@@ -250,18 +293,39 @@ final class WindowStore {
     private func removeWatch(pid: pid_t) {
         guard var watch = watches.removeValue(forKey: pid) else { return }
         watch.reenumerateWork?.cancel()
-        detachObserver(&watch)
+        swapObserver(&watch, to: nil)
     }
 
-    /// 事件统一汇入：去抖后全量重枚举（简单可靠，事件风暴被 150ms 吸收）
+    /// 事件统一汇入：去抖后全量重枚举（简单可靠，事件风暴被 150ms 吸收）。
+    /// 调度即快照采集输入（纯值）并交付后台队列；执行线程在后台，
+    /// 去抖 cancel 语义不变（未开始的 work 取消，执行中的一轮由代数校验丢弃）。
     private func scheduleReenumerate(pid: pid_t, after delay: TimeInterval) {
-        if let work = watches[pid]?.reenumerateWork {
+        guard var watch = watches[pid] else { return }
+        watch.generation += 1
+        if let work = watch.reenumerateWork {
             work.cancel()
         }
-        let bridge = MainThreadBridge { [weak self] in self?.reenumerate(pid: pid) }
-        let work = DispatchWorkItem { bridge() }
-        watches[pid]?.reenumerateWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+        // 采集输入快照：上一轮次序与屏归属、显示器列表、前台基准、refcon 指回自身
+        let previous = watch.snapshots ?? []
+        let request = AXEnumerationRequest(
+            pid: pid,
+            generation: watch.generation,
+            identity: watch.identity,
+            isFrontmost: markingFrontmostPID == pid,
+            previousOrder: previous.map(\.elementIdentifier),
+            previousScreens: previous.reduce(into: [:]) { $0[$1.elementIdentifier] = $1.screenID },
+            displays: Self.currentDisplays(),
+            refcon: Unmanaged.passUnretained(self).toOpaque())
+        // @Sendable：剥离闭包对上下文 MainActor 隔离的继承，否则 DispatchWorkItem
+        // 在后台队列执行时触发运行时隔离检查（Swift 6 动态检测刷屏）
+        let work = DispatchWorkItem { @Sendable in
+            let outcome = Self.enumerate(request)
+            let store = Unmanaged<WindowStore>.fromOpaque(request.refcon).takeUnretainedValue()
+            MainThreadBridge { store.applyEnumeration(request, outcome) }.call()
+        }
+        watch.reenumerateWork = work
+        watches[pid] = watch
+        Self.axQueue.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     @discardableResult
@@ -276,37 +340,28 @@ final class WindowStore {
         return true
     }
 
-    private func reenumerate(pid: pid_t) {
-        guard var watch = watches[pid] else { return }
-        watch.reenumerateWork = nil
+    // MARK: 后台采集（axQueue）与结果应用（主线程）
 
-        let appElement = AXUIElementCreateApplication(pid)
+    /// 后台采集入口：全部 AX IPC（窗口列表、逐属性读取、observer 创建与通知注册）
+    /// 在调用线程现场执行。pid 存活校验快速失败，不烧满超时。
+    private nonisolated static func enumerate(_ request: AXEnumerationRequest) -> AXEnumerationOutcome {
+        if NSRunningApplication(processIdentifier: request.pid)?.isTerminated != false {
+            return AXEnumerationOutcome(content: .unreadable(observer: nil))
+        }
+        let appElement = AXUIElementCreateApplication(request.pid)
         AXUIElementSetMessagingTimeout(appElement, 0.5)
         guard let elements = AXReader.readWindows(of: appElement) else {
-            let degraded = watch.snapshots != nil
-            watch.snapshots = nil
-            watches[pid] = watch
-            if degraded {
-                NSLog("TideBar WindowStore degraded: %@ (pid %d) kAXWindows unreadable",
-                      watch.identity.bundleIdentifier, pid)
-                onUpdate?(watch.identity)
-            }
-            _ = attachObserver(pid: pid, appElement: appElement, windows: [])
-            scheduleRetry(pid: pid)
-            return
+            return AXEnumerationOutcome(content: .unreadable(
+                observer: installObserver(request, appElement: appElement, windows: [])))
         }
 
         var snapshots: [WindowSnapshot] = []
         var complete = true
-        let displays = Self.currentDisplays()
         // 聚焦窗口仅前台 app 读取；与快照比对靠 elementIdentifier（CFHash 跨查询稳定）
-        let focusedWindowIdentifier: Int? = markingFrontmostPID == pid
+        let focusedWindowIdentifier: Int? = request.isFrontmost
             ? AXReader.readElement(appElement, kAXFocusedWindowAttribute as String)
                 .map { Int(bitPattern: CFHash($0)) }
             : nil
-        let previousScreens = (watch.snapshots ?? []).reduce(into: [:]) { partial, snapshot in
-            partial[snapshot.elementIdentifier] = snapshot.screenID
-        }
         elementLoop: for element in elements {
             AXReader.setWindowElementTimeout(element)
 
@@ -340,7 +395,7 @@ final class WindowStore {
             let elementIdentifier = Int(bitPattern: CFHash(element))
             let frame = AXReader.readFrame(element)
             snapshots.append(WindowSnapshot(
-                ownerPID: pid,
+                ownerPID: request.pid,
                 elementIdentifier: elementIdentifier,
                 element: element,
                 title: AXReader.readString(element, kAXTitleAttribute as String),
@@ -349,64 +404,142 @@ final class WindowStore {
                 frame: frame,
                 screenID: WindowScreenAssignment.resolve(frame: frame,
                                                          isMinimized: minimized,
-                                                         displays: displays,
-                                                         previous: previousScreens[elementIdentifier]),
+                                                         displays: request.displays,
+                                                         previous: request.previousScreens[elementIdentifier]),
                 isActive: elementIdentifier == focusedWindowIdentifier
             ))
         }
 
         guard complete else {
-            let degraded = watch.snapshots != nil
-            watch.snapshots = nil
-            watches[pid] = watch
-            if degraded {
-                NSLog("TideBar WindowStore degraded: %@ (pid %d) window attributes incomplete",
-                      watch.identity.bundleIdentifier, pid)
-                onUpdate?(watch.identity)
-            }
-            _ = attachObserver(pid: pid, appElement: appElement, windows: [])
-            scheduleRetry(pid: pid)
-            return
+            return AXEnumerationOutcome(content: .incomplete(
+                observer: installObserver(request, appElement: appElement, windows: [])))
         }
 
         // 窗口序稳定化：kAXWindows 返回 z 序（激活窗口恒在前、最小化恒垫底），
         // 直接沿用会让点点随焦点跳动、点击循环顺序漂移；沿用上一轮快照中已知
         // 窗口的相对次序，新窗口按枚举序追加队尾（点点、点击循环与潮涌共用）。
-        snapshots = Self.stableOrdered(snapshots, preservingOrderOf: watch.snapshots)
+        let ordered = stableOrdered(snapshots, preservingOrderOf: request.previousOrder)
+        return AXEnumerationOutcome(content: .snapshots(
+            ordered, observer: installObserver(request, appElement: appElement, windows: ordered)))
+    }
 
-        let changed = watch.snapshots.map { Self.signature($0) } != Self.signature(snapshots)
-        watch.snapshots = snapshots
-        watches[pid] = watch
-        let observing = attachObserver(pid: pid, appElement: appElement, windows: snapshots)
-        if observing {
-            watches[pid]?.retryAttempt = 0
-        } else if !scheduleRetry(pid: pid), var degradedWatch = watches[pid] {
-            degradedWatch.snapshots = nil
-            watches[pid] = degradedWatch
-            NSLog("TideBar WindowStore degraded: %@ (pid %d) AX notifications incomplete",
-                  degradedWatch.identity.bundleIdentifier, pid)
-            onUpdate?(degradedWatch.identity)
-        }
-        if changed {
-            let mini = snapshots.filter(\.isMinimized).count
-            NSLog("TideBar WindowStore %@ (pid %d): %d windows (%d minimized)",
-                  watch.identity.bundleIdentifier, pid, snapshots.count, mini)
-            onUpdate?(watch.identity)
+    /// 采集结果应用：代数或 pid 失配即丢弃（app 退出、被新调度取代、重复回传）。
+    /// degraded 判定、快照更新、observer swap 与重试梯语义与迁移前一致。
+    private func applyEnumeration(_ request: AXEnumerationRequest, _ outcome: AXEnumerationOutcome) {
+        guard var watch = watches[request.pid], watch.generation == request.generation else { return }
+        watch.reenumerateWork = nil
+
+        switch outcome.content {
+        case let .unreadable(observer):
+            degrade(&watch, request, observer: observer, reason: "kAXWindows unreadable")
+        case let .incomplete(observer):
+            degrade(&watch, request, observer: observer, reason: "window attributes incomplete")
+        case let .snapshots(snapshots, observer):
+            let changed = watch.snapshots.map { Self.signature($0) } != Self.signature(snapshots)
+            watch.snapshots = snapshots
+            swapObserver(&watch, to: observer)
+            watches[request.pid] = watch
+            if observer != nil {
+                watches[request.pid]?.retryAttempt = 0
+            } else if !scheduleRetry(pid: request.pid), var degradedWatch = watches[request.pid] {
+                degradedWatch.snapshots = nil
+                watches[request.pid] = degradedWatch
+                NSLog("TideBar WindowStore degraded: %@ (pid %d) AX notifications incomplete",
+                      degradedWatch.identity.bundleIdentifier, request.pid)
+                onUpdate?(degradedWatch.identity)
+            }
+            if changed {
+                let mini = snapshots.filter(\.isMinimized).count
+                NSLog("TideBar WindowStore %@ (pid %d): %d windows (%d minimized)",
+                      request.identity.bundleIdentifier, request.pid, snapshots.count, mini)
+                onUpdate?(request.identity)
+            }
         }
     }
 
+    /// 降级应用：有旧知识才报 degraded；空窗口 observer 兑新窗口事件，重试梯继续爬
+    private func degrade(_ watch: inout Watch, _ request: AXEnumerationRequest,
+                         observer: AXObserver?, reason: String) {
+        let degraded = watch.snapshots != nil
+        watch.snapshots = nil
+        swapObserver(&watch, to: observer)
+        watches[request.pid] = watch
+        if degraded {
+            NSLog("TideBar WindowStore degraded: %@ (pid %d) %@",
+                  request.identity.bundleIdentifier, request.pid, reason)
+            onUpdate?(request.identity)
+        }
+        scheduleRetry(pid: request.pid)
+    }
+
+    /// 每轮重建 observer：主线程只挂/摘 runloop source（纯本地，CFRunLoop 非线程
+    /// 安全）；通知注册已在后台完成。新者为 nil 即保持无 observer（靠重试梯与
+    /// 展开全量刷新兑底）。
+    private func swapObserver(_ watch: inout Watch, to observer: AXObserver?) {
+        if let old = watch.observer {
+            CFRunLoopRemoveSource(RunLoop.main.getCFRunLoop(),
+                                  AXObserverGetRunLoopSource(old),
+                                  CFRunLoopMode.defaultMode)
+        }
+        watch.observer = nil
+        if let observer {
+            CFRunLoopAddSource(RunLoop.main.getCFRunLoop(),
+                              AXObserverGetRunLoopSource(observer),
+                              CFRunLoopMode.defaultMode)
+            watch.observer = observer
+        }
+    }
+
+    /// 后台安装 observer（创建 + 逐通知注册均为 AX IPC）；runloop source 挂载由
+    /// 主线程应用段完成——回调线程 = source 所挂 runloop，保持主线程回调链路。
+    /// 返回 nil = 创建失败或必要通知缺失（调用方按通知缺失处理）。
+    private nonisolated static func installObserver(_ request: AXEnumerationRequest,
+                                                    appElement: AXUIElement,
+                                                    windows: [WindowSnapshot]) -> AXObserver? {
+        var error = AXError.failure
+        var observer: AXObserver?
+        error = AXObserverCreate(request.pid, axObserverCallback, &observer)
+        guard error == .success, let observer else {
+            NSLog("TideBar AXObserver create failed for pid %d: %d", request.pid, error.rawValue)
+            return nil
+        }
+
+        func add(_ element: AXUIElement, _ notification: String) -> Bool {
+            AXObserverAddNotification(observer, element, notification as CFString, request.refcon) == .success
+        }
+
+        // 窗口集合与最小化态决定 Finder 可见性和点点，相关通知必须完整安装。
+        var essentialInstalled = add(appElement, kAXWindowCreatedNotification as String)
+        for window in windows {
+            let destroyed = add(window.element, kAXUIElementDestroyedNotification as String)
+            let minimized = add(window.element, kAXWindowMiniaturizedNotification as String)
+            let restored = add(window.element, kAXWindowDeminiaturizedNotification as String)
+            essentialInstalled = essentialInstalled && destroyed && minimized && restored
+            // 标题通知只增强菜单与潮涌的实时内容；不支持时不抹掉已确认的窗口知识。
+            _ = add(window.element, kAXTitleChangedNotification as String)
+        }
+        // 聚焦切换（应用内 Cmd+` 等）驱动点点强调色；安装失败不降级，
+        // 焦点漂移由前台切换与展开全量刷新兑底。
+        _ = add(appElement, kAXFocusedWindowChangedNotification as String)
+        guard essentialInstalled else {
+            NSLog("TideBar AXObserver missing essential notification for pid %d", request.pid)
+            return nil
+        }
+        return observer
+    }
+
     /// 窗口序稳定化：已知窗口沿用上轮次序，新窗口按本轮枚举序续到队尾；无上轮时保持枚举序
-    private static func stableOrdered(_ snapshots: [WindowSnapshot],
-                                      preservingOrderOf previous: [WindowSnapshot]?) -> [WindowSnapshot] {
-        guard let previous, !previous.isEmpty else { return snapshots }
+    private nonisolated static func stableOrdered(_ snapshots: [WindowSnapshot],
+                                                  preservingOrderOf previousOrder: [Int]) -> [WindowSnapshot] {
+        guard !previousOrder.isEmpty else { return snapshots }
         let currentByID = Dictionary(snapshots.map { ($0.elementIdentifier, $0) },
                                      uniquingKeysWith: { first, _ in first })
         var matched = Set<Int>()
         var ordered: [WindowSnapshot] = []
-        for snapshot in previous {
-            guard let current = currentByID[snapshot.elementIdentifier] else { continue }
+        for identifier in previousOrder {
+            guard let current = currentByID[identifier] else { continue }
             ordered.append(current)
-            matched.insert(snapshot.elementIdentifier)
+            matched.insert(identifier)
         }
         ordered.append(contentsOf: snapshots.filter { !matched.contains($0.elementIdentifier) })
         return ordered
@@ -434,61 +567,6 @@ final class WindowStore {
             }
             return FullscreenDisplay(id: id, bounds: CGDisplayBounds(id))
         }
-    }
-
-    /// 每轮重枚举后整体重建 observer：旧窗口的通知随旧 observer 一并失效，无悬挂
-    private func attachObserver(pid: pid_t, appElement: AXUIElement,
-                                windows: [WindowSnapshot]) -> Bool {
-        guard var watch = watches[pid] else { return false }
-        detachObserver(&watch)
-
-        var error = AXError.failure
-        var observer: AXObserver?
-        error = AXObserverCreate(pid, axObserverCallback, &observer)
-        guard error == .success, let observer else {
-            NSLog("TideBar AXObserver create failed for pid %d: %d", pid, error.rawValue)
-            watches[pid] = watch
-            return false
-        }
-        let refcon = Unmanaged.passUnretained(self).toOpaque()
-
-        func add(_ element: AXUIElement, _ notification: String) -> Bool {
-            AXObserverAddNotification(observer, element, notification as CFString, refcon) == .success
-        }
-
-        // 窗口集合与最小化态决定 Finder 可见性和点点，相关通知必须完整安装。
-        var essentialInstalled = add(appElement, kAXWindowCreatedNotification as String)
-        for window in windows {
-            let destroyed = add(window.element, kAXUIElementDestroyedNotification as String)
-            let minimized = add(window.element, kAXWindowMiniaturizedNotification as String)
-            let restored = add(window.element, kAXWindowDeminiaturizedNotification as String)
-            essentialInstalled = essentialInstalled && destroyed && minimized && restored
-            // 标题通知只增强菜单与潮涌的实时内容；不支持时不抹掉已确认的窗口知识。
-            _ = add(window.element, kAXTitleChangedNotification as String)
-        }
-        // 聚焦切换（应用内 Cmd+` 等）驱动点点强调色；安装失败不降级，
-        // 焦点漂移由前台切换与展开全量刷新兑底。
-        _ = add(appElement, kAXFocusedWindowChangedNotification as String)
-        guard essentialInstalled else {
-            NSLog("TideBar AXObserver missing essential notification for pid %d", pid)
-            watches[pid] = watch
-            return false
-        }
-        CFRunLoopAddSource(RunLoop.main.getCFRunLoop(),
-                          AXObserverGetRunLoopSource(observer),
-                          CFRunLoopMode.defaultMode)
-        watch.observer = observer
-        watches[pid] = watch
-        return true
-    }
-
-    private func detachObserver(_ watch: inout Watch) {
-        if let observer = watch.observer {
-            CFRunLoopRemoveSource(RunLoop.main.getCFRunLoop(),
-                                  AXObserverGetRunLoopSource(observer),
-                                  CFRunLoopMode.defaultMode)
-        }
-        watch.observer = nil
     }
 
     /// AX 回调落点：仅重排去抖，不做重活。

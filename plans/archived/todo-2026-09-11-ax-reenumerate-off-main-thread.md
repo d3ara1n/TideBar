@@ -1,6 +1,11 @@
 # 窗口 AX 重枚举移出主线程
 
-> 状态：已立案，未开工。缘起：高负载下「展开背景迟迟不现」的修复（玻璃淡入改 CA 提交）只解除了编舞对主线程的依赖；主线程本身在高负载下仍会被 AX 阻塞数秒。
+> 状态：已完成，用户验收通过（高负载场景交互不再冻结，无 data race 告警）。
+> 实现：三段拆分——主线程调度（Watch.generation + 纯值请求）→ `dev.dearain.TideBar.ax`
+> 串行队列采集（全部 AX IPC，含 observer 创建与通知注册）→ 主线程应用（代数/pid
+> 校验丢弃过期结果，degraded/重试梯语义不变，主线程仅挂摘 runloop source）。
+> 踩坑记录：DispatchWorkItem 闭包继承上下文 MainActor 隔离，后台执行触发
+> Swift 6 运行时隔离检查刷屏；显式 @Sendable 剥离继承后修复。
 
 ## 问题
 
