@@ -1,11 +1,18 @@
 import SwiftUI
+import AVFoundation
 
 // 引导向导视图：四步分页 + 底部导航条。
-// 演示动画规划（当前以占位框标记，后续以代码生成动画填充，录制动图备选）：
-//   1. 第 1 步主演示位：汐线 → 图标栏 → 潮涌 的三段式展开过程；
-//   2. 第 3 步对比示意位：接管前后（系统 Dock 常驻 ↔ 汐线收于底部）。
-// 替换占位时动画不得成为阅读前提：需遵循 AppConfiguration.reducedMotion，
-// 减少动态效果下退化为静态示意。
+// 演示素材：第 1 步为实机录屏循环（onboarding-demo.mp4，1670×640，网站演示位共用同一条素材与比例）；
+// 第 3 步为代码绘制的接管前后静态对比，不用视频。
+// 动效不得成为阅读前提：AppConfiguration.reducedMotion 生效时第 1 步退化为静态占位示意。
+
+/// 演示录屏素材比例（onboarding-demo.mp4）；软件内容器与网站演示位共用。
+private enum OnboardingViewConstants {
+    static let demoAspectRatio = 1670.0 / 640.0
+}
+
+/// 内容区底部的呼吸边距；满宽视频以负 padding 抵消，底边与分割线重合。
+private let onboardingContentBottomPadding: CGFloat = 20
 
 struct OnboardingRootView: View {
     @ObservedObject var model: OnboardingModel
@@ -16,6 +23,7 @@ struct OnboardingRootView: View {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.top, 44)
+                .padding(.bottom, onboardingContentBottomPadding)
                 .overlay(alignment: .topTrailing) {
                     // 语言切换只放首步：进入向导时语言未定，这是切换的入口
                     if model.step == .intro {
@@ -134,7 +142,7 @@ private struct StepHeader: View {
     }
 }
 
-/// 演示占位：标记后续填充代码生成动画（或录制动图）的位置。
+/// 演示占位：reducedMotion 下第 1 步演示视频的静态退化视图。
 private struct DemoPlaceholder: View {
     let title: String
     let caption: String
@@ -160,6 +168,55 @@ private struct DemoPlaceholder: View {
                 .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
                 .foregroundStyle(.quaternary)
         )
+    }
+}
+
+/// 实机录屏无缝循环播放：静音自动播放，AVPlayerLooper 驱动；
+/// 视图离开窗口（切步/关窗）即暂停，不后台空转。
+private struct DemoLoopVideo: NSViewRepresentable {
+    /// App Bundle 内的素材名（不含扩展名）。
+    let resource: String
+
+    func makeNSView(context: Context) -> LoopLayerView {
+        let view = LoopLayerView()
+        view.load(resource: resource)
+        return view
+    }
+
+    func updateNSView(_ nsView: LoopLayerView, context: Context) {}
+
+    final class LoopLayerView: NSView {
+        private var player: AVQueuePlayer?
+        private var looper: AVPlayerLooper?
+
+        override init(frame frameRect: NSRect) {
+            super.init(frame: frameRect)
+            wantsLayer = true
+        }
+
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func makeBackingLayer() -> CALayer { AVPlayerLayer() }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let player else { return }
+            if window != nil { player.play() } else { player.pause() }
+        }
+
+        func load(resource: String) {
+            guard let url = Bundle.module.url(forResource: resource, withExtension: "mp4") else { return }
+            let queue = AVQueuePlayer()
+            queue.isMuted = true
+            looper = AVPlayerLooper(player: queue, templateItem: AVPlayerItem(url: url))
+            guard let layer = layer as? AVPlayerLayer else { return }
+            layer.videoGravity = .resizeAspect
+            layer.player = queue
+            player = queue
+            if window != nil { queue.play() }
+        }
     }
 }
 
@@ -211,17 +268,28 @@ private struct IntroStep: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            // 演示位 1：汐线 → 图标栏 → 潮涌（代码生成动画占位）
-            DemoPlaceholder(
-                title: l10n.string("intro.demoTitle", table: .onboarding),
-                caption: l10n.string("intro.demoCaption", table: .onboarding)
-            )
-            .padding(.horizontal, 44)
-            .frame(height: 190)
-
             Text(l10n.string("intro.privacyNote", table: .onboarding))
                 .font(.caption)
                 .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+
+            if Motion.shouldReduceMotion {
+                // 减少动态效果：退化为静态占位示意，不自动播放
+                DemoPlaceholder(
+                    title: l10n.string("intro.demoTitle", table: .onboarding),
+                    caption: l10n.string("intro.demoCaption", table: .onboarding)
+                )
+                .padding(.horizontal, 44)
+                .aspectRatio(OnboardingViewConstants.demoAspectRatio, contentMode: .fit)
+            } else {
+                DemoLoopVideo(resource: "onboarding-demo")
+                    .aspectRatio(OnboardingViewConstants.demoAspectRatio, contentMode: .fit)
+                    // 满宽无边框：左右边与窗口边重合，底边与内容区分割线重合
+                    .padding(.bottom, -onboardingContentBottomPadding)
+                    .accessibilityHidden(true)
+            }
         }
     }
 }
@@ -279,13 +347,6 @@ private struct TakeoverStep: View {
 
             statusArea
 
-            if case .idle = model.dockOperation, !model.isTakeoverEnabled, isNormalDockState {
-                HStack(spacing: 10) {
-                    Button(l10n.string("takeover.enable", table: .onboarding)) { showEnableConfirmation = true }
-                    Button(l10n.string("takeover.notNow", table: .onboarding), action: model.goNext)
-                }
-            }
-
             Spacer()
 
             Text(l10n.string("takeover.persistenceNote", table: .onboarding))
@@ -303,10 +364,87 @@ private struct TakeoverStep: View {
         }
     }
 
-    private var isNormalDockState: Bool {
-        switch model.dockState {
-        case .notEnabled: return true
-        default: return false
+    /// 接管前后选择卡：点击即选中，选中即所选的底部形态；代码绘制，不引入视频素材。
+    private struct TakeoverComparison: View {
+        @Environment(\.l10n) private var l10n
+        /// 当前生效的是否为「接管后」；未接管时选中「接管前」。
+        let afterSelected: Bool
+        /// 点击「接管后」：请求启用（弹出系统修改确认）。
+        let onSelectAfter: () -> Void
+        /// 点击「接管前」：保持系统 Dock（向导阶段未接管时无额外操作）。
+        let onSelectBefore: () -> Void
+
+        var body: some View {
+            HStack(spacing: 12) {
+                panel(
+                    title: l10n.string("takeover.compare.before", table: .onboarding),
+                    caption: l10n.string("takeover.compare.beforeDetail", table: .onboarding),
+                    isSelected: !afterSelected,
+                    action: onSelectBefore
+                ) {
+                    HStack(spacing: 8) {
+                        ForEach(0..<4, id: \.self) { _ in
+                            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                .fill(.secondary.opacity(0.55))
+                                .frame(width: 15, height: 15)
+                        }
+                    }
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(.bar, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                }
+                panel(
+                    title: l10n.string("takeover.compare.after", table: .onboarding),
+                    caption: l10n.string("takeover.compare.afterDetail", table: .onboarding),
+                    isSelected: afterSelected,
+                    action: onSelectAfter
+                ) {
+                    Capsule()
+                        .fill(Color.primary.opacity(0.75))
+                        .frame(width: 64, height: 3)
+                }
+            }
+        }
+
+        private func panel<Graphic: View>(title: String, caption: String, isSelected: Bool,
+                                          action: @escaping () -> Void,
+                                          @ViewBuilder graphic: () -> Graphic) -> some View {
+            Button(action: action) {
+                VStack(spacing: 10) {
+                    HStack(spacing: 5) {
+                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                            .font(.caption)
+                            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                        Text(title)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+                    }
+                    ZStack(alignment: .bottom) {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(.quaternary.opacity(0.5))
+                        graphic()
+                            .padding(.bottom, 8)
+                    }
+                    .frame(height: 52)
+                    Text(caption)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(12)
+                .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(isSelected ? Color.accentColor : Color.clear,
+                                      lineWidth: isSelected ? 1.5 : 0)
+                )
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering in
+                if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
         }
     }
 
@@ -360,12 +498,11 @@ private struct TakeoverStep: View {
                            title: l10n.string("takeover.recoveryTitle", table: .onboarding),
                            message: l10n.string("takeover.recoveryMessage", table: .onboarding))
             default:
-                // 演示位 2：接管前后对比（代码生成动画或录制动图占位）
-                DemoPlaceholder(
-                    title: l10n.string("takeover.demoTitle", table: .onboarding),
-                    caption: l10n.string("takeover.demoCaption", table: .onboarding)
+                TakeoverComparison(
+                    afterSelected: model.isTakeoverEnabled,
+                    onSelectAfter: { showEnableConfirmation = true },
+                    onSelectBefore: {}
                 )
-                .frame(height: 150)
             }
         }
     }
@@ -406,7 +543,7 @@ private struct FinishStep: View {
             Text(l10n.string("finish.gesturesTitle", table: .onboarding))
                 .font(.headline)
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 105), spacing: 10)], spacing: 10) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 10) {
                 GestureHint(symbol: "cursorarrow",
                             title: l10n.string("finish.gesture.approachTitle", table: .onboarding),
                             detail: l10n.string("finish.gesture.approachDetail", table: .onboarding))
@@ -453,19 +590,24 @@ private struct GestureHint: View {
     let detail: String
 
     var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: symbol)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(.tint)
-                .accessibilityHidden(true)
-            Text(title).font(.callout.weight(.medium))
+        VStack(spacing: 5) {
+            HStack(spacing: 5) {
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(.caption.weight(.medium))
+            }
             Text(detail)
-                .font(.caption)
+                .font(.caption2)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 6)
         .background(.quaternary.opacity(0.6),
                     in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }

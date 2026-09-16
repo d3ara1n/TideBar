@@ -20,7 +20,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
-        window.setContentSize(NSSize(width: 640, height: 500))
+        window.setContentSize(NSSize(width: 640, height: 560))
         window.isReleasedWhenClosed = false
         self.model = model
         super.init(window: window)

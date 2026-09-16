@@ -27,8 +27,6 @@
 // 第 3 步：Dock 接管
 "takeover.title" = "Dock 接管";
 "takeover.message" = "启用后，汐会隐藏系统 Dock 的可见入口，由屏幕底部的汐线接替。Dock 进程不会被关闭，已打开的应用不受影响。";
-"takeover.enable" = "启用汐";
-"takeover.notNow" = "暂不启用";
 "takeover.confirmTitle" = "启用汐？";
 "takeover.confirmEnable" = "启用汐";
 "takeover.cancel" = "取消";
@@ -47,8 +45,10 @@
 "takeover.driftedMessage" = "汐检测到既有接管配置不一致。请到设置中心的「Dock 与恢复」页重新应用。";
 "takeover.recoveryTitle" = "无法自动恢复 macOS Dock";
 "takeover.recoveryMessage" = "缺少接管前保存的 Dock 配置。请到设置中心的「Dock 与恢复」页查看处理方式。";
-"takeover.demoTitle" = "演示：接管前后的底部变化";
-"takeover.demoCaption" = "启用前系统 Dock 常驻屏幕底部；启用后 Dock 收起，汐线在原位待命";
+"takeover.compare.before" = "不接管";
+"takeover.compare.beforeDetail" = "系统 Dock 常驻屏幕底部";
+"takeover.compare.after" = "接管";
+"takeover.compare.afterDetail" = "汐线收于原位待命";
 
 // 第 4 步：完成与快速提示
 "finish.title" = "一切就绪";

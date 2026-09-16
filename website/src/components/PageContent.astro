@@ -10,8 +10,8 @@ const { lang = "en" } = Astro.props;
 const en = lang === "en";
 
 const titles = en
-  ? { features: "Features", privacy: "Privacy", download: "Download", source: "Source" }
-  : { features: "功能", privacy: "隐私", download: "下载", source: "源码" };
+  ? { demo: "Demo", features: "Features", privacy: "Privacy", download: "Download", source: "Source" }
+  : { demo: "演示", features: "功能", privacy: "隐私", download: "下载", source: "源码" };
 ---
 <main class="desktop" id="main-content">
   <div class="desktop-wallpaper" aria-hidden="true"></div>
@@ -39,6 +39,21 @@ const titles = en
       </a>
     </div>
     <p class="hero-meta">{en ? "macOS 14+ · MIT License" : "macOS 14+ · MIT 许可证"}</p>
+  </section>
+
+  <section class="window" id="demo" data-window="demo" aria-label={titles.demo}>
+    <div class="window-titlebar">
+      <button class="window-close" type="button" data-close aria-label={en ? "Close window" : "关闭窗口"}>
+        <X strokeWidth={2.6} aria-hidden="true" />
+      </button>
+      <span class="window-dot yellow" aria-hidden="true"></span>
+      <span class="window-dot green" aria-hidden="true"></span>
+      <span class="window-title">{titles.demo}</span>
+    </div>
+    <div class="window-body window-body-media">
+      <video class="demo-video" src="/demo.mp4" autoplay muted loop playsinline disablepictureinpicture
+        aria-label={en ? "TideBar live demo recording" : "TideBar 实机演示录屏"}></video>
+    </div>
   </section>
 
   <section class="window" id="features" data-window="features" aria-labelledby="features-title">

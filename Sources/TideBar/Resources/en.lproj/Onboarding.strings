@@ -27,8 +27,6 @@
 // 第 3 步：Dock 接管
 "takeover.title" = "Dock Takeover";
 "takeover.message" = "When enabled, TideBar hides the system Dock's visible entrance and the tide line takes its place at the bottom of the screen. The Dock process isn't quit, and open apps are unaffected.";
-"takeover.enable" = "Enable Takeover";
-"takeover.notNow" = "Not Now";
 "takeover.confirmTitle" = "Enable Dock takeover?";
 "takeover.confirmEnable" = "Enable";
 "takeover.cancel" = "Cancel";
@@ -47,8 +45,10 @@
 "takeover.driftedMessage" = "TideBar detected an inconsistency with its saved takeover configuration. Re-apply it from Settings → Dock & Recovery.";
 "takeover.recoveryTitle" = "Can't restore the macOS Dock automatically";
 "takeover.recoveryMessage" = "The Dock configuration saved before takeover is missing. See Settings → Dock & Recovery for how to proceed.";
-"takeover.demoTitle" = "Demo: the bottom edge before and after takeover";
-"takeover.demoCaption" = "Before: the system Dock is a permanent fixture; after: the Dock steps aside and the tide line stands by in its place";
+"takeover.compare.before" = "No Takeover";
+"takeover.compare.beforeDetail" = "The system Dock sits permanently at the bottom";
+"takeover.compare.after" = "Takeover";
+"takeover.compare.afterDetail" = "The tide line rests in its place, ready to rise";
 
 // 第 4 步：完成与快速提示
 "finish.title" = "All Set";

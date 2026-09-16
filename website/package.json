@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
+    "predev": "node scripts/sync-demo.mjs",
+    "prebuild": "node scripts/sync-demo.mjs",
     "build": "astro build",
-    "preview": "astro preview",
-    "demo:convert": "node scripts/demo-webp.mjs"
+    "preview": "astro preview"
   },
   "dependencies": {
     "astro": "^5.0.0",
