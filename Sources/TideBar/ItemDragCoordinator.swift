@@ -17,14 +17,12 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
         let itemID: ItemID
         let startTimestamp: TimeInterval
         let wasPinned: Bool
-        let originalPIDs: Set<pid_t>
         var invalidated = false
         var committed = false
         init(item: ItemEntry, event: NSEvent) {
             itemID = item.id
             startTimestamp = event.timestamp
             wasPinned = item.isPinned
-            originalPIDs = Set(item.application?.runningAppsByPID.keys.map { $0 } ?? [])
         }
     }
     private struct Proposal {
@@ -113,8 +111,9 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
               latest.isPinned == state.wasPinned else { return }
         // 小工具实例删除需经设置页确认；栏内拖出只回位，不做删除。
         guard latest.kind != .widget else { return }
-        if !state.wasPinned,
-           Set(latest.application?.runningAppsByPID.keys.map { $0 } ?? []) != state.originalPIDs { return }
+        // 临时项是运行实例的投射，拖出不提交移除，会话结束即弹回原位；
+        // 固定项取消固定，仍在运行的 app 由重建投射保留为临时项。
+        guard latest.isPinned else { return }
         do {
             try registry.remove(state.itemID)
         } catch { ItemErrors.report(error) }
