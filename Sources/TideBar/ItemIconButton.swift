@@ -26,8 +26,16 @@ private final class IconArtworkView: NSView {
     }
 
     func setDragState(_ state: ItemDragIconState) {
+        let previous = dragState
         dragState = state
         effect.update(icon: icon, state: state)
+        guard let layer = layer else { return }
+        // 进入拒绝态的边沿弹一次（悬停滑过多个拒绝目标逐个触发；出拒绝态不弹）
+        if state == .rejected, previous != .rejected {
+            ItemDragStyle.denyShake(layer)
+        }
+        // 接受态托起/回落（状态边沿驱动，与拒绝弹震同层不同轴）
+        ItemDragStyle.receiveLift(layer, on: state == .receiving)
     }
 
     override func layout() {

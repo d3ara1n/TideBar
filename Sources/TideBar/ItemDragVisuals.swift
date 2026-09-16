@@ -9,6 +9,41 @@ enum ItemDragStyle {
     static let placeholderOpacity: CGFloat = 0.12
     static let receiverBrightness: Float = 0.30
     static let rejectionShade: Float = 0.38
+    /// 拒绝弹震：进入拒绝态时一次短促侧滑（幅度随图标尺寸衰减，两轮归零）
+    static let denyShakeAmplitude: CGFloat = 4
+    static let denyShakeDuration: CFTimeInterval = 0.32
+    /// 接受态上浮：轻微托起（比 hover 浮起克制），进入托起、离开回落
+    static let receiveLiftOffset: CGFloat = 1.5
+
+    /// 拒绝弹震（进入拒绝态的边沿触发）：与 reposition spring 不同 key，
+    /// 短促衰减侧滑；减少动态效果下退化为纯静态灰暗，不弹。
+    static func denyShake(_ layer: CALayer) {
+        guard !Motion.shouldReduceMotion else { return }
+        let animation = CAKeyframeAnimation(keyPath: "transform.translation.x")
+        let a = denyShakeAmplitude
+        animation.values = [0, -a, a, -a * 0.6, a * 0.6, 0]
+        animation.duration = denyShakeDuration
+        animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        layer.removeAnimation(forKey: "motion.deny.shake")
+        layer.add(animation, forKey: "motion.deny.shake")
+    }
+
+    /// 接受态上浮：作用于图标视觉层 translation.y，与拒绝弹震（translation.x）
+    /// 同层不同轴互不干扰；减少动态效果下直接落位，位移作为状态表达保留。
+    static func receiveLift(_ layer: CALayer, on: Bool) {
+        let target = on ? receiveLiftOffset : CGFloat(0)
+        guard !Motion.shouldReduceMotion else {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            defer { CATransaction.commit() }
+            layer.removeAnimation(forKey: "motion.transform.translation.y")
+            layer.setValue(target, forKeyPath: "transform.translation.y")
+            return
+        }
+        Motion.spring(layer, keyPath: "transform.translation.y", to: target,
+                      stiffness: Motion.dragRepositionStiffness, damping: Motion.dragRepositionDamping,
+                      minDuration: Motion.dragRepositionDuration)
+    }
 
     static func suppressHover(pivot: CALayer, halo: CALayer) {
         CATransaction.begin()
@@ -43,6 +78,7 @@ enum ItemDragIconState: Equatable {
 }
 
 /// 独立图层只作用于 artwork 的不透明像素，不放大外圈、不改变 hit geometry。
+/// 拒绝态在压暗之上叠加去饱和（彩色→灰的失活信号，深浅外观下均醒目）。
 @MainActor
 final class ItemDragIconEffect {
     let layer = CALayer()
@@ -50,6 +86,19 @@ final class ItemDragIconEffect {
     private var icon: NSImage?
 
     init() { layer.opacity = 0 }
+
+    private static let ciContext = CIContext()
+
+    /// 去饱和（CIColorControls saturation = 0）；失败时调用方回退原色
+    private static func desaturated(_ icon: NSImage) -> NSImage? {
+        guard let cgImage = icon.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let filter = CIFilter(name: "CIColorControls") else { return nil }
+        filter.setValue(CIImage(cgImage: cgImage), forKey: kCIInputImageKey)
+        filter.setValue(0.0, forKey: "inputSaturation")
+        guard let output = filter.outputImage,
+              let rendered = ciContext.createCGImage(output, from: output.extent) else { return nil }
+        return NSImage(cgImage: rendered, size: icon.size)
+    }
 
     func update(icon: NSImage, state: ItemDragIconState) {
         guard self.state != state || self.icon !== icon else { return }
@@ -59,8 +108,9 @@ final class ItemDragIconEffect {
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
         let tint: NSColor = state == .rejected ? .black : .white
+        let base = state == .rejected ? Self.desaturated(icon) ?? icon : icon
         let image = NSImage(size: icon.size, flipped: false) { rect in
-            icon.draw(in: rect)
+            base.draw(in: rect)
             tint.setFill()
             rect.fill(using: .sourceAtop)
             return true
