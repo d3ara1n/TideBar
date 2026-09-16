@@ -44,11 +44,18 @@ macOS Dock 替代品：平时缩成屏幕底部一条细线，鼠标靠近时如
 
 ## 约定
 
+### 分支与 PR
+
+- 主干 `main`；开发开分支（`feat/`、`fix/`、`docs/` 等前缀随提交 type），经 PR squash merge 回 `main`，一个 PR 对应一个合并提交。
+- PR 标题即合并提交首行，用 Conventional Commits 格式（见语言规范）；分支内过程提交自由，最终以 squash 结果为准。
+- 每个 PR 打 label 进 release note 分组（`.github/release.yml`）：`feature`/`enhancement` → Features、`bug`/`fix` → Bug Fixes、`documentation` → Documentation；`chore-release` 的 PR 不进 release note。
+- 版本与发版由 release CI 自动处理（按合并提交算版本，每周一自动发版），不手动打 tag。
+
 ### 语言规范
 
 - **对外文案双语，英文为主**：README、官网、软件 UI 以英文为第一语言、中文（zh-Hans）为第二语言。各载体按读者需要说明实际功能与操作；产品词汇及含义见 `docs/glossary.md`。
 - **开发文档随开发者语言，用中文**：docs/、plans/、代码注释、提交信息主题——它们是开发者写给自己看的；词汇表同时记录英文名称。
 - 运行时日志（NSLog）用正式英文，保证可 grep。
 - 提交信息用 Conventional Commits 格式（type 英文小写：feat/fix/docs/chore/refactor…，主题中文）。
-- AI 辅助的提交加 `Co-Authored-By: <模型名> <邮箱>` trailer；模型身份查 `PI_*` 环境变量，无对应邮箱用 `noreply@pi.dev`，不得伪造 provider 域名。
+- AI 辅助的提交加 `Co-Authored-By: <模型名> <邮箱>` trailer（PR 流下写在 PR 描述，随 squash 进入合并提交 body）；模型身份查 `PI_*` 环境变量，无对应邮箱用 `noreply@pi.dev`，不得伪造 provider 域名。
 - 代码与文档不留「原来是 A 改成 B」的历史痕迹，追溯看 git log。
