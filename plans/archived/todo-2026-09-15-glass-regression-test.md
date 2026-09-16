@@ -1,6 +1,6 @@
 # macOS 27 上回归测试 NSGlassEffectView，达标则接入玻璃背景
 
-> 状态：立案待执行。本机已 macOS 27.0 + Xcode 26.6；NSGlassEffectView 属 macOS 26 SDK，即刻可测，无需等 Xcode 27。
+> 状态：已结案。macOS 27.0 实测不达标：材质颜色随窗口 key 状态跳变，与 M2 期间行为一致，一票否决；接入代码已回退，维持 StableBlurBackgroundView。
 
 ## 背景
 
@@ -19,6 +19,12 @@
 ## 验收
 
 - agent 止于 `swift build`；渲染质量、观感与性能由用户 `swift run` 操作 UI 确认。
+
+## 结论
+
+- macOS 27.0（SDK 27.0，26A425）实测：NSGlassEffectView 材质颜色随窗口 key/非 key 切换跳变，key 耦合未解绑，一票否决。
+- 公开 API 全集为 contentView / cornerRadius / tintColor / style / effectIsInteractive（27+），无 state、无 appearance 钉死手段；key 联动在 WindowServer 渲染管线内部，无公开开关。
+- 维持 StableBlurBackgroundView（NSVisualEffectView，`.state = .active` + 深浅色钉死）；实测结论已补记 decisions「UI 技术栈分工」材质条目。
 
 ## 参考
 

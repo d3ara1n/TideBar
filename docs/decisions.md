@@ -108,7 +108,7 @@ killall Dock
 1. **窗口层恒为 AppKit**：borderless/nonactivating、level、collectionBehavior、makeKey 语义只有 NSPanel/NSWindow 能表达；SwiftUI Window scene 服务常规应用模型，不适用于零存在感悬浮窗。
 2. **画布层（汐线/图标栏/潮涌）用 NSView + CALayer**：编舞需要 keyPath 级控制（anchorPoint 钉底边、同层正交动画、精确 from-value、spring 参数与错峰 delay）；窗口几何由控制器命令式计算；常驻窗口空闲零开销（合成器线程重复动画，无 SwiftUI 宿主 runtime），图标行按 identity 差分复用。
 3. **SwiftUI 用于窗口界面**：设置页、引导页、KeyboardShortcuts 录制器等数据驱动表单，经 `NSHostingController` + `LocalizedContent` 注入语言快照。
-4. **材质直控 NSVisualEffectView**：material/blendingMode/state/appearance 全部可显式钉死（`.active` 固定 + 深浅色覆盖），不套 SwiftUI Material 密封抽象。
+4. **材质直控 NSVisualEffectView**：material/blendingMode/state/appearance 全部可显式钉死（`.active` 固定 + 深浅色覆盖），不套 SwiftUI Material 密封抽象。NSGlassEffectView 公开 API 无 state/appearance 钉死手段，macOS 27.0 实测材质仍随窗口 key 状态跳变，不可用。
 
 ## 潮涌：类型化长按面板
 
