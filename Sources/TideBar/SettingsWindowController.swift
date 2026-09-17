@@ -41,7 +41,7 @@ final class SettingsWindowController: NSWindowController {
         }
         // AX 授权没有通知渠道：窗口可见期间注册轮询需求（关窗即注销），
         // 经通知送达状态模型；开窗先送一拍，展示不等人
-        PollScheduler.shared.register(Self.permissionDemand, interval: 1) {
+        PollScheduler.shared.register(Self.permissionDemand, interval: Layout.permissionPollInterval) {
             NotificationCenter.default.post(name: .settingsPermissionTick, object: nil)
         }
         NotificationCenter.default.post(name: .settingsPermissionTick, object: nil)

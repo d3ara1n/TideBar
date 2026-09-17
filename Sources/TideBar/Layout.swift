@@ -101,8 +101,12 @@ enum Layout {
     static let collapseDebounce: TimeInterval = 0.3
 
     // 采样与兜底
-    static let mouseSampleThrottle: TimeInterval = 0.04
+    /// 事件路径节流：60fps 档，跟上原生 tracking 响应；保留小节流防高报告率
+    /// 鼠标（游戏鼠可达 1000Hz）的 mouseMoved 风暴打满主线程
+    static let mouseSampleThrottle: TimeInterval = 0.016
     static let pollInterval: TimeInterval = 0.25
     static let fullscreenPollInterval: TimeInterval = 0.5
     static let fullscreenFailureGracePeriod: TimeInterval = 2
+    /// 设置/引导窗口可见期的 AX 授权轮询（授权边沿广播恢复主功能）
+    static let permissionPollInterval: TimeInterval = 1
 }

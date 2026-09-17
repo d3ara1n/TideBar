@@ -73,7 +73,7 @@ killall Dock
 ## 交互与鼠标态约定
 
 - **窗口层组合**：borderless + nonactivating + canJoinAllSpaces + fullScreenAuxiliary；level 见「窗口层级与避让」。收起态靠 `ignoresMouseEvents` 点击穿透，进入交互翻回 false。
-- **鼠标态统一采样器驱动（非激活悬浮窗上 NSTrackingArea 不可靠）**：图标悬停、潮涌行悬停、离场判定全部由接近检测采样器（mouseMoved 事件 + 40ms 节流 + 0.25s 兜底轮询）做命中测试驱动；点击/长按仍走 mouseDown/Up 事件流（该路径可靠）。离场收起防抖 300ms，期间 re-enter 取消。
+- **鼠标态统一采样器驱动（非激活悬浮窗上 NSTrackingArea 不可靠）**：图标悬停、潮涌行悬停、离场判定全部由接近检测采样器（mouseMoved 事件 + 16ms 节流 + 0.25s 兜底轮询）做命中测试驱动；点击/长按仍走 mouseDown/Up 事件流（该路径可靠）。离场收起防抖 300ms，期间 re-enter 取消。
 - **接近检测主路线**：全局 `NSEvent.addGlobalMonitorForEvents` 监听 mouseMoved / leftMouseDragged（鼠标类零权限），local monitor 兜底自家激活态，低频轮询 `NSEvent.mouseLocation` 兜底。左键按住期间的真实位置变化属于移动，静止轮询不解除菜单保持或键盘展开抑制。NSTrackingArea 仅用于展开面板内部 hover。
 - **key 只服务键盘会话**：材质质量与窗口 key 状态无关（NSVisualEffectView 以 `.state = .active` 固定渲染）；`makeKey()` 仅在键盘会话开始时调用（local monitor 只能看到投递给本 app 的键盘事件，潮涌面板自身无需 key），鼠标展开不改变 frontmost。
 - **悬停名 = 名字气泡（所有条目通用）**：替代系统 tooltip 的标准交互。悬停图标短暂延迟后图标上方浮出玻璃小泡显示条目名，泡在场时换目标即时切换；宽度随文字自适应、240pt 封顶，封顶后转泡内往返滚动（两端渐隐，减弱动态退化为中截断）。气泡纯展示（ignoresMouseEvents，悬停判定仍由采样器驱动），潮涌展开、收起、拖拽与面板重建时让位隐藏。

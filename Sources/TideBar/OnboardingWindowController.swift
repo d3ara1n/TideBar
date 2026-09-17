@@ -35,7 +35,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     override func showWindow(_ sender: Any?) {
         model.reset()
         // 开窗先送一拍，展示不等人；此后每秒轮询（关窗即注销）
-        PollScheduler.shared.register(Self.permissionDemand, interval: 1) {
+        PollScheduler.shared.register(Self.permissionDemand, interval: Layout.permissionPollInterval) {
             NotificationCenter.default.post(name: Self.permissionTick, object: nil)
         }
         NotificationCenter.default.post(name: Self.permissionTick, object: nil)
