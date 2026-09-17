@@ -46,8 +46,10 @@ macOS Dock 替代品：平时缩成屏幕底部一条细线，鼠标靠近时如
 
 ### 分支与 PR
 
-- 主干 `main`；开发开分支（`feat/`、`fix/`、`docs/` 等前缀随提交 type），经 PR squash merge 回 `main`，一个 PR 对应一个合并提交。
-- PR 标题即合并提交首行，用 Conventional Commits 格式（见语言规范）；分支内过程提交自由，最终以 squash 结果为准。
+- 主干 `main` 开分支保护，一切改动经 PR squash merge 回 `main`，不直接 push；一个 PR 对应一个合并提交。
+- PR 攒批使用：会话内产生的工程杂务（CI/构建/配置/文档）不单独成 PR，攒进同一个批次 PR；用户可见的功能或缺陷修复才单独成 PR。
+- 合入满足确定性条件：CI 全绿，功能/交互改动另需用户运行验收；条件不满足则 PR 挂起不合。
+- PR 标题即合并提交首行，用 Conventional Commits 格式（见语言规范），攒批 PR 取主导 type、body 列各任务明细；分支内过程提交自由，最终以 squash 结果为准。
 - 每个 PR 打 label 进 release note 分组（`.github/release.yml`）：`feature`/`enhancement` → Features、`bug`/`fix` → Bug Fixes、`documentation` → Documentation；`chore-release` 的 PR 不进 release note。
 - 版本与发版由 release CI 自动处理（按合并提交算版本，每周一自动发版），不手动打 tag。
 
