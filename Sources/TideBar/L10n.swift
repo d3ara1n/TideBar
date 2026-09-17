@@ -56,11 +56,11 @@ struct Localization: Equatable, Sendable {
 
     private static func loadBundle(_ code: String) -> Bundle {
         // SPM 将 lproj 目录名规范化为小写；同时支持保留标准语言代码大小写的资源包。
-        guard let path = Bundle.module.path(forResource: code, ofType: "lproj")
-                ?? Bundle.module.path(forResource: code.lowercased(), ofType: "lproj"),
+        guard let path = AppResources.bundle.path(forResource: code, ofType: "lproj")
+                ?? AppResources.bundle.path(forResource: code.lowercased(), ofType: "lproj"),
               let bundle = Bundle(path: path) else {
             NSLog("TideBar L10n missing localization %@ in module bundle", code)
-            return Bundle.module
+            return AppResources.bundle
         }
         return bundle
     }
