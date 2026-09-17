@@ -9,9 +9,10 @@ enum AppResources {
     static nonisolated let bundle: Bundle = {
         let name = "TideBar_TideBar"
         let candidates: [URL?] = [
-            Bundle.main.resourceURL,               // .app 的 Contents/Resources
-            Bundle(for: Marker.self).resourceURL,  // 以 framework 形态链接时
-            Bundle.main.bundleURL,                 // swift run：可执行文件所在目录
+            Bundle.main.resourceURL,                                          // .app 的 Contents/Resources
+            Bundle(for: Marker.self).resourceURL,                             // 以 framework/xctest 形态链接时
+            Bundle(for: Marker.self).bundleURL.deletingLastPathComponent(),   // 测试：xctest 所在的构建输出目录
+            Bundle.main.bundleURL,                                            // swift run：可执行文件所在目录
         ]
         for candidate in candidates {
             if let url = candidate?.appendingPathComponent("\(name).bundle"),
