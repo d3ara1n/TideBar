@@ -103,6 +103,8 @@ enum Layout {
     // 采样与兜底
     static let mouseSampleThrottle: TimeInterval = 0.04
     static let pollInterval: TimeInterval = 0.25
+    /// 菜单跟踪会话期间 monitor 全静默，轮询是唯一采样通道，临时收紧到此频率
+    static let menuPollInterval: TimeInterval = 0.05
     static let fullscreenPollInterval: TimeInterval = 0.5
     static let fullscreenFailureGracePeriod: TimeInterval = 2
 }

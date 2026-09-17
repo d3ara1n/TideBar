@@ -208,6 +208,9 @@ final class ItemIconButton: NSView {
     var onSurge: ((ItemEntry, NSRect) -> Void)?
     /// 小工具右键菜单的「移除小工具」；执行方负责确认弹窗
     var onRemoveWidget: ((ItemEntry) -> Void)?
+    /// 右键菜单会话边界（willOpenMenu→true，didCloseMenu→false）。跟踪会话期间
+    /// 事件 monitor 全静默，控制器据此切换轮询节奏并挂起收起
+    var onMenuSessionChange: ((Bool) -> Void)?
 
     private enum VisualTransition {
         case enter
@@ -486,6 +489,14 @@ final class ItemIconButton: NSView {
     }
 
     // MARK: 右键菜单
+
+    override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
+        onMenuSessionChange?(true)
+    }
+
+    override func didCloseMenu(_ menu: NSMenu, with event: NSEvent?) {
+        onMenuSessionChange?(false)
+    }
 
     override func menu(for event: NSEvent) -> NSMenu? {
         if entry.kind == .widget { return widgetMenu() }
