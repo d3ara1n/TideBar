@@ -10,6 +10,9 @@ import QuartzCore
 /// - 主线程 tick 只做触发（亚毫秒级），重活（AX 读取等）由需求自行调度后台队列，
 ///   经 `MainThreadBridge` 回主线程改模型。
 /// - 容差 = 基频/5，允许系统合并唤醒；轮询是兜底与新鲜度通道，不承诺精确定时。
+/// - Timer 挂 common 模式：菜单等跟踪会话把主 run loop 切到 eventTracking，
+///   default 模式 Timer 期间整体停摆，轮询恰要在这些会话里兜住鼠标采样；
+///   应用空闲的静默由需求节奏（收起降频）与容差承担，与模式无关。
 @MainActor
 final class PollScheduler {
     static let shared = PollScheduler()
@@ -64,7 +67,7 @@ final class PollScheduler {
             sweep()
         }
         timer.tolerance = base / 5
-        RunLoop.main.add(timer, forMode: .default)
+        RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
     }
 

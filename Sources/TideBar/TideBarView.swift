@@ -103,6 +103,8 @@ final class TideBarView: NSView {
     var onSurge: ((ItemEntry, NSRect) -> Void)?
     /// 小工具「移除小工具」菜单项透传；执行方负责确认
     var onRemoveWidget: ((ItemEntry) -> Void)?
+    /// 菜单会话透传（true = 打开中）
+    var onMenuSessionChange: ((Bool) -> Void)?
     /// 悬停目标变化（携图标 frame，本视图坐标系）；nil 表示离开图标区
     var onHoverItem: ((ItemEntry, NSRect) -> Void)?
     var onHoverClear: (() -> Void)?
@@ -331,6 +333,7 @@ final class TideBarView: NSView {
         iconRow.onSetPinned = { [weak self] identity, pinned in self?.onSetPinned?(identity, pinned) }
         iconRow.onSurge = { [weak self] entry, frame in self?.onSurge?(entry, frame) }
         iconRow.onRemoveWidget = { [weak self] entry in self?.onRemoveWidget?(entry) }
+        iconRow.onMenuSessionChange = { [weak self] active in self?.onMenuSessionChange?(active) }
     }
 
     @available(*, unavailable)

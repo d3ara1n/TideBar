@@ -50,6 +50,9 @@ final class TideBarController {
     private var observers: [NSObjectProtocol] = []
     private var lastSampleTime: CFTimeInterval = 0
     private var lastSampledMouseLocation: NSPoint?
+    /// 右键菜单跟踪会话进行中：monitor 通道静默，采样由 common-mode 轮询接管；
+    /// 期间挂起收起（菜单悬在栏上方）并抑制其他屏热区展开
+    private var isMenuSessionActive = false
     private let fullscreenDetector = FullscreenDetector()
     private var fullscreenStates: [CGDirectDisplayID: FullscreenState] = [:]
 
@@ -572,6 +575,9 @@ final class TideBarController {
             view.onRemoveWidget = { [weak self] entry in
                 self?.confirmRemoveWidget(entry)
             }
+            view.onMenuSessionChange = { [weak self] active in
+                self?.setMenuSession(active)
+            }
             view.onHoverItem = { [weak self, weak state] entry, iconFrame in
                 guard let self, let state else { return }
                 self.updateNameBubble(entry: entry, iconFrame: iconFrame, state: state)
@@ -639,6 +645,15 @@ final class TideBarController {
 
     // MARK: - 鼠标采样与状态机
 
+    /// 菜单会话边界：轮询收紧到菜单档（monitor 静默期间唯一采样通道）；
+    /// 结束时放宽，下次采样按正常节奏回归——鼠标在栏外则照常防抖收起
+    private func setMenuSession(_ active: Bool) {
+        guard isMenuSessionActive != active else { return }
+        isMenuSessionActive = active
+        PollScheduler.shared.updateInterval(
+            Self.mouseDemand, interval: active ? Layout.menuPollInterval : Layout.pollInterval)
+    }
+
     private func sampleMouse(isMovement: Bool) {
         let location = NSEvent.mouseLocation
         // 拖拽追踪不保证 mouseMoved 送达；轮询只在左键按住且位置确实变化时
@@ -664,7 +679,7 @@ final class TideBarController {
                 continue
             }
             if state.isExpanded {
-                if state.collapseHeldUntilMouseMoves || isKeyboardHolding(state) {
+                if isMenuSessionActive || state.collapseHeldUntilMouseMoves || isKeyboardHolding(state) {
                     cancelCollapse(state)
                     state.view.updateHover(atScreen: location)
                     continue
@@ -680,7 +695,8 @@ final class TideBarController {
                     scheduleCollapse(state)
                 }
                 state.view.updateHover(atScreen: location)
-            } else if state.effectiveFullscreenBehavior == .normal,
+            } else if !isMenuSessionActive,
+                      state.effectiveFullscreenBehavior == .normal,
                       !state.suppressExpandUntilMouseMove,
                       hotZone(for: state.screen).contains(location) {
                 expand(state)

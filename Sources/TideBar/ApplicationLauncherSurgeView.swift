@@ -546,6 +546,16 @@ private final class LauncherItemView: NSView {
         onClick?()
     }
 
+    // 潮涌面板层级（statusBar+1）同样高于菜单窗口，行菜单底部重叠区的
+    // 事件会被面板截走；会话期间面板临时穿透，didCloseMenu 恢复
+    override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
+        window?.ignoresMouseEvents = true
+    }
+
+    override func didCloseMenu(_ menu: NSMenu, with event: NSEvent?) {
+        window?.ignoresMouseEvents = false
+    }
+
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = NSMenu()
         let title = L10nManager.shared.current.string("surge.launcher.remove", table: .runtime)
