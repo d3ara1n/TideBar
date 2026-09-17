@@ -492,10 +492,15 @@ final class ItemIconButton: NSView {
 
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         onMenuSessionChange?(true)
+        // 菜单窗口（popUpMenu 层）低于汐线面板（statusBar 层），弹出时底部
+        // 若干行落在面板 frame 内，事件会被面板截走使这些菜单项不高亮：
+        // 会话期间面板临时穿透，收起态本就用同一手法
+        window?.ignoresMouseEvents = true
     }
 
     override func didCloseMenu(_ menu: NSMenu, with event: NSEvent?) {
         onMenuSessionChange?(false)
+        window?.ignoresMouseEvents = false
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
