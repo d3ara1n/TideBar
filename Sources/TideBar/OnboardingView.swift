@@ -207,7 +207,7 @@ private struct DemoLoopVideo: NSViewRepresentable {
         }
 
         func load(resource: String) {
-            guard let url = Bundle.module.url(forResource: resource, withExtension: "mp4") else { return }
+            guard let url = AppResources.bundle.url(forResource: resource, withExtension: "mp4") else { return }
             let queue = AVQueuePlayer()
             queue.isMuted = true
             looper = AVPlayerLooper(player: queue, templateItem: AVPlayerItem(url: url))

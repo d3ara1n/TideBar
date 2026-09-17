@@ -15,8 +15,8 @@ enum BrandAssets {
     }
 
     private static func load(_ name: String) -> NSImage? {
-        guard let url = Bundle.module.url(forResource: name,
-                                          withExtension: "pdf") else {
+        guard let url = AppResources.bundle.url(forResource: name,
+                                               withExtension: "pdf") else {
             return nil
         }
         return NSImage(contentsOf: url)
