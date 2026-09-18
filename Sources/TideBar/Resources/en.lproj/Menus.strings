@@ -1,8 +1,7 @@
 // 状态栏（汐图标）
 "statusBar.name" = "TideBar";
 "statusBar.openSettings" = "Settings…";
-"statusBar.replayOnboarding" = "Replay Tour…";
-"statusBar.checkStatus" = "Check TideBar Status";
+"statusBar.checkForUpdates" = "Check for Updates…";
 "statusBar.quit" = "Quit TideBar";
 
 // 应用右键菜单

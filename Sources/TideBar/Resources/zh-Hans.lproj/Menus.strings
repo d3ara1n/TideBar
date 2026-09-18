@@ -1,8 +1,7 @@
 // 状态栏（汐图标）
 "statusBar.name" = "汐";
 "statusBar.openSettings" = "打开设置…";
-"statusBar.replayOnboarding" = "重看引导…";
-"statusBar.checkStatus" = "检查汐的状态";
+"statusBar.checkForUpdates" = "检查更新…";
 "statusBar.quit" = "退出汐";
 
 // 应用右键菜单

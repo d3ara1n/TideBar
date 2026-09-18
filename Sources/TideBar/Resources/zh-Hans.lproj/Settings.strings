@@ -5,23 +5,38 @@
 "action.openSystemSettings" = "打开系统设置";
 "state.available" = "可用";
 "state.pending" = "等待授权";
-"state.comingSoon" = "即将推出";
 "state.granted" = "已授权";
 "state.notGranted" = "未授权";
 
 // 窗口与侧栏
 "window.title" = "汐 TideBar";
+"window.title.development" = "开发预览";
 "sidebar.section.app" = "汐 TideBar";
 "sidebar.section.system" = "系统";
-"page.overview" = "概览";
+"page.general" = "通用";
 "page.pinned" = "固定项目";
 "page.widgets" = "小工具";
 "page.windows" = "窗口管理";
 "page.appearance" = "外观与交互";
 "page.shortcuts" = "快捷键";
 "page.dock" = "Dock 与恢复";
-"page.permissions" = "权限";
 "page.about" = "关于";
+"page.developer" = "开发者";
+
+// 通用（登录项与软件更新仅正式运行展示）
+"general.header.title" = "通用";
+"general.header.description" = "启动、更新与应用语言。";
+"general.section.login" = "启动";
+"general.loginItem" = "登录时启动 TideBar";
+"general.loginItemFooter" = "也可在系统设置 › 通用 › 登录项中管理。";
+"general.loginItemRequiresApproval" = "待批准——请在系统设置 › 通用 › 登录项中允许 TideBar。";
+"general.openLoginItemsSettings" = "打开系统设置";
+"general.section.update" = "软件更新";
+"general.automaticChecks" = "自动检查更新";
+"general.checkForUpdates" = "检查更新…";
+"general.section.language" = "语言";
+"general.language" = "应用语言";
+"general.language.footer" = "切换立即应用到汐的所有界面。";
 
 // 操作横幅（OperationKind）
 "op.working.enabling" = "正在启用汐…";
@@ -35,21 +50,21 @@
 "op.failure.drifted" = "系统 Dock 设置仍不一致，请重新检查。";
 "op.failure.manualRecovery" = "缺少接管前保存的 Dock 配置，无法自动恢复。";
 
-// 概览
-"overview.header.title" = "概览";
-"overview.header.description" = "查看汐的运行状态，并管理系统 Dock 的接管关系。";
-"overview.section.recent" = "最近操作";
-"overview.state.notEnabled.title" = "汐尚未启用";
-"overview.state.notEnabled.message" = "启用后，汐会隐藏系统 Dock 的可见入口，并在屏幕底部提供应用与窗口访问。";
-"overview.state.takeover.title" = "汐正在运行";
-"overview.state.takeover.message" = "系统 Dock 的可见入口已由汐接替。汐线会在屏幕底部收起，靠近时展开。";
-"overview.state.drifted.title" = "系统 Dock 设置已发生变化";
-"overview.state.drifted.message" = "汐发现当前 Dock 设置与接管配置不一致。你可以重新应用汐的设置，或关闭汐并恢复原始配置。";
-"overview.state.manualRecovery.title" = "无法自动恢复 macOS Dock";
-"overview.state.manualRecovery.message" = "汐找不到启用前保存的 Dock 设置，因此无法安全执行自动恢复。请查看恢复说明，或联系支持以获取手动恢复步骤。";
-"overview.state.failed.title" = "需要处理系统 Dock";
-
-// 接管与恢复（概览与 Dock 页共用）
+// Dock 接管与恢复
+"dock.header.description" = "查看系统 Dock 的接管配置，并在需要时检查、修复或恢复。";
+"dock.state.notEnabled.title" = "汐尚未启用";
+"dock.state.notEnabled.message" = "启用后，汐会隐藏系统 Dock 的可见入口，并在屏幕底部提供应用与窗口访问。";
+"dock.state.takeover.title" = "汐正在运行";
+"dock.state.takeover.message" = "系统 Dock 的可见入口已由汐接替。汐线会在屏幕底部收起，靠近时展开。";
+"dock.state.drifted.title" = "系统 Dock 设置已发生变化";
+"dock.state.drifted.message" = "汐发现当前 Dock 设置与接管配置不一致。你可以重新应用汐的设置，或关闭汐并恢复原始配置。";
+"dock.state.manualRecovery.title" = "无法自动恢复 macOS Dock";
+"dock.state.manualRecovery.message" = "汐找不到启用前保存的 Dock 设置，因此无法安全执行自动恢复。请查看恢复说明，或联系支持以获取手动恢复步骤。";
+"dock.state.failed.title" = "需要处理系统 Dock";
+"dock.reapply" = "重新应用接管设置";
+"dock.section.maintenance" = "维护与恢复";
+"dock.maintenance.footer" = "重新应用会覆盖汐所需的 Dock 设置并重新启动 Dock。恢复会使用启用前保存的设置。";
+"dock.section.recent" = "最近操作";
 "takeover.confirmTitle" = "启用汐？";
 "takeover.confirmEnable" = "启用汐";
 "takeover.confirmMessage" = "汐会保存当前 Dock 设置、应用接管配置并重新启动系统 Dock。已打开的应用不会关闭。";
@@ -86,19 +101,19 @@
 "widgets.removeConfirmAction" = "移除小工具";
 "widgets.removeConfirmMessage" = "移除 %@ 并清除它保存的内容？";
 
-// 窗口管理
+// 窗口管理（含权限）
 "windows.header.description" = "汐的核心能力：让最小化窗口和多个窗口都能被直接找到。";
 "windows.section.capabilities" = "能力";
 "windows.cap.windowList.title" = "窗口列表";
 "windows.cap.windowList.description" = "按应用展开该应用的全部窗口。";
 "windows.cap.minimizeRestore.title" = "最小化窗口还原";
 "windows.cap.minimizeRestore.description" = "点击窗口后自动还原并置前。";
-"windows.cap.preview.title" = "窗口预览";
-"windows.cap.preview.description" = "悬停时查看窗口缩略图。";
 "windows.section.requirements" = "运行条件";
 "windows.accessibilityLabel" = "辅助功能权限";
 "windows.footer.granted" = "窗口管理已具备运行条件。若刚刚完成授权，请重新启动汐以开始观察已有应用。";
 "windows.footer.notGranted" = "辅助功能权限用于读取窗口列表、识别最小化与全屏状态，并将窗口带回前台。";
+"windows.section.privacy" = "隐私";
+"windows.privacy.note" = "汐不会请求屏幕录制权限。";
 
 // 外观与交互
 "appearance.header.description" = "调整主题、汐线、展开动画和图标栏的表现。";
@@ -129,27 +144,6 @@
 "shortcuts.switcher.footer" = "停止操作达到该时间后，汐会提交当前选择并结束临时切换会话。";
 "shortcuts.resetDefaults" = "恢复默认快捷键与延迟";
 
-// Dock 与恢复
-"dock.header.description" = "查看系统 Dock 的接管配置，并在需要时检查、修复或恢复。";
-"dock.currentState" = "当前状态";
-"dock.section.dock" = "系统 Dock";
-"dock.reapply" = "重新应用接管设置";
-"dock.section.maintenance" = "维护与恢复";
-"dock.maintenance.footer" = "重新应用会覆盖汐所需的 Dock 设置并重新启动 Dock。恢复会使用启用前保存的设置。";
-"dock.status.notEnabled" = "尚未启用";
-"dock.status.takeover" = "正常运行";
-"dock.status.drifted" = "设置不一致";
-"dock.status.manualRecovery" = "无法自动恢复";
-"dock.status.failed" = "需要处理";
-
-// 权限
-"permissions.header.description" = "汐只在需要时请求系统能力，并清楚说明每项权限的用途。";
-"permissions.accessibility" = "辅助功能";
-"permissions.section.windows" = "窗口管理";
-"permissions.windows.footer" = "用于读取窗口列表、识别最小化状态，并将选中的窗口带回前台。";
-"permissions.section.privacy" = "隐私";
-"permissions.privacy.note" = "汐不会请求屏幕录制权限。窗口预览功能开放后，会在启用前单独说明用途。";
-
 // 关于
 "about.header.title" = "关于汐";
 "about.header.description" = "启动应用、切换窗口，以及打开固定的文件和文件夹。";
@@ -162,19 +156,13 @@
 "about.copyright" = "版权";
 "about.feedback" = "反馈";
 
-// 语言
-"appearance.section.language" = "语言";
-"appearance.language" = "应用语言";
-"appearance.language.footer" = "切换立即应用到汐的所有界面。";
-
-// 通用与更新
-"general.section" = "通用";
-"general.loginItem" = "登录时启动 TideBar";
-"general.loginItemFooter" = "也可在系统设置 › 通用 › 登录项中管理。";
-"general.loginItemDevHint" = "仅正式 TideBar.app 中可用。";
-"general.loginItemRequiresApproval" = "待批准——请在系统设置 › 通用 › 登录项中允许 TideBar。";
-"general.openLoginItemsSettings" = "打开系统设置";
-"about.updateSection" = "软件更新";
-"about.checkForUpdates" = "检查更新…";
-"about.automaticChecks" = "自动检查更新";
-"about.updatesDevHint" = "正式 TideBar.app 中提供更新检查。";
+// 开发者（仅开发运行）
+"developer.header.title" = "开发者";
+"developer.header.description" = "开发运行专用的工具与环境说明。";
+"developer.section.onboarding" = "引导";
+"developer.replayOnboarding" = "重看引导…";
+"developer.replayOnboarding.footer" = "从头重放首次启动的引导流程。";
+"developer.section.environment" = "环境";
+"developer.environment.mode" = "运行模式";
+"developer.environment.modeValue" = "开发预览（swift run）";
+"developer.environment.note" = "读取正式版汐的持久化设置；此处修改退出进程后即丢弃。";

@@ -5,7 +5,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let controller = TideBarController()
     private let shortcutManager = ShortcutManager()
     private var settingsWindow: SettingsWindowController?
-    private var onboardingWindow: OnboardingWindowController?
     private var statusItem: NSStatusItem?
     private var configurationObserver: NSObjectProtocol?
     private var appearanceObserver: NSObjectProtocol?
@@ -15,9 +14,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         applyAppearance()
+        UpdateCoordinator.shared.start()
         configureStatusItem()
         DockController.shared.start()
-        UpdateCoordinator.shared.start()
         controller.start()
         if RuntimeEnvironment.isProduction {
             shortcutManager.onAction = { [weak self] action in
@@ -57,9 +56,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }.call()
         }
 
-        if RuntimeEnvironment.isProduction,
-           !AppConfiguration.shared.onboardingCompleted {
-            showOnboarding()
+        if !AppConfiguration.shared.onboardingCompleted {
+            OnboardingWindowController.shared.showWindow(self)
         }
         NSLog("TideBar application shell ready (%@)",
               RuntimeEnvironment.isDevelopment ? "development" : "production")
@@ -115,30 +113,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: L10nManager.shared.current.string("statusBar.openSettings", table: .menus),
                                 action: #selector(openSettings), keyEquivalent: ","))
-        menu.addItem(NSMenuItem(title: L10nManager.shared.current.string("statusBar.replayOnboarding", table: .menus),
-                                action: #selector(showOnboarding), keyEquivalent: ""))
+        // 更新能力依赖 .app bundle（SUFeedURL），开发运行不展示入口
+        if UpdateCoordinator.shared.isAvailable {
+            let updates = NSMenuItem(title: L10nManager.shared.current.string("statusBar.checkForUpdates", table: .menus),
+                                     action: #selector(UpdateCoordinator.checkForUpdates(_:)), keyEquivalent: "")
+            updates.target = UpdateCoordinator.shared
+            menu.addItem(updates)
+        }
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: L10nManager.shared.current.string("statusBar.checkStatus", table: .menus),
-                                action: #selector(checkDock), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: L10nManager.shared.current.string("statusBar.quit", table: .menus),
                                 action: #selector(terminate), keyEquivalent: "q"))
-        for menuItem in menu.items { menuItem.target = self }
+        for menuItem in menu.items where menuItem.target == nil { menuItem.target = self }
         item.menu = menu
-    }
-
-    @objc private func showOnboarding() {
-        if onboardingWindow == nil { onboardingWindow = OnboardingWindowController() }
-        onboardingWindow?.showWindow(self)
     }
 
     @objc private func openSettings() {
         if settingsWindow == nil { settingsWindow = SettingsWindowController() }
         settingsWindow?.showWindow(self)
-    }
-
-    @objc private func checkDock() {
-        DockController.shared.checkStatus()
-        openSettings()
     }
 
     @objc private func terminate() {
