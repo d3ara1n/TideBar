@@ -9,7 +9,7 @@ final class SettingsWindowController: NSWindowController {
     convenience init() {
         let hosting = NSHostingController(rootView: LocalizedContent { SettingsRootView() })
         let window = NSWindow(contentViewController: hosting)
-        window.title = L10nManager.shared.current.string("window.title", table: .settings)
+        window.title = Self.windowTitle()
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         // unified 标题栏与内容区融合，保留玻璃窗口观感。
         window.toolbar = NSToolbar(identifier: "TideBar.settings")
@@ -27,9 +27,16 @@ final class SettingsWindowController: NSWindowController {
     private static let permissionDemand = "settings.permission"
     private var languageObserver: NSObjectProtocol?
 
+    /// 正式版标题即产品名；开发运行追加后缀，与正式版窗口一眼可辨。
+    private static func windowTitle() -> String {
+        let name = L10nManager.shared.current.string("window.title", table: .settings)
+        guard RuntimeEnvironment.isDevelopment else { return name }
+        return name + " — " + L10nManager.shared.current.string("window.title.development", table: .settings)
+    }
+
     override func showWindow(_ sender: Any?) {
         // 窗口标题与语言同步：开窗时重设并在可见期间随语言变化更新（关窗即注销）
-        window?.title = L10nManager.shared.current.string("window.title", table: .settings)
+        window?.title = Self.windowTitle()
         if languageObserver == nil {
             languageObserver = NotificationCenter.default.addObserver(
                 forName: L10nManager.languageDidChange, object: nil, queue: .main
@@ -83,12 +90,11 @@ private final class SettingsModel: ObservableObject {
         case manualRecovery
     }
 
-    /// 登录项当前状态；裸可执行（swift run）无注册能力。
+    /// 登录项当前状态；开发运行不展示登录项设置，模型跳过刷新。
     enum LoginItemState {
         case enabled
         case notRegistered
         case requiresApproval
-        case unavailableDev
     }
 
     enum Operation: Equatable {
@@ -210,10 +216,7 @@ private final class SettingsModel: ObservableObject {
     }
 
     func refreshLoginItem() {
-        guard UpdateCoordinator.isAppBundle else {
-            loginItemState = .unavailableDev
-            return
-        }
+        guard RuntimeEnvironment.isProduction else { return }
         switch SMAppService.mainApp.status {
         case .enabled: loginItemState = .enabled
         case .requiresApproval: loginItemState = .requiresApproval
@@ -397,31 +400,41 @@ private struct PinnedApplication: Identifiable, Equatable {
 // MARK: - 导航
 
 private enum SettingsPage: String, CaseIterable, Identifiable {
-    case overview
+    case general
+    case appearance
     case pinned
     case widgets
     case windows
-    case appearance
     case shortcuts
     case dock
-    case permissions
     case about
+    case developer
 
     var id: String { rawValue }
 
     var titleKey: String { "page.\(rawValue)" }
 
+    /// 按运行环境过滤：开发者页仅开发运行可见；
+    /// 快捷键热键只在正式运行注册，且录制的持久化域与正式版不通，开发运行不展示。
+    @MainActor var isVisible: Bool {
+        switch self {
+        case .developer: return RuntimeEnvironment.isDevelopment
+        case .shortcuts: return RuntimeEnvironment.isProduction
+        default: return true
+        }
+    }
+
     var symbolName: String {
         switch self {
-        case .overview: return "rectangle.grid.1x2"
+        case .general: return "gearshape"
+        case .appearance: return "paintbrush"
         case .pinned: return "pin"
         case .widgets: return "square.grid.2x2"
         case .windows: return "macwindow.on.rectangle"
-        case .appearance: return "paintbrush"
         case .shortcuts: return "keyboard"
         case .dock: return "dock.rectangle"
-        case .permissions: return "checkmark.shield"
         case .about: return "info.circle"
+        case .developer: return "wrench.and.screwdriver"
         }
     }
 }
@@ -429,41 +442,41 @@ private enum SettingsPage: String, CaseIterable, Identifiable {
 private struct SettingsRootView: View {
     @StateObject private var model = SettingsModel()
     @Environment(\.l10n) private var l10n
-    @State private var selection: SettingsPage? = .overview
+    @State private var selection: SettingsPage? = .general
 
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
                 Section(l10n.string("sidebar.section.app", table: .settings)) {
-                    pageRow(.overview)
+                    pageRow(.general)
+                    pageRow(.appearance)
                     pageRow(.pinned)
                     pageRow(.widgets)
                     pageRow(.windows)
-                    pageRow(.appearance)
                     pageRow(.shortcuts)
                 }
                 Section(l10n.string("sidebar.section.system", table: .settings)) {
                     pageRow(.dock)
-                    pageRow(.permissions)
                 }
                 Section {
                     pageRow(.about)
+                    pageRow(.developer)
                 }
             }
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 190, ideal: 215, max: 250)
         } detail: {
             Group {
-                switch selection ?? .overview {
-                case .overview: OverviewPage(model: model)
+                switch selection ?? .general {
+                case .general: GeneralPage(model: model)
+                case .appearance: AppearancePage(model: model)
                 case .pinned: PinnedPage(model: model)
                 case .widgets: WidgetsPage(model: model)
                 case .windows: WindowsPage(model: model)
-                case .appearance: AppearancePage(model: model)
                 case .shortcuts: ShortcutsPage(model: model)
                 case .dock: DockPage(model: model)
-                case .permissions: PermissionsPage(model: model)
                 case .about: AboutPage()
+                case .developer: DeveloperPage()
                 }
             }
             .frame(maxWidth: 680, alignment: .leading)
@@ -471,9 +484,12 @@ private struct SettingsRootView: View {
         }
     }
 
+    /// 侧栏行按运行环境过滤；被隐藏的页面不可达。
     @ViewBuilder
     private func pageRow(_ page: SettingsPage) -> some View {
-        Label(l10n.string(page.titleKey, table: .settings), systemImage: page.symbolName).tag(page)
+        if page.isVisible {
+            Label(l10n.string(page.titleKey, table: .settings), systemImage: page.symbolName).tag(page)
+        }
     }
 }
 
@@ -556,24 +572,21 @@ private struct StatusCard: View {
     }
 }
 
-// MARK: - 概览
+// MARK: - 通用
 
-private struct OverviewPage: View {
+private struct GeneralPage: View {
     @Environment(\.l10n) private var l10n
     @ObservedObject var model: SettingsModel
-    @State private var showEnableConfirmation = false
-    @State private var showRestoreConfirmation = false
+    @State private var automaticChecks = UpdateCoordinator.shared.automaticallyChecksForUpdates
 
     var body: some View {
         Form {
-            PageHeader(title: l10n.string("overview.header.title", table: .settings),
-                       description: l10n.string("overview.header.description", table: .settings))
+            PageHeader(title: l10n.string("general.header.title", table: .settings),
+                       description: l10n.string("general.header.description", table: .settings))
 
-            Section {
-                if model.loginItemState == .unavailableDev {
-                    Text(l10n.string("general.loginItemDevHint", table: .settings))
-                        .foregroundStyle(.secondary)
-                } else {
+            // 登录项与更新依赖 .app bundle，开发运行不展示
+            if RuntimeEnvironment.isProduction {
+                Section {
                     Toggle(l10n.string("general.loginItem", table: .settings), isOn: Binding(
                         get: { model.loginItemState == .enabled },
                         set: { model.setLoginItem($0) }
@@ -582,86 +595,45 @@ private struct OverviewPage: View {
                         Button(l10n.string("general.openLoginItemsSettings", table: .settings),
                                action: model.openLoginItemsSettings)
                     }
+                } header: {
+                    Text(l10n.string("general.section.login", table: .settings))
+                } footer: {
+                    if let footerText {
+                        Text(footerText)
+                    }
                 }
+
+                Section {
+                    Toggle(l10n.string("general.automaticChecks", table: .settings), isOn: $automaticChecks)
+                        .onChange(of: automaticChecks) { _, value in
+                            UpdateCoordinator.shared.automaticallyChecksForUpdates = value
+                        }
+                    Button(l10n.string("general.checkForUpdates", table: .settings)) {
+                        UpdateCoordinator.shared.checkForUpdates(nil)
+                    }
+                } header: {
+                    Text(l10n.string("general.section.update", table: .settings))
+                }
+            }
+
+            Section {
+                LanguagePicker(title: l10n.string("general.language", table: .settings))
             } header: {
-                Text(l10n.string("general.section", table: .settings))
+                Text(l10n.string("general.section.language", table: .settings))
             } footer: {
-                if let footerText {
-                    Text(footerText)
-                }
+                Text(l10n.string("general.language.footer", table: .settings))
             }
-
-            Section {
-                statusCard
-            }
-
-            Section {
-                OperationBanner(operation: model.operation)
-            } header: {
-                Text(l10n.string("overview.section.recent", table: .settings))
-            }
-            .opacity(model.operation == .idle ? 0 : 1)
         }
         .formStyle(.grouped)
-        .navigationTitle(l10n.string("page.overview", table: .settings))
-        .confirmationDialog(l10n.string("takeover.confirmTitle", table: .settings), isPresented: $showEnableConfirmation) {
-            Button(l10n.string("takeover.confirmEnable", table: .settings)) { model.enableTakeover() }
-            Button(l10n.string("action.cancel", table: .settings), role: .cancel) {}
-        } message: {
-            Text(l10n.string("takeover.confirmMessage", table: .settings))
-        }
-        .confirmationDialog(l10n.string("restore.confirmTitle", table: .settings), isPresented: $showRestoreConfirmation) {
-            Button(l10n.string("restore.confirmAction", table: .settings), role: .destructive) { model.restoreDock() }
-            Button(l10n.string("action.cancel", table: .settings), role: .cancel) {}
-        } message: {
-            Text(l10n.string("restore.confirmMessage", table: .settings))
-        }
+        .navigationTitle(l10n.string("page.general", table: .settings))
     }
 
     private var footerText: String? {
         switch model.loginItemState {
         case .requiresApproval:
             return l10n.string("general.loginItemRequiresApproval", table: .settings)
-        case .unavailableDev:
-            return nil
         case .enabled, .notRegistered:
             return l10n.string("general.loginItemFooter", table: .settings)
-        }
-    }
-
-    @ViewBuilder
-    private var statusCard: some View {
-        switch model.dockState {
-        case .notEnabled:
-            StatusCard(symbol: "circle.dashed", tint: .secondary,
-                       title: l10n.string("overview.state.notEnabled.title", table: .settings),
-                       message: l10n.string("overview.state.notEnabled.message", table: .settings),
-                       actionTitle: l10n.string("takeover.confirmEnable", table: .settings),
-                       action: { showEnableConfirmation = true })
-        case .takeover:
-            StatusCard(symbol: "checkmark.circle.fill", tint: .green,
-                       title: l10n.string("overview.state.takeover.title", table: .settings),
-                       message: l10n.string("overview.state.takeover.message", table: .settings),
-                       actionTitle: l10n.string("restore.action", table: .settings),
-                       action: { showRestoreConfirmation = true })
-        case .drifted:
-            StatusCard(symbol: "exclamationmark.triangle.fill", tint: .orange,
-                       title: l10n.string("overview.state.drifted.title", table: .settings),
-                       message: l10n.string("overview.state.drifted.message", table: .settings),
-                       actionTitle: l10n.string("dock.reapply", table: .settings),
-                       action: { model.repairDock() })
-        case .manualRecoveryRequired:
-            StatusCard(symbol: "exclamationmark.octagon.fill", tint: .red,
-                       title: l10n.string("overview.state.manualRecovery.title", table: .settings),
-                       message: l10n.string("overview.state.manualRecovery.message", table: .settings),
-                       actionTitle: l10n.string("action.checkNow", table: .settings),
-                       action: { model.checkDock() })
-        case .failed(let failure):
-            StatusCard(symbol: "xmark.circle.fill", tint: .red,
-                       title: l10n.string("overview.state.failed.title", table: .settings),
-                       message: failure.message(in: l10n),
-                       actionTitle: l10n.string("action.checkNow", table: .settings),
-                       action: { model.checkDock() })
         }
     }
 }
@@ -1106,9 +1078,6 @@ private struct WindowsPage: View {
                               description: l10n.string("windows.cap.minimizeRestore.description", table: .settings),
                               state: l10n.string(model.accessibilityTrusted ? "state.available" : "state.pending", table: .settings),
                               tint: model.accessibilityTrusted ? .green : .orange)
-                CapabilityRow(title: l10n.string("windows.cap.preview.title", table: .settings),
-                              description: l10n.string("windows.cap.preview.description", table: .settings),
-                              state: l10n.string("state.comingSoon", table: .settings), tint: .secondary)
             } header: {
                 Text(l10n.string("windows.section.capabilities", table: .settings))
             }
@@ -1125,6 +1094,13 @@ private struct WindowsPage: View {
                 Text(l10n.string("windows.section.requirements", table: .settings))
             } footer: {
                 Text(l10n.string(model.accessibilityTrusted ? "windows.footer.granted" : "windows.footer.notGranted", table: .settings))
+            }
+
+            Section {
+                Text(l10n.string("windows.privacy.note", table: .settings))
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text(l10n.string("windows.section.privacy", table: .settings))
             }
         }
         .formStyle(.grouped)
@@ -1160,14 +1136,6 @@ private struct AppearancePage: View {
         Form {
             PageHeader(title: l10n.string("page.appearance", table: .settings),
                        description: l10n.string("appearance.header.description", table: .settings))
-
-            Section {
-                LanguagePicker(title: l10n.string("appearance.language", table: .settings))
-            } header: {
-                Text(l10n.string("appearance.section.language", table: .settings))
-            } footer: {
-                Text(l10n.string("appearance.language.footer", table: .settings))
-            }
 
             Section {
                 Picker(l10n.string("appearance.theme", table: .settings), selection: Binding(
@@ -1306,11 +1274,12 @@ private struct ShortcutsPage: View {
     }
 }
 
-// MARK: - Dock 与恢复
+// MARK: - Dock 接管与恢复
 
 private struct DockPage: View {
     @Environment(\.l10n) private var l10n
     @ObservedObject var model: SettingsModel
+    @State private var showEnableConfirmation = false
     @State private var showRestoreConfirmation = false
 
     var body: some View {
@@ -1319,15 +1288,11 @@ private struct DockPage: View {
                        description: l10n.string("dock.header.description", table: .settings))
 
             Section {
-                LabeledContent(l10n.string("dock.currentState", table: .settings)) {
-                    Text(statusText).foregroundStyle(statusColor)
-                }
-                Button(l10n.string("action.checkNow", table: .settings), action: model.checkDock)
-            } header: {
-                Text(l10n.string("dock.section.dock", table: .settings))
+                statusCard
             }
 
             Section {
+                Button(l10n.string("action.checkNow", table: .settings), action: model.checkDock)
                 Button(l10n.string("dock.reapply", table: .settings), action: model.repairDock)
                     .disabled(model.dockState != .drifted)
                 Button(l10n.string("restore.action", table: .settings), role: .destructive) {
@@ -1342,11 +1307,19 @@ private struct DockPage: View {
 
             Section {
                 OperationBanner(operation: model.operation)
+            } header: {
+                Text(l10n.string("dock.section.recent", table: .settings))
             }
             .opacity(model.operation == .idle ? 0 : 1)
         }
         .formStyle(.grouped)
         .navigationTitle(l10n.string("page.dock", table: .settings))
+        .confirmationDialog(l10n.string("takeover.confirmTitle", table: .settings), isPresented: $showEnableConfirmation) {
+            Button(l10n.string("takeover.confirmEnable", table: .settings)) { model.enableTakeover() }
+            Button(l10n.string("action.cancel", table: .settings), role: .cancel) {}
+        } message: {
+            Text(l10n.string("takeover.confirmMessage", table: .settings))
+        }
         .confirmationDialog(l10n.string("restore.confirmTitle", table: .settings), isPresented: $showRestoreConfirmation) {
             Button(l10n.string("restore.confirmAction", table: .settings), role: .destructive, action: model.restoreDock)
             Button(l10n.string("action.cancel", table: .settings), role: .cancel) {}
@@ -1355,61 +1328,40 @@ private struct DockPage: View {
         }
     }
 
-    private var statusText: String {
+    @ViewBuilder
+    private var statusCard: some View {
         switch model.dockState {
-        case .notEnabled: l10n.string("dock.status.notEnabled", table: .settings)
-        case .takeover: l10n.string("dock.status.takeover", table: .settings)
-        case .drifted: l10n.string("dock.status.drifted", table: .settings)
-        case .manualRecoveryRequired: l10n.string("dock.status.manualRecovery", table: .settings)
-        case .failed: l10n.string("dock.status.failed", table: .settings)
+        case .notEnabled:
+            StatusCard(symbol: "circle.dashed", tint: .secondary,
+                       title: l10n.string("dock.state.notEnabled.title", table: .settings),
+                       message: l10n.string("dock.state.notEnabled.message", table: .settings),
+                       actionTitle: l10n.string("takeover.confirmEnable", table: .settings),
+                       action: { showEnableConfirmation = true })
+        case .takeover:
+            StatusCard(symbol: "checkmark.circle.fill", tint: .green,
+                       title: l10n.string("dock.state.takeover.title", table: .settings),
+                       message: l10n.string("dock.state.takeover.message", table: .settings),
+                       actionTitle: l10n.string("restore.action", table: .settings),
+                       action: { showRestoreConfirmation = true })
+        case .drifted:
+            StatusCard(symbol: "exclamationmark.triangle.fill", tint: .orange,
+                       title: l10n.string("dock.state.drifted.title", table: .settings),
+                       message: l10n.string("dock.state.drifted.message", table: .settings),
+                       actionTitle: l10n.string("dock.reapply", table: .settings),
+                       action: { model.repairDock() })
+        case .manualRecoveryRequired:
+            StatusCard(symbol: "exclamationmark.octagon.fill", tint: .red,
+                       title: l10n.string("dock.state.manualRecovery.title", table: .settings),
+                       message: l10n.string("dock.state.manualRecovery.message", table: .settings),
+                       actionTitle: l10n.string("action.checkNow", table: .settings),
+                       action: { model.checkDock() })
+        case .failed(let failure):
+            StatusCard(symbol: "xmark.circle.fill", tint: .red,
+                       title: l10n.string("dock.state.failed.title", table: .settings),
+                       message: failure.message(in: l10n),
+                       actionTitle: l10n.string("action.checkNow", table: .settings),
+                       action: { model.checkDock() })
         }
-    }
-
-    private var statusColor: Color {
-        switch model.dockState {
-        case .notEnabled: return .secondary
-        case .takeover: return .green
-        case .drifted: return .orange
-        case .manualRecoveryRequired: return .red
-        case .failed: return .red
-        }
-    }
-}
-
-// MARK: - 权限
-
-private struct PermissionsPage: View {
-    @Environment(\.l10n) private var l10n
-    @ObservedObject var model: SettingsModel
-
-    var body: some View {
-        Form {
-            PageHeader(title: l10n.string("page.permissions", table: .settings),
-                       description: l10n.string("permissions.header.description", table: .settings))
-
-            Section {
-                LabeledContent(l10n.string("permissions.accessibility", table: .settings)) {
-                    Text(l10n.string(model.accessibilityTrusted ? "state.granted" : "state.notGranted", table: .settings))
-                        .foregroundStyle(model.accessibilityTrusted ? .green : .orange)
-                }
-                if !model.accessibilityTrusted {
-                    Button(l10n.string("action.openSystemSettings", table: .settings), action: model.openAccessibilitySettings)
-                }
-            } header: {
-                Text(l10n.string("permissions.section.windows", table: .settings))
-            } footer: {
-                Text(l10n.string("permissions.windows.footer", table: .settings))
-            }
-
-            Section {
-                Text(l10n.string("permissions.privacy.note", table: .settings))
-                    .foregroundStyle(.secondary)
-            } header: {
-                Text(l10n.string("permissions.section.privacy", table: .settings))
-            }
-        }
-        .formStyle(.grouped)
-        .navigationTitle(l10n.string("page.permissions", table: .settings))
     }
 }
 
@@ -1417,7 +1369,6 @@ private struct PermissionsPage: View {
 
 private struct AboutPage: View {
     @Environment(\.l10n) private var l10n
-    @State private var automaticChecks = UpdateCoordinator.shared.automaticallyChecksForUpdates
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
             ?? l10n.string("about.devVersion", table: .settings)
@@ -1453,23 +1404,6 @@ private struct AboutPage: View {
             }
 
             Section {
-                if UpdateCoordinator.shared.isAvailable {
-                    Toggle(l10n.string("about.automaticChecks", table: .settings), isOn: $automaticChecks)
-                        .onChange(of: automaticChecks) { _, value in
-                            UpdateCoordinator.shared.automaticallyChecksForUpdates = value
-                        }
-                    Button(l10n.string("about.checkForUpdates", table: .settings)) {
-                        UpdateCoordinator.shared.checkForUpdates()
-                    }
-                } else {
-                    Text(l10n.string("about.updatesDevHint", table: .settings))
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Text(l10n.string("about.updateSection", table: .settings))
-            }
-
-            Section {
                 LabeledContent(l10n.string("about.systemRequirements", table: .settings),
                                value: l10n.string("about.requirementsValue", table: .settings))
                 LabeledContent(l10n.string("about.copyright", table: .settings),
@@ -1481,5 +1415,40 @@ private struct AboutPage: View {
         }
         .formStyle(.grouped)
         .navigationTitle(l10n.string("page.about", table: .settings))
+    }
+}
+
+// MARK: - 开发者（仅开发运行展示）
+
+private struct DeveloperPage: View {
+    @Environment(\.l10n) private var l10n
+
+    var body: some View {
+        Form {
+            PageHeader(title: l10n.string("developer.header.title", table: .settings),
+                       description: l10n.string("developer.header.description", table: .settings))
+
+            Section {
+                Button(l10n.string("developer.replayOnboarding", table: .settings)) {
+                    OnboardingWindowController.shared.showWindow(nil)
+                }
+            } header: {
+                Text(l10n.string("developer.section.onboarding", table: .settings))
+            } footer: {
+                Text(l10n.string("developer.replayOnboarding.footer", table: .settings))
+            }
+
+            Section {
+                LabeledContent(l10n.string("developer.environment.mode", table: .settings),
+                               value: l10n.string("developer.environment.modeValue", table: .settings))
+                Text(l10n.string("developer.environment.note", table: .settings))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text(l10n.string("developer.section.environment", table: .settings))
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle(l10n.string("page.developer", table: .settings))
     }
 }

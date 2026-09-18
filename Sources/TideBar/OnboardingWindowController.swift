@@ -9,9 +9,12 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     static let permissionTick = Notification.Name("TideBar.onboardingPermissionTick")
     private static let permissionDemand = "onboarding.permission"
 
+    /// 首启自动弹出与设置中心「重看引导」共用同一窗口实例。
+    static let shared = OnboardingWindowController()
+
     private let model: OnboardingModel
 
-    init() {
+    private init() {
         let model = OnboardingModel()
         let hosting = NSHostingController(rootView: LocalizedContent { OnboardingRootView(model: model) })
         let window = NSWindow(contentViewController: hosting)
@@ -90,7 +93,7 @@ final class OnboardingModel: ObservableObject {
     /// 登录自启勾选：opt-out，默认开启；完成向导时按终值生效。
     @Published var launchAtLogin = true
 
-    var canManageLoginItem: Bool { UpdateCoordinator.isAppBundle }
+    var canManageLoginItem: Bool { RuntimeEnvironment.isProduction }
 
     /// 「开始使用」「跳过引导」后由控制器关闭窗口。
     var onFinish: (() -> Void)?
