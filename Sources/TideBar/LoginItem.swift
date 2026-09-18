@@ -4,7 +4,7 @@ import ServiceManagement
 @MainActor
 enum LoginItem {
     static func set(_ enabled: Bool) {
-        guard UpdateCoordinator.isAppBundle else { return }
+        guard RuntimeEnvironment.isProduction else { return }
         do {
             if enabled {
                 try SMAppService.mainApp.register()

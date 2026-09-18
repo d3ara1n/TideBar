@@ -5,23 +5,38 @@
 "action.openSystemSettings" = "Open System Settings";
 "state.available" = "Available";
 "state.pending" = "Pending access";
-"state.comingSoon" = "Coming soon";
 "state.granted" = "Granted";
 "state.notGranted" = "Not granted";
 
 // 窗口与侧栏
 "window.title" = "TideBar";
+"window.title.development" = "Development Preview";
 "sidebar.section.app" = "TideBar";
 "sidebar.section.system" = "System";
-"page.overview" = "Overview";
+"page.general" = "General";
 "page.pinned" = "Pinned Items";
 "page.widgets" = "Widgets";
 "page.windows" = "Window Management";
 "page.appearance" = "Appearance & Interaction";
 "page.shortcuts" = "Shortcuts";
 "page.dock" = "Dock & Recovery";
-"page.permissions" = "Access";
 "page.about" = "About";
+"page.developer" = "Developer";
+
+// 通用（登录项与软件更新仅正式运行展示）
+"general.header.title" = "General";
+"general.header.description" = "Startup, updates, and app language.";
+"general.section.login" = "Startup";
+"general.loginItem" = "Launch TideBar at Login";
+"general.loginItemFooter" = "Also manageable in System Settings › General › Login Items.";
+"general.loginItemRequiresApproval" = "Approval pending — allow TideBar in System Settings › General › Login Items.";
+"general.openLoginItemsSettings" = "Open System Settings";
+"general.section.update" = "Software Update";
+"general.automaticChecks" = "Check for updates automatically";
+"general.checkForUpdates" = "Check for Updates…";
+"general.section.language" = "Language";
+"general.language" = "App language";
+"general.language.footer" = "Changes apply immediately across TideBar.";
 
 // 操作横幅（OperationKind）
 "op.working.enabling" = "Enabling TideBar…";
@@ -35,21 +50,21 @@
 "op.failure.drifted" = "System Dock settings are still inconsistent — check again.";
 "op.failure.manualRecovery" = "The Dock configuration saved before takeover is missing, so automatic restore isn't possible.";
 
-// 概览
-"overview.header.title" = "Overview";
-"overview.header.description" = "See how TideBar is doing and manage system Dock takeover.";
-"overview.section.recent" = "Recent Activity";
-"overview.state.notEnabled.title" = "TideBar hasn't taken over";
-"overview.state.notEnabled.message" = "Once enabled, TideBar hides the system Dock's visible entrance and provides app and window access along the bottom edge of the screen.";
-"overview.state.takeover.title" = "TideBar is running";
-"overview.state.takeover.message" = "The system Dock's visible entrance has been replaced by TideBar. The tide line rests at the bottom of the screen and rises as you approach.";
-"overview.state.drifted.title" = "System Dock settings have changed";
-"overview.state.drifted.message" = "TideBar found the current Dock settings inconsistent with its takeover configuration. You can re-apply TideBar's settings, or turn TideBar off and restore the original ones.";
-"overview.state.manualRecovery.title" = "Can't restore the macOS Dock automatically";
-"overview.state.manualRecovery.message" = "TideBar can't find the Dock settings saved before takeover, so it can't perform an automatic restore safely. See the recovery notes, or reach out to support for manual steps.";
-"overview.state.failed.title" = "System Dock needs attention";
-
-// 接管与恢复（概览与 Dock 页共用）
+// Dock 接管与恢复
+"dock.header.description" = "Inspect the system Dock takeover configuration, and check, repair, or restore it when needed.";
+"dock.state.notEnabled.title" = "TideBar hasn't taken over";
+"dock.state.notEnabled.message" = "Once enabled, TideBar hides the system Dock's visible entrance and provides app and window access along the bottom edge of the screen.";
+"dock.state.takeover.title" = "TideBar is running";
+"dock.state.takeover.message" = "The system Dock's visible entrance has been replaced by TideBar. The tide line rests at the bottom of the screen and rises as you approach.";
+"dock.state.drifted.title" = "System Dock settings have changed";
+"dock.state.drifted.message" = "TideBar found the current Dock settings inconsistent with its takeover configuration. You can re-apply TideBar's settings, or turn TideBar off and restore the original ones.";
+"dock.state.manualRecovery.title" = "Can't restore the macOS Dock automatically";
+"dock.state.manualRecovery.message" = "TideBar can't find the Dock settings saved before takeover, so it can't perform an automatic restore safely. See the recovery notes, or reach out to support for manual steps.";
+"dock.state.failed.title" = "System Dock needs attention";
+"dock.reapply" = "Re-apply Takeover Settings";
+"dock.section.maintenance" = "Maintenance & Recovery";
+"dock.maintenance.footer" = "Re-applying overwrites the Dock settings TideBar needs and restarts the Dock. Restoring uses the settings saved before takeover.";
+"dock.section.recent" = "Recent Activity";
 "takeover.confirmTitle" = "Enable Dock takeover?";
 "takeover.confirmEnable" = "Enable";
 "takeover.confirmMessage" = "TideBar will save the current Dock settings and per-app takeover configuration, then restart the system Dock. Open apps won't be closed.";
@@ -86,19 +101,19 @@
 "widgets.removeConfirmAction" = "Remove Widget";
 "widgets.removeConfirmMessage" = "Remove %@ and clear its saved contents?";
 
-// 窗口管理
+// 窗口管理（含权限）
 "windows.header.description" = "TideBar's core skill: minimized windows and extra windows all become directly reachable.";
 "windows.section.capabilities" = "Capabilities";
 "windows.cap.windowList.title" = "Window list";
 "windows.cap.windowList.description" = "Expands every window of an app under its icon.";
 "windows.cap.minimizeRestore.title" = "Minimized window restore";
 "windows.cap.minimizeRestore.description" = "Clicking a window restores it and brings it to the front.";
-"windows.cap.preview.title" = "Window previews";
-"windows.cap.preview.description" = "Hover to see a window's thumbnail.";
 "windows.section.requirements" = "Requirements";
 "windows.accessibilityLabel" = "Accessibility access";
 "windows.footer.granted" = "Window management is ready to run. If you just approved access, restart TideBar to start watching apps that are already open.";
 "windows.footer.notGranted" = "Accessibility access is used to list windows, identify minimized and fullscreen states, and bring windows back to the front.";
+"windows.section.privacy" = "Privacy";
+"windows.privacy.note" = "TideBar never requests screen recording.";
 
 // 外观与交互
 "appearance.header.description" = "Tune the theme, the tide line, expansion animation, and the icon bar.";
@@ -129,27 +144,6 @@
 "shortcuts.switcher.footer" = "After you stop interacting for this long, TideBar commits the current selection and ends the quick-switch session.";
 "shortcuts.resetDefaults" = "Restore Default Shortcuts & Delay";
 
-// Dock 与恢复
-"dock.header.description" = "Inspect the system Dock takeover configuration, and check, repair, or restore it when needed.";
-"dock.currentState" = "Current status";
-"dock.section.dock" = "System Dock";
-"dock.reapply" = "Re-apply Takeover Settings";
-"dock.section.maintenance" = "Maintenance & Recovery";
-"dock.maintenance.footer" = "Re-applying overwrites the Dock settings TideBar needs and restarts the Dock. Restoring uses the settings saved before takeover.";
-"dock.status.notEnabled" = "Not enabled";
-"dock.status.takeover" = "Running";
-"dock.status.drifted" = "Inconsistent";
-"dock.status.manualRecovery" = "Manual recovery required";
-"dock.status.failed" = "Needs attention";
-
-// 权限
-"permissions.header.description" = "TideBar only asks for system capabilities when it needs them, and explains what each one is for.";
-"permissions.accessibility" = "Accessibility";
-"permissions.section.windows" = "Window Management";
-"permissions.windows.footer" = "Used to read the window list, tell minimized windows apart, and bring the window you pick back to the front.";
-"permissions.section.privacy" = "Privacy";
-"permissions.privacy.note" = "TideBar never requests screen recording. If window previews ship later, their purpose will be explained separately before enabling.";
-
 // 关于
 "about.header.title" = "About TideBar";
 "about.header.description" = "Launch apps, switch windows, and open pinned files and folders.";
@@ -162,19 +156,13 @@
 "about.copyright" = "Copyright";
 "about.feedback" = "Feedback";
 
-// 语言
-"appearance.section.language" = "Language";
-"appearance.language" = "App language";
-"appearance.language.footer" = "Changes apply immediately across TideBar.";
-
-// 通用与更新
-"general.section" = "General";
-"general.loginItem" = "Launch TideBar at Login";
-"general.loginItemFooter" = "Also manageable in System Settings › General › Login Items.";
-"general.loginItemDevHint" = "Available in the release TideBar.app only.";
-"general.loginItemRequiresApproval" = "Approval pending — allow TideBar in System Settings › General › Login Items.";
-"general.openLoginItemsSettings" = "Open System Settings";
-"about.updateSection" = "Software Update";
-"about.checkForUpdates" = "Check for Updates…";
-"about.automaticChecks" = "Check for updates automatically";
-"about.updatesDevHint" = "Update checks are available in the release TideBar.app.";
+// 开发者（仅开发运行）
+"developer.header.title" = "Developer";
+"developer.header.description" = "Tools and environment notes for development runs.";
+"developer.section.onboarding" = "Onboarding";
+"developer.replayOnboarding" = "Replay Tour…";
+"developer.replayOnboarding.footer" = "Replays the first-launch tour from the beginning.";
+"developer.section.environment" = "Environment";
+"developer.environment.mode" = "Run mode";
+"developer.environment.modeValue" = "Development preview (swift run)";
+"developer.environment.note" = "Reads persisted settings from the release TideBar.app; changes made here are discarded when the process exits.";

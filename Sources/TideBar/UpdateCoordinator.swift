@@ -7,11 +7,6 @@ import Sparkle
 final class UpdateCoordinator: NSObject {
     static let shared = UpdateCoordinator()
 
-    /// 正式 .app bundle 判定；登录项等其他 bundle 依赖能力共用。
-    static var isAppBundle: Bool {
-        Bundle.main.bundleURL.pathExtension == "app"
-    }
-
     private var controller: SPUStandardUpdaterController?
 
     private override init() {
@@ -19,14 +14,14 @@ final class UpdateCoordinator: NSObject {
     }
 
     func start() {
-        guard Self.isAppBundle, controller == nil else { return }
+        guard RuntimeEnvironment.isProduction, controller == nil else { return }
         controller = SPUStandardUpdaterController(
             startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil
         )
     }
 
     var isAvailable: Bool {
-        Self.isAppBundle && controller != nil
+        RuntimeEnvironment.isProduction && controller != nil
     }
 
     var automaticallyChecksForUpdates: Bool {
@@ -34,8 +29,9 @@ final class UpdateCoordinator: NSObject {
         set { controller?.updater.automaticallyChecksForUpdates = newValue }
     }
 
-    /// 打开 Sparkle 标准检查窗口（含进度与确认）。
-    func checkForUpdates() {
-        controller?.checkForUpdates(nil)
+    /// 打开 Sparkle 标准检查窗口（含进度与确认）；兼作状态栏菜单项动作，
+    /// 更新能力不可用（开发运行）时静默。
+    @objc func checkForUpdates(_ sender: Any?) {
+        controller?.checkForUpdates(sender)
     }
 }
