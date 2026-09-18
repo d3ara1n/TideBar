@@ -11,7 +11,9 @@ APP="TideBar.app"
 DIST="dist"
 
 echo "── swift build (release) ──"
-swift build -c release
+# --build-system native：swiftbuild 后端会把 LC_BUILD_VERSION 的 sdk 写成部署目标，
+# 产物会被系统按旧外观渲染；native 后端写入真实 SDK 版本
+swift build -c release --build-system native
 
 STAGING="$DIST/$APP"
 rm -rf "$STAGING"
@@ -88,6 +90,17 @@ EOF
 echo "── 签名 ($IDENTITY) ──"
 codesign --force --sign "$IDENTITY" "$STAGING"
 codesign --verify --strict "$STAGING"
+
+# 外观门禁：系统按 LC_BUILD_VERSION.sdk 做新外观的 linked-on-or-after 判定，
+# sdk < 26 的产物会被渲染成旧样式，禁止发布
+echo "── 校验二进制 SDK 标记 ──"
+SDK=$(xcrun vtool -show-build "$STAGING/Contents/MacOS/TideBar" | awk '$1=="sdk"{print $2}')
+SDK_MAJOR=${SDK%%.*}
+if [ -z "$SDK" ] || [ "$SDK_MAJOR" -lt 26 ]; then
+    echo "❌ LC_BUILD_VERSION.sdk=$SDK（需 ≥26）：产物会被按旧外观渲染，禁止发布" >&2
+    exit 1
+fi
+echo "✅ LC_BUILD_VERSION.sdk=$SDK"
 
 echo "── 打包 zip ──"
 mkdir -p "$DIST"
