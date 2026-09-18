@@ -9,10 +9,10 @@ concurrency:
 
 jobs:
     build-and-test:
-        runs-on: macos-26
+        runs-on: xcode-27
         steps:
             - uses: actions/checkout@v4
             - name: Build
-              run: swift build
+              run: swift build --build-system native
             - name: Test
-              run: swift test
+              run: swift test --build-system native
