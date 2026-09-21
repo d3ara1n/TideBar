@@ -10,24 +10,21 @@
 
 ## 当前规避（全部已落地）
 
-- 本地与 CI 一律 `--build-system native`（AGENTS.md 构建命令、ci.yml、build-app.sh）。
-- `build-app.sh` 发布门禁：`vtool` 校验产物 `sdk ≥ 26`，不满足即失败。
-- native 后端已被标记 deprecated，构建时有无害警告。
+- 日常本地构建、运行与 CI 使用 `--build-system native`，保留正确的 SDK 标记。
+- `build-app.sh` 发布打包使用 swiftbuild，并显式传递 `-platform_version macos 14.0 <当前 SDK>`：既采用其适配标准 `.app/Contents/Resources` 的资源 accessor，又覆盖错误的 SDK 标记。
+- 发布脚本自动嵌入所有 SwiftPM 资源 bundle 与顶层 framework，并校验 accessor、动态依赖、严格签名以及最终 `minos 14.0 / sdk <当前 SDK>`。
+- native 后端已被标记 deprecated，日常构建时有无害警告。
 
 ## 重新评估的触发条件
 
 任一满足即重新立案处理：
 
-1. SwiftPM 移除 native 后端（deprecation 落地）。
-2. SwiftPM 修复 swiftbuild 的 sdk 标记（升级工具链后验证：`swift build -c release` 默认后端 + `vtool -show-build` 看 sdk 是否为真实 SDK 版本）。
-3. 发布门禁报警（sdk < 26 导致 release 失败）。
+1. SwiftPM 移除 native 后端（deprecation 落地），影响日常构建、运行与 CI。
+2. SwiftPM 修复 swiftbuild 的 sdk 标记；升级工具链后以无链接覆盖的 release 构建配合 `vtool -show-build` 验证。
+3. swiftbuild 资源 accessor 不再优先查找 `Bundle.main.resourceURL`，或任一发布门禁报警。
 
 ## 届时动作
 
-- 工具链修复后：移除所有 `--build-system native` 与 AGENTS.md 相应说明；门禁保留（防回归）。
-- native 被移除而 bug 未修：切到「swiftbuild + 链接器显式覆盖」，**已验证可行**（2026-09-18，Xcode 27A266a）：
-  ```bash
-  swift build -c release --build-system swiftbuild \
-    -Xlinker -platform_version -Xlinker macos -Xlinker 14.0 -Xlinker "$(xcrun --show-sdk-version)"
-  ```
-  产物 minos 14.0 / sdk 27.0；注意 swiftbuild 产物路径变为 `.build/out/Products/<Config>/`，build-app.sh 的拷贝路径需同步。日常 `swift run` 不建议带这串参数（长且易错），仅作为发布/脚本路径的替代。
+- SDK 标记修复后：发布脚本保留 swiftbuild 与全部完整性门禁，仅移除链接器 `platform_version` 覆盖。
+- native 被移除而 SDK bug 未修：日常构建与 CI 切换 swiftbuild；需要运行 GUI 的开发产物沿用发布脚本已经验证的链接覆盖参数，或在工具链提供等价正式入口后改用正式入口。
+- 资源 accessor 行为变化：以标准签名布局 `Contents/Resources` 为约束调整打包方案，不把资源放到 `.app` 根目录，也不放宽 `codesign --deep --strict`。
