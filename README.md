@@ -46,7 +46,7 @@ TideBar does not try to recreate every Dock feature. It focuses on two things: z
 ### Notifications, quietly
 
 - App badges are mirrored from the system Dock onto TideBar icons.
-- A new badge sends one pulse along the Tide Line, then a calm ripple repeats until you expand the bar or every badge clears. Expanding acknowledges the reminder — it never marks messages as read in the original apps.
+- A new badge sends one pulse along the Tide Line, then a calm ripple repeats until you expand the bar or the triggering apps' badges clear. Expanding acknowledges the reminder — it never marks messages as read in the original apps.
 
 ## Install
 

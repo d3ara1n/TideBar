@@ -25,12 +25,15 @@ final class BadgeStore {
     private var consecutiveFailures = 0
     /// 已激活轮询（幂等重入的恢复入口用）
     private var started = false
+    /// 轮询频率由展开态与涟漪观察档共同决定（syncPollInterval）
+    private var expandedState = false
+    private var rippleWatch = false
     private let readQueue = DispatchQueue(label: "dev.dearain.TideBar.badges", qos: .utility)
 
     /// 角标集合变化（Registry 去抖后刷新模型）
     var onUpdate: (() -> Void)?
-    /// 新角标出现或计数增长（合并为一次事件，携带显示名；仅收起态消费）
-    var onPulse: ((String) -> Void)?
+    /// 新角标出现或计数增长（合并为一次事件，携带本轮全部来源显示名；仅收起态消费）
+    var onPulse: (([String]) -> Void)?
 
     func start() {
         guard !started else { return }
@@ -40,18 +43,36 @@ final class BadgeStore {
             return
         }
         started = true
-        PollScheduler.shared.register(Self.badgeDemand, interval: Layout.badgePollCollapsed) { [weak self] in
+        PollScheduler.shared.register(Self.badgeDemand, interval: pollInterval) { [weak self] in
             self?.poll()
         }
     }
 
     /// 展开/收起切换节奏：展开加速 + 立即全量读（新鲜角标随去抖落进视图）
     func setExpanded(_ expanded: Bool) {
+        expandedState = expanded
+        syncPollInterval()
+        if expanded { poll() }
+    }
+
+    /// 涟漪观察档：收起态仍有未确认涟漪时保持展开档频率，
+    /// 触发者的角标消失能在一拍内被看见；触发者清空或展开确认后回落
+    func setRippleWatch(_ active: Bool) {
+        guard rippleWatch != active else { return }
+        rippleWatch = active
+        syncPollInterval()
+    }
+
+    /// 收起基频 4s；展开或涟漪观察期间 1s（start 注册与后续调整共用）
+    private var pollInterval: TimeInterval {
+        (expandedState || rippleWatch) ? Layout.badgePollExpanded : Layout.badgePollCollapsed
+    }
+
+    private func syncPollInterval() {
         PollScheduler.shared.updateInterval(
             Self.badgeDemand,
-            interval: expanded ? Layout.badgePollExpanded : Layout.badgePollCollapsed
+            interval: pollInterval
         )
-        if expanded { poll() }
     }
 
     func value(named displayName: String) -> BadgeValue? {
@@ -101,27 +122,27 @@ final class BadgeStore {
         }
         let baselineJustEstablished = !hasBaseline
         hasBaseline = true
-        let pulsedName = baselineJustEstablished ? nil : Self.detectPulse(old: values, new: parsed)
+        let pulsedNames = baselineJustEstablished ? [] : Self.detectPulse(old: values, new: parsed)
         guard parsed != values else { return }
         values = parsed
         onUpdate?()
-        if let pulsedName { onPulse?(pulsedName) }
+        if !pulsedNames.isEmpty { onPulse?(pulsedNames) }
     }
 
     /// 脉冲判定：出现（无→有）或计数增长。数值回落、形态切换不脉冲。
-    /// 返回首个触发脉冲的显示名（供脉冲事件定位来源 app）。
-    private static func detectPulse(old: [String: BadgeValue], new: [String: BadgeValue]) -> String? {
-        for (name, value) in new {
+    /// 返回本轮全部触发者的显示名——视觉合并为一次事件，
+    /// 来源逐个记录（涟漪跟随触发者的停住判定需要完整集合）。
+    private static func detectPulse(old: [String: BadgeValue], new: [String: BadgeValue]) -> [String] {
+        new.compactMap { name, value in
             switch (old[name], value) {
             case (nil, _):
                 return name
             case (.count(let previous), .count(let current)) where current > previous:
                 return name
             default:
-                continue
+                return nil
             }
         }
-        return nil
     }
 
     // MARK: AX 读取（后台队列；纯 C API，不触主线程状态）
