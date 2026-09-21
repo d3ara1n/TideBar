@@ -67,7 +67,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         shortcutManager.stop()
         controller.stop()
         if RuntimeEnvironment.isProduction,
-           AppConfiguration.shared.isTakeoverEnabled {
+           AppConfiguration.shared.isTakeoverEnabled,
+           !UpdateCoordinator.shared.isRelaunchingForUpdate {
             DockController.shared.restore()
         }
         if let configurationObserver {
