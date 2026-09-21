@@ -170,8 +170,8 @@ final class AppRegistry {
 
     private let windowStore = WindowStore()
     private let badgeStore = BadgeStore()
-    /// 新角标出现/增长（携带显示名；收起态由控制器消费为汐线脉冲）
-    var onBadgePulse: ((String) -> Void)?
+    /// 新角标出现/增长（携带本轮全部来源显示名；收起态由控制器消费为汐线脉冲）
+    var onBadgePulse: (([String]) -> Void)?
     private var refreshDebounce: DispatchWorkItem?
     private var observers: [NSObjectProtocol] = []
 
@@ -195,7 +195,7 @@ final class AppRegistry {
         windowStore.onUpdate = { [weak self] _ in self?.refreshSoon() }
         windowStore.start()
         badgeStore.onUpdate = { [weak self] in self?.refreshSoon() }
-        badgeStore.onPulse = { [weak self] name in self?.onBadgePulse?(name) }
+        badgeStore.onPulse = { [weak self] names in self?.onBadgePulse?(names) }
         badgeStore.start()
         refresh()
     }
@@ -203,6 +203,16 @@ final class AppRegistry {
     /// 展开/收起切换角标轮询节奏（展开加速 + 立即全量读）
     func setBadgeCadence(expanded: Bool) {
         badgeStore.setExpanded(expanded)
+    }
+
+    /// 指定 Dock 标题的 app 当前是否挂角标（涟漪触发者存活判定）
+    func hasBadge(named dockTitle: String) -> Bool {
+        badgeStore.value(named: dockTitle) != nil
+    }
+
+    /// 涟漪观察档：收起态仍有未确认涟漪时角标轮询提速（角标消失的停住延迟跟手）
+    func setBadgeRippleWatch(_ active: Bool) {
+        badgeStore.setRippleWatch(active)
     }
 
     /// 重读全部窗口知识（frame→屏归属）；展开时消费，保证点色反映最新窗口位置

@@ -55,6 +55,9 @@ final class TideBarController {
     private var isMenuSessionActive = false
     private let fullscreenDetector = FullscreenDetector()
     private var fullscreenStates: [CGDirectDisplayID: FullscreenState] = [:]
+    /// 涟漪触发者（Dock 标题小写）：还有角标在的才让涟漪继续，
+    /// 其他 app 的常驻角标不挟持本次提醒；展开即整体确认清空
+    private var rippleSources: Set<String> = []
 
     private var isDevelopment: Bool { RuntimeEnvironment.isDevelopment }
 
@@ -104,7 +107,7 @@ final class TideBarController {
         }
         fullscreenDetector.onChange = { [weak self] in self?.applyFullscreenStates() }
         items.onChange = { [weak self] in self?.appsDidChange() }
-        registry.onBadgePulse = { [weak self] name in self?.badgePulse(named: name) }
+        registry.onBadgePulse = { [weak self] names in self?.badgePulse(names: names) }
         registry.onApplicationsStarted = { [weak self] in self?.applicationsStarted() }
         items.start()
         if isDevelopment || AppConfiguration.shared.isTakeoverEnabled {
@@ -511,6 +514,10 @@ final class TideBarController {
             screens.removeAll()
             fullscreenDetector.reset()
             fullscreenStates.removeAll()
+            // 栏整体退场即全部确认：触发者与观察档一并复位，防 1s 空转轮询
+            rippleSources.removeAll()
+            registry.setBadgeRippleWatch(false)
+            syncBadgeCadence()
             NSLog("TideBar takeover disabled: panels closed")
             return
         }
@@ -593,6 +600,16 @@ final class TideBarController {
             screens[displayID] = state
         }
         behaviorDidChange()
+        // 面板重建与涟漪状态对账：未确认触发者在新的收起屏上恢复涟漪；
+        // 已无触发者则确保观察档回落（防 1s 轮询常驻），并按最终面板态重同步节奏
+        if rippleSources.isEmpty {
+            registry.setBadgeRippleWatch(false)
+        } else {
+            for state in screens.values where !state.isExpanded {
+                state.view.startTidelineRipple()
+            }
+        }
+        syncBadgeCadence()
     }
 
     // MARK: - 几何
@@ -756,6 +773,8 @@ final class TideBarController {
         registry.refreshWindows()
         syncBadgeCadence()
         state.view.setExpanded(true, apps: items.entries)
+        // 展开即用户已知：涟漪在全部屏停住，触发者清空（任意一次展开即确认）
+        acknowledgeRipples()
         NSLog("TideBar expanded on screen %u", displayID(of: state.screen) ?? 0)
         return true
     }
@@ -797,12 +816,26 @@ final class TideBarController {
     }
 
     /// 新角标事件：收起态的汐线轻涌一次并启动持久波纹（展开即确认停住）。
-    /// 展开态不脉冲，角标本身即反馈。
-    private func badgePulse(named name: String) {
-        NSLog("TideBar badge pulse: %@", name)
-        for state in screens.values where !state.isExpanded && !state.hiddenForFullscreen {
+    /// 展开态不脉冲，角标本身即反馈；触发者记入 rippleSources，
+    /// 其角标消失时涟漪随之停住（appsDidChange 判定）。
+    private func badgePulse(names: [String]) {
+        NSLog("TideBar badge pulse: %@", names.joined(separator: ", "))
+        let targets = screens.values.filter { !$0.isExpanded && !$0.hiddenForFullscreen }
+        guard !targets.isEmpty else { return }
+        rippleSources.formUnion(names)
+        registry.setBadgeRippleWatch(true)
+        for state in targets {
             state.view.pulseTideline()
             state.view.startTidelineRipple()
+        }
+    }
+
+    /// 展开即用户已知：涟漪触发者整体清空，全部屏的波纹停住，角标轮询回落常态
+    private func acknowledgeRipples() {
+        rippleSources.removeAll()
+        registry.setBadgeRippleWatch(false)
+        for state in screens.values {
+            state.view.stopTidelineRipple()
         }
     }
 
@@ -936,10 +969,15 @@ final class TideBarController {
     // MARK: - 数据与屏幕变更
 
     private func appsDidChange() {
-        // 全部角标消失（如从横幅点开读完）：未确认提醒失去载体，波纹停住
-        if !registry.entries.contains(where: { $0.badge != nil }) {
-            for state in screens.values {
-                state.view.stopTidelineRipple()
+        // 涟漪跟随触发者：只有触发过脉冲的 app 还挂着角标才继续；
+        // 其他 app 的常驻角标不挟持本次提醒（泛化原「全部角标消失」条件）
+        if !rippleSources.isEmpty {
+            rippleSources = rippleSources.filter { registry.hasBadge(named: $0) }
+            if rippleSources.isEmpty {
+                registry.setBadgeRippleWatch(false)
+                for state in screens.values {
+                    state.view.stopTidelineRipple()
+                }
             }
         }
         // 条目消失、窗口知识降级或任意窗口内容变化时，应用体的潮涌模型即过期；

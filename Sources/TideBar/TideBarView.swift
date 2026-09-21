@@ -219,7 +219,7 @@ final class TideBarView: NSView {
     }
 
     /// 汐线波纹：未被展开确认的新角标期间，细线持续涟漪发散。
-    /// 展开即用户已知（setExpanded 里停），全部角标消失也停（控制器清）。
+    /// 展开即用户已知（setExpanded 里停），触发涟漪的应用角标全部消失也停（控制器清）。
     /// 减少动态效果时不做常驻循环（一次性脉冲已足够，且循环动画正是该人群忌讳）。
     func startTidelineRipple() {
         guard !isExpandedState, rippleRings.isEmpty, !Motion.shouldReduceMotion else { return }
