@@ -18,12 +18,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         configureStatusItem()
         DockController.shared.start()
         controller.start()
-        if RuntimeEnvironment.isProduction {
-            shortcutManager.onAction = { [weak self] action in
-                self?.controller.handleShortcut(action)
-            }
-            shortcutManager.start()
+        shortcutManager.onAction = { [weak self] action in
+            self?.controller.handleShortcut(action)
         }
+        shortcutManager.start()
         configurationObserver = NotificationCenter.default.addObserver(
             forName: AppConfiguration.didChange, object: nil, queue: .main
         ) { [weak self] _ in
