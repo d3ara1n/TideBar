@@ -82,8 +82,9 @@ final class BadgeStore {
     // MARK: 轮询执行
 
     private func poll() {
-        // 开发预览不读取系统 Dock；正式接管态才镜像角标。
-        guard RuntimeEnvironment.isProduction,
+        // 开发运行与正式接管态同样镜像角标（调试通知链路）；
+        // 仅生产未接管不轮询——那时本栏不存在，系统 Dock 自己在场。
+        guard RuntimeEnvironment.isDevelopment ||
               AppConfiguration.shared.isTakeoverEnabled else { return }
         guard !busy else { return }
         if dockPID == nil {

@@ -591,12 +591,6 @@ final class TideBarController {
             }
             view.onHoverClear = { [weak self] in self?.hideNameBubble() }
             panel.orderFrontRegardless()
-            if isDevelopment {
-                // 调试栏始终以展开态显示，便于直接观察最新 UI；不参与底部热区/全屏策略。
-                state.isExpanded = true
-                state.panel.ignoresMouseEvents = false
-                state.view.setExpanded(true, apps: items.entries, immediate: true)
-            }
             screens[displayID] = state
         }
         behaviorDidChange()
@@ -623,7 +617,7 @@ final class TideBarController {
 
     private func barBottom(for screen: NSScreen) -> CGFloat {
         if isDevelopment {
-            // `swift run` 只做悬浮预览：整栏位于屏幕中央，不与正式底栏重叠。
+            // 开发运行不接管，与系统 Dock 并存：悬浮屏幕中央（热区随行），互不干扰
             return screen.frame.midY - Layout.expandedHeight / 2
         }
         return screen.frame.minY
@@ -882,8 +876,7 @@ final class TideBarController {
     /// 返回 true 表示整屏面板隐藏，不参与鼠标采样；点击模式展开后仍走正常离场收起。
     private func applyFullscreenBehavior(_ state: ScreenState, fullscreen: FullscreenState) -> Bool {
         // 持续未知时保持普通交互可用；检测真值仍为 unknown。
-        let behavior = isDevelopment ? .normal
-            : (fullscreen == .fullscreen ? AppConfiguration.shared.fullscreenBehavior : .normal)
+        let behavior = fullscreen == .fullscreen ? AppConfiguration.shared.fullscreenBehavior : .normal
         let previous = state.effectiveFullscreenBehavior
         state.effectiveFullscreenBehavior = behavior
         if behavior != previous, behavior != .normal {

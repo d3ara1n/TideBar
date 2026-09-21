@@ -414,12 +414,11 @@ private enum SettingsPage: String, CaseIterable, Identifiable {
 
     var titleKey: String { "page.\(rawValue)" }
 
-    /// 按运行环境过滤：开发者页仅开发运行可见；
-    /// 快捷键热键只在正式运行注册，且录制的持久化域与正式版不通，开发运行不展示。
+    /// 按运行环境过滤：开发者页仅开发运行可见；其余页面两种环境一致
+    /// （快捷键在开发运行同样注册，录制落在进程名域，不污染正式配置）。
     @MainActor var isVisible: Bool {
         switch self {
         case .developer: return RuntimeEnvironment.isDevelopment
-        case .shortcuts: return RuntimeEnvironment.isProduction
         default: return true
         }
     }
