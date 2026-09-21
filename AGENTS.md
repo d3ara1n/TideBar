@@ -16,7 +16,7 @@ macOS Dock 替代品：平时缩成屏幕底部一条细线，鼠标靠近时如
 
 ## 构建与验证
 
-- 构建必须显式用旧后端：`swift build --build-system native` 编译；`swift run --build-system native` 运行（占终端，Ctrl-C 退出）。Xcode 27 起 SwiftPM 默认的 swiftbuild 后端会把 LC_BUILD_VERSION 的 sdk 写成部署目标，产物被系统按旧外观渲染（观察项见 `plans/`）。
+- 日常构建与运行显式用旧后端：`swift build --build-system native` 编译；`swift run --build-system native` 运行（占终端，Ctrl-C 退出）。发布打包由 `scripts/build-app.sh` 使用 swiftbuild，以获得适配标准 `.app/Contents/Resources` 的依赖资源查找；脚本通过链接器 `platform_version` 显式写入真实 SDK，并以 `vtool` 门禁防止 Xcode 27 将 sdk 错写成部署目标（观察项见 `plans/`）。
 - **agent 的验证职责止于 `swift build`**：GUI 的运行验证由用户执行 `swift run` 并操作 UI 确认；不做「启动→等几秒→杀掉」式的自动冒烟。
 - 系统级命令（如隐藏系统 Dock 的 defaults 写入）只输出给用户执行，或经确认后执行，不静默改。
 

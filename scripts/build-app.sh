@@ -7,29 +7,85 @@ cd "$(dirname "$0")/.."
 
 VERSION="${1:-0.0.0}"
 IDENTITY="TideBar Signing"
-APP="TideBar.app"
+PRODUCT="TideBar"
+APP="$PRODUCT.app"
+APP_RESOURCE_BUNDLE="TideBar_TideBar.bundle"
 DIST="dist"
 
 echo "── swift build (release) ──"
-# --build-system native：swiftbuild 后端会把 LC_BUILD_VERSION 的 sdk 写成部署目标，
-# 产物会被系统按旧外观渲染；native 后端写入真实 SDK 版本
-swift build -c release --build-system native
+# swiftbuild 的资源 accessor 原生查找 Contents/Resources，但 Xcode 27 会把
+# LC_BUILD_VERSION.sdk 错写成部署目标。显式 platform_version 同时固定最低系统与真实 SDK；
+# 下方 vtool 门禁会再次校验最终二进制，禁止错误标记进入发布包。
+DEPLOYMENT_TARGET="14.0"
+SDK_VERSION="$(xcrun --show-sdk-version)"
+BUILD_ARGUMENTS=(
+    -c release
+    --build-system swiftbuild
+    -Xlinker -platform_version
+    -Xlinker macos
+    -Xlinker "$DEPLOYMENT_TARGET"
+    -Xlinker "$SDK_VERSION"
+)
+swift build "${BUILD_ARGUMENTS[@]}"
+BUILD_DIR="$(swift build "${BUILD_ARGUMENTS[@]}" --show-bin-path)"
+BUILD_ROOT="$(cd "$BUILD_DIR/../.." && pwd)"
+
+# 工具链升级后若资源 accessor 行为变化，在发布阶段立即失败，不留到用户机器闪退。
+RESOURCE_ACCESSORS=()
+while IFS= read -r -d '' accessor; do
+    RESOURCE_ACCESSORS+=("$accessor")
+done < <(find "$BUILD_ROOT" -path '*/DerivedSources/resource_bundle_accessor.swift' -print0)
+
+if (( ${#RESOURCE_ACCESSORS[@]} == 0 )); then
+    echo "❌ 未找到 SwiftPM 资源 accessor，无法保证发布包资源可定位" >&2
+    exit 1
+fi
+for accessor in "${RESOURCE_ACCESSORS[@]}"; do
+    if ! grep -q 'Bundle.main.resourceURL' "$accessor"; then
+        echo "❌ 资源 accessor 未支持 Contents/Resources：$accessor" >&2
+        exit 1
+    fi
+done
 
 STAGING="$DIST/$APP"
 rm -rf "$STAGING"
 mkdir -p "$STAGING/Contents/MacOS" "$STAGING/Contents/Resources"
 
 echo "── 组装 bundle ──"
-cp .build/release/TideBar "$STAGING/Contents/MacOS/"
+cp "$BUILD_DIR/$PRODUCT" "$STAGING/Contents/MacOS/"
 
-# Sparkle 为动态 framework（官方 Developer ID 签名，保留原签不重签）
-if [ -d .build/release/Sparkle.framework ]; then
-    mkdir -p "$STAGING/Contents/Frameworks"
-    cp -R .build/release/Sparkle.framework "$STAGING/Contents/Frameworks/"
-    # SPM 扁平布局的 rpath 是 @loader_path；bundle 内 framework 在 ../Frameworks
-    install_name_tool -add_rpath @loader_path/../Frameworks "$STAGING/Contents/MacOS/TideBar"
+# 所有 SwiftPM 资源 bundle 统一放入标准 Contents/Resources；swiftbuild 的 accessor 让
+# TideBar 与第三方 package 使用同一套位置规则，新增带资源依赖后无需修改此脚本。
+shopt -s nullglob
+RESOURCE_BUNDLES=("$BUILD_DIR"/*.bundle)
+FRAMEWORKS=("$BUILD_DIR"/*.framework)
+shopt -u nullglob
+
+FOUND_APP_RESOURCE=false
+for bundle in "${RESOURCE_BUNDLES[@]}"; do
+    name="$(basename "$bundle")"
+    cp -R "$bundle" "$STAGING/Contents/Resources/"
+    echo "  resource: Contents/Resources/$name"
+    if [[ "$name" == "$APP_RESOURCE_BUNDLE" ]]; then
+        FOUND_APP_RESOURCE=true
+    fi
+done
+if [[ "$FOUND_APP_RESOURCE" != true ]]; then
+    echo "❌ 缺少主程序资源：$BUILD_DIR/$APP_RESOURCE_BUNDLE" >&2
+    exit 1
 fi
-cp -R .build/release/TideBar_TideBar.bundle "$STAGING/Contents/Resources/"
+
+# 顶层 binary framework 统一嵌入标准 Frameworks 目录；保留供应方原始签名。
+if (( ${#FRAMEWORKS[@]} > 0 )); then
+    mkdir -p "$STAGING/Contents/Frameworks"
+    for framework in "${FRAMEWORKS[@]}"; do
+        cp -R "$framework" "$STAGING/Contents/Frameworks/"
+        echo "  framework: $(basename "$framework")"
+    done
+    # SwiftPM 扁平布局通常使用 @rpath；bundle 内 framework 在 ../Frameworks。
+    install_name_tool -add_rpath @loader_path/../Frameworks "$STAGING/Contents/MacOS/$PRODUCT"
+fi
+
 cp brand/composer/AppIcon.icns "$STAGING/Contents/Resources/"
 
 cat > "$STAGING/Contents/Info.plist" <<EOF
@@ -58,7 +114,7 @@ cat > "$STAGING/Contents/Info.plist" <<EOF
     <key>CFBundleVersion</key>
     <string>$VERSION</string>
     <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
+    <string>$DEPLOYMENT_TARGET</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSHumanReadableCopyright</key>
@@ -87,20 +143,72 @@ cat > "$STAGING/Contents/Resources/zh-Hans.lproj/InfoPlist.strings" <<'EOF'
 "CFBundleName" = "汐";
 EOF
 
+echo "── 校验依赖完整性 ──"
+# 复制后再次逐项核对，避免脚本演进时静默漏装某个 SwiftPM 资源包。
+for bundle in "${RESOURCE_BUNDLES[@]}"; do
+    name="$(basename "$bundle")"
+    destination="$STAGING/Contents/Resources/$name"
+    if [[ ! -d "$destination" ]]; then
+        echo "❌ 资源 bundle 未嵌入：$name" >&2
+        exit 1
+    fi
+done
+
+# 系统库无需随包分发；所有其他主程序动态依赖必须能在应用包内解析。
+MISSING_DEPENDENCIES=()
+while IFS= read -r dependency; do
+    case "$dependency" in
+        /System/*|/usr/lib/*)
+            continue
+            ;;
+        @rpath/*)
+            embedded="$STAGING/Contents/Frameworks/${dependency#@rpath/}"
+            ;;
+        @loader_path/../Frameworks/*)
+            embedded="$STAGING/Contents/Frameworks/${dependency#@loader_path/../Frameworks/}"
+            ;;
+        @executable_path/../Frameworks/*)
+            embedded="$STAGING/Contents/Frameworks/${dependency#@executable_path/../Frameworks/}"
+            ;;
+        @loader_path/*)
+            embedded="$STAGING/Contents/MacOS/${dependency#@loader_path/}"
+            ;;
+        @executable_path/*)
+            embedded="$STAGING/Contents/MacOS/${dependency#@executable_path/}"
+            ;;
+        *)
+            MISSING_DEPENDENCIES+=("$dependency")
+            continue
+            ;;
+    esac
+    if [[ ! -e "$embedded" ]]; then
+        MISSING_DEPENDENCIES+=("$dependency")
+    fi
+done < <(otool -L "$STAGING/Contents/MacOS/$PRODUCT" | awk 'NR > 1 { print $1 }')
+
+if (( ${#MISSING_DEPENDENCIES[@]} > 0 )); then
+    printf '❌ 未嵌入的非系统动态依赖：\n' >&2
+    printf '  %s\n' "${MISSING_DEPENDENCIES[@]}" >&2
+    exit 1
+fi
+echo "✅ ${#RESOURCE_BUNDLES[@]} 个资源 bundle、${#FRAMEWORKS[@]} 个 framework 已完整嵌入"
+
 echo "── 签名 ($IDENTITY) ──"
 codesign --force --sign "$IDENTITY" "$STAGING"
-codesign --verify --strict "$STAGING"
+codesign --verify --deep --strict "$STAGING"
 
 # 外观门禁：系统按 LC_BUILD_VERSION.sdk 做新外观的 linked-on-or-after 判定，
 # sdk < 26 的产物会被渲染成旧样式，禁止发布
 echo "── 校验二进制 SDK 标记 ──"
-SDK=$(xcrun vtool -show-build "$STAGING/Contents/MacOS/TideBar" | awk '$1=="sdk"{print $2}')
+BUILD_VERSION=$(xcrun vtool -show-build "$STAGING/Contents/MacOS/$PRODUCT")
+MIN_OS=$(awk '$1=="minos"{print $2}' <<< "$BUILD_VERSION")
+SDK=$(awk '$1=="sdk"{print $2}' <<< "$BUILD_VERSION")
 SDK_MAJOR=${SDK%%.*}
-if [ -z "$SDK" ] || [ "$SDK_MAJOR" -lt 26 ]; then
-    echo "❌ LC_BUILD_VERSION.sdk=$SDK（需 ≥26）：产物会被按旧外观渲染，禁止发布" >&2
+if [[ "$MIN_OS" != "$DEPLOYMENT_TARGET" || "$SDK" != "$SDK_VERSION" || "$SDK_MAJOR" -lt 26 ]]; then
+    echo "❌ LC_BUILD_VERSION=minos $MIN_OS / sdk $SDK（预期 minos $DEPLOYMENT_TARGET / sdk $SDK_VERSION，且 sdk ≥26）" >&2
     exit 1
 fi
-echo "✅ LC_BUILD_VERSION.sdk=$SDK"
+echo "✅ LC_BUILD_VERSION=minos $MIN_OS / sdk $SDK"
 
 echo "── 打包 zip ──"
 mkdir -p "$DIST"
