@@ -194,6 +194,7 @@ killall Dock
 2. **发布侧管道与应用侧一体落地**：EdDSA 密钥（私钥存 `~/.signing/tidebar/`，与签名证书同处；公钥固化在 Info.plist `SUPublicEDKey`）、`SUFeedURL` 指向 GitHub Releases 固定跳转、appcast 随 release 自动生成；应用侧 `UpdateCoordinator` 包装 `SPUStandardUpdaterController`，入口在设置页「关于」，自动检查每日一拍（`SUScheduledCheckInterval=86400`）。Sparkle.framework 随包分发（`Contents/Frameworks/`，保留官方 Developer ID 签名不重签，外层 app 签名封印嵌套完整性）。开发路径（swift run 裸可执行）不启动 updater，UI 禁用并提示，沿用「开发与发布启动路径分离」。
 3. **appcast 单条目**：每次发布全新生成，仅含最新版本；不维护历史条目，不回下载旧 zip。Sparkle 客户端拉最新条目即可完成任意旧版升级。
 4. **更新完整性走 EdDSA，与 codesign 独立**：自签证书不公证不影响更新可信性；首次下载仍需右键打开，属不公证路线既定代价。
+5. **更新重启不恢复系统 Dock**：「安装并重启」的退出不触发 Dock 恢复——Sparkle 终止宿主前回调 `updaterWillRelaunchApplication`，`applicationWillTerminate` 据此跳过 `restore()`，接管偏好、快照与开关跨重启原样保留，新实例指纹校验即回 takeover；「退出时静默安装」不重启应用，Dock 照常恢复。
 
 ## 开机启动
 
