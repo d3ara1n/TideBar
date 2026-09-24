@@ -16,11 +16,14 @@ protocol ItemBarArtwork: AnyObject {
     func update(entry: ItemEntry)
     /// 必须是 requirement，同上；默认无操作。
     func setHighlightState(hovered: Bool, selected: Bool)
+    /// 拖拽接收/拒绝反馈由 widget 自己决定，避免套用通用图标效果。
+    func setDragFeedback(_ state: ItemDragIconState)
 }
 
 extension ItemBarArtwork {
     var usesSharedHoverEffects: Bool { true }
     func setHighlightState(hovered: Bool, selected: Bool) {}
+    func setDragFeedback(_ state: ItemDragIconState) {}
 }
 
 typealias AnyBarArtwork = NSView & ItemBarArtwork
@@ -35,8 +38,10 @@ final class ApplicationLauncherTileView: NSView, ItemBarArtwork {
     /// 失效条目（无 URL）用 template 符号回退，绘制前需显式设色随主题
     private var unavailableFlags: [Bool] = []
     private let highlightLayer = CALayer()
+    private let dragFeedbackLayer = CALayer()
     private var artHovered = false
     private var artSelected = false
+    private var dragFeedbackState: ItemDragIconState = .idle
 
     init(entry: ItemEntry) {
         super.init(frame: .zero)
@@ -44,6 +49,9 @@ final class ApplicationLauncherTileView: NSView, ItemBarArtwork {
         highlightLayer.cornerCurve = .continuous
         highlightLayer.opacity = 0
         layer?.addSublayer(highlightLayer)
+        dragFeedbackLayer.cornerCurve = .continuous
+        dragFeedbackLayer.opacity = 0
+        layer?.addSublayer(dragFeedbackLayer)
         refreshHighlightColor()
         reload(from: entry.reference)
     }
@@ -94,8 +102,50 @@ final class ApplicationLauncherTileView: NSView, ItemBarArtwork {
                      duration: lit ? Motion.hoverEnterDuration : Motion.hoverExitDuration)
     }
 
+    func setDragFeedback(_ state: ItemDragIconState) {
+        guard state != dragFeedbackState else { return }
+        let previous = dragFeedbackState
+        dragFeedbackState = state
+
+        let isReceiving = state == .receiving
+        let isRejected = state == .rejected
+        let opacity: Float = isReceiving ? 0.30 : (isRejected ? 0.38 : 0)
+        dragFeedbackLayer.backgroundColor = (isRejected ? NSColor.black : NSColor.white).cgColor
+        Motion.basic(dragFeedbackLayer, keyPath: "opacity", to: opacity,
+                     duration: Motion.dragFeedbackDuration)
+
+        guard let visualLayer = layer else { return }
+        if isRejected, previous != .rejected, !Motion.shouldReduceMotion {
+            let animation = CAKeyframeAnimation(keyPath: "transform.translation.x")
+            animation.values = [0, -3.5, 3.5, -2.2, 2.2, 0]
+            animation.duration = 0.28
+            animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            visualLayer.removeAnimation(forKey: "widget.drag.reject")
+            visualLayer.add(animation, forKey: "widget.drag.reject")
+        }
+
+        let targetScale: CGFloat = isReceiving ? 1.06 : (isRejected ? 0.96 : 1)
+        let targetOffset: CGFloat = isReceiving ? 1.5 : 0
+        if Motion.shouldReduceMotion {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            visualLayer.removeAnimation(forKey: "motion.transform.scale")
+            visualLayer.removeAnimation(forKey: "motion.transform.translation.y")
+            visualLayer.setValue(targetScale, forKeyPath: "transform.scale")
+            visualLayer.setValue(targetOffset, forKeyPath: "transform.translation.y")
+            CATransaction.commit()
+        } else {
+            Motion.spring(visualLayer, keyPath: "transform.scale", to: targetScale,
+                          stiffness: 520, damping: 34, minDuration: Motion.dragFeedbackDuration)
+            Motion.spring(visualLayer, keyPath: "transform.translation.y", to: targetOffset,
+                          stiffness: 520, damping: 34, minDuration: Motion.dragFeedbackDuration)
+        }
+    }
+
     /// 高亮层目标透明度（模型值，动画即时设定）；供测试验证反馈链路
     var highlightOpacity: Float { highlightLayer.opacity }
+    /// 拖拽反馈层目标透明度，供测试验证自绘反馈链路。
+    var dragFeedbackOpacity: Float { dragFeedbackLayer.opacity }
 
     private func refreshHighlightColor() {
         highlightLayer.backgroundColor = AppearanceColors.cgColor(
@@ -107,9 +157,11 @@ final class ApplicationLauncherTileView: NSView, ItemBarArtwork {
         let side = Layout.iconSize
         highlightLayer.frame = NSRect(x: (bounds.width - side) / 2, y: (bounds.height - side) / 2,
                                       width: side, height: side)
+        dragFeedbackLayer.frame = highlightLayer.frame
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         highlightLayer.cornerRadius = side * 0.225
+        dragFeedbackLayer.cornerRadius = side * 0.225
         CATransaction.commit()
     }
 

@@ -205,9 +205,7 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
         if let payload = payload(for: sender) {
             if case .internalItem(let sourceID) = payload,
                let source = registry.entries.first(where: { $0.id == sourceID }),
-               source.kind == .application,
-               let bundleIdentifier = source.application?.bundleIdentifier,
-               let reference = try? ItemReferences.application(bundleIdentifier) {
+               let reference = applicationReference(for: source) {
                 return [reference]
             }
             if case .externalReferences(let references) = payload {
@@ -220,6 +218,24 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
             }
         }
         return nil
+    }
+
+    private func applicationReference(for source: ItemEntry) -> ItemReference? {
+        guard source.kind == .application else { return nil }
+
+        if let locator = ItemReferences.applicationLocator(source.reference) {
+            if locator.bookmark != nil { return source.reference }
+            if let app = source.application,
+               let bundleIdentifier = app.bundleIdentifier,
+               let reference = try? ItemReferences.application(bundleIdentifier, url: app.applicationURL) {
+                return reference
+            }
+            return source.reference
+        }
+
+        guard let app = source.application,
+              let bundleIdentifier = app.bundleIdentifier else { return nil }
+        return try? ItemReferences.application(bundleIdentifier, url: app.applicationURL)
     }
 
     private func validatedProposal(_ sender: any NSDraggingInfo, in view: TideBarView) -> Proposal? {
@@ -257,12 +273,10 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
             }
         case .deliverItem(let sourceID, let targetID):
             guard let source = registry.entries.first(where: { $0.id == sourceID }),
-                  source.kind == .application,
                   let target = registry.entries.first(where: { $0.id == targetID }),
                   target.kind == .widget,
                   target.capabilities.contains(.receive),
-                  let bundleIdentifier = source.application?.bundleIdentifier,
-                  let appReference = try? ItemReferences.application(bundleIdentifier),
+                  let appReference = applicationReference(for: source),
                   let receiver = ItemBehaviors.provider(for: target),
                   let receive = receiver.receive([appReference], at: target.reference),
                   allowed.contains(receive.operation) else { return nil }

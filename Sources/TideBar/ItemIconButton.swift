@@ -201,8 +201,8 @@ final class ItemIconButton: NSView {
     var onClick: ((ItemEntry) -> Void)?
     /// 调用方拥有拖拽 source；按钮只处理手势，不承载跨收起／重建的会话。
     var onBeginDrag: ((ItemIconButton, NSEvent) -> Bool)?
-    var onSetHidden: ((AppIdentity, Bool) -> Void)?
-    var onTerminate: ((AppIdentity) -> Bool)?
+    var onSetHidden: ((ApplicationItemIdentity, Bool) -> Void)?
+    var onTerminate: ((ApplicationItemIdentity) -> Bool)?
     var onSetPinned: ((ItemID, Bool) -> Void)?
     /// 潮涌触发，携图标 frame（位于 ItemRowView 坐标系，即面板内容坐标）
     var onSurge: ((ItemEntry, NSRect) -> Void)?
@@ -341,6 +341,7 @@ final class ItemIconButton: NSView {
         }
         artworkView.setDragState(state)
         animateVisualState(.exit)
+        customArtworkView?.setDragFeedback(state)
     }
 
     func setHovered(_ on: Bool) {

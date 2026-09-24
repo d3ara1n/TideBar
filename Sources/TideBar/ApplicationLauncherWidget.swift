@@ -42,6 +42,24 @@ enum WidgetReferences {
     }
 }
 
+enum ApplicationLauncherWidgetSupport {
+    @MainActor
+    static func uniqueAdditions(current: [ItemReference],
+                                incoming: [ItemReference]) -> [ItemReference] {
+        var known = current
+        var additions: [ItemReference] = []
+        for reference in incoming {
+            guard ItemReferences.applicationLocator(reference) != nil,
+                  !known.contains(where: { ItemReferences.sameApplicationLocation($0, reference) }) else {
+                continue
+            }
+            known.append(reference)
+            additions.append(reference)
+        }
+        return additions
+    }
+}
+
 @MainActor
 private struct ApplicationLauncherWidgetBehavior: ItemBehaviorProviding {
     let capabilities: ItemCapabilities = [.receive, .surgeBody]
@@ -77,13 +95,10 @@ private struct ApplicationLauncherWidgetBehavior: ItemBehaviorProviding {
             }), let current = WidgetReferences.applicationLauncherConfiguration(for: record.reference) else {
                 throw ItemFailure("item.error.changed")
             }
-            var identities = Set(current.applications.compactMap {
-                ItemReferences.applicationLocator($0).map { AppIdentity($0.bundleIdentifier) }
-            })
-            let additions = appReferences.filter { reference in
-                guard let locator = ItemReferences.applicationLocator(reference) else { return false }
-                return identities.insert(AppIdentity(locator.bundleIdentifier)).inserted
-            }
+            let additions = ApplicationLauncherWidgetSupport.uniqueAdditions(
+                current: current.applications,
+                incoming: appReferences
+            )
             guard !additions.isEmpty else { return }
             let latest = try WidgetReferences.replacing(record.reference,
                                                         applications: current.applications + additions)

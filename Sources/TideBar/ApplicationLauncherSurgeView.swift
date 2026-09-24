@@ -334,8 +334,13 @@ final class ApplicationLauncherSurgeView: NSView, SurgeBody, NSDraggingSource, N
                 return record.reference
             }
             guard refs.count == urls.count else { return false }
-            let existing = Set(applicationReferences)
-            applicationReferences += refs.filter { !existing.contains($0) }
+            var known = applicationReferences
+            for reference in refs where !known.contains(where: {
+                ItemReferences.sameApplicationLocation($0, reference)
+            }) {
+                known.append(reference)
+            }
+            applicationReferences = known
             reloadItems()
             onApplicationsChange?(applicationReferences)
             return true

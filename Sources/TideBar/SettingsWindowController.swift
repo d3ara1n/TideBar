@@ -328,9 +328,14 @@ private final class SettingsModel: ObservableObject {
         refreshPinnedApps()
     }
 
-    func addPinned(bundleIdentifiers: [String]) {
-        for bundleIdentifier in bundleIdentifiers {
-            AppConfiguration.shared.setPinned(true, bundleIdentifier: bundleIdentifier)
+    func addPinnedApplicationPaths(_ paths: [String]) {
+        do {
+            let references = paths.map { ItemReferences.externalFile(URL(fileURLWithPath: $0)) }
+            let prepared = try ItemPinOperation.prepare(references,
+                                                        existing: PinnedItemStore.shared.records)
+            try PinnedItemStore.shared.replace(prepared.records)
+        } catch {
+            ItemErrors.report(error)
         }
         refreshPinnedApps()
     }
@@ -389,8 +394,11 @@ private struct PinnedApplication: Identifiable, Equatable {
     let name: String
     let icon: NSImage
     let isInstalled: Bool
+    let path: String
 
-    var id: String { bundleIdentifier.lowercased() }
+    var id: String {
+        URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
+    }
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.id == rhs.id && lhs.name == rhs.name && lhs.isInstalled == rhs.isInstalled
@@ -910,12 +918,12 @@ private enum ApplicationScanner {
             }
         }
 
-        var seenBundleIdentifiers = Set<String>()
+        var seenApplicationPaths = Set<String>()
         var infos: [InstalledApplicationInfo] = []
         for url in urls {
             guard let bundle = Bundle(url: url),
                   let bundleIdentifier = bundle.bundleIdentifier,
-                  seenBundleIdentifiers.insert(bundleIdentifier).inserted
+                  seenApplicationPaths.insert(url.standardizedFileURL.resolvingSymlinksInPath().path).inserted
             else { continue }
             let name = bundle.localizedInfoDictionary?["CFBundleDisplayName"] as? String
                 ?? bundle.infoDictionary?["CFBundleName"] as? String
@@ -937,7 +945,7 @@ private struct ApplicationPickerSheet: View {
     @State private var installedApps: [PinnedApplication] = []
     @State private var isScanning = true
     @State private var searchText = ""
-    @State private var selectedBundleIdentifiers: Set<String> = []
+    @State private var selectedApplicationPaths: Set<String> = []
 
     private var filteredApps: [PinnedApplication] {
         let keyword = searchText.trimmingCharacters(in: .whitespaces)
@@ -945,8 +953,13 @@ private struct ApplicationPickerSheet: View {
         return installedApps.filter { $0.name.localizedCaseInsensitiveContains(keyword) }
     }
 
-    private var pinnedBundleIdentifiers: Set<String> {
-        Set(model.pinnedItems.compactMap { ItemReferences.applicationLocator($0.record.reference)?.bundleIdentifier })
+    private var pinnedApplicationPaths: Set<String> {
+        Set(model.pinnedItems.compactMap {
+            guard let locator = ItemReferences.applicationLocator($0.record.reference),
+                  locator.bookmark != nil,
+                  let url = ItemReferences.applicationURL($0.record.reference) else { return nil }
+            return url.standardizedFileURL.resolvingSymlinksInPath().path
+        })
     }
 
     var body: some View {
@@ -963,8 +976,8 @@ private struct ApplicationPickerSheet: View {
 
             List(filteredApps) { app in
                 ApplicationPickerRow(app: app,
-                                     isPinned: pinnedBundleIdentifiers.contains(app.bundleIdentifier),
-                                     isSelected: selectedBundleIdentifiers.contains(app.bundleIdentifier)) {
+                                     isPinned: pinnedApplicationPaths.contains(app.id),
+                                     isSelected: selectedApplicationPaths.contains(app.id)) {
                     toggleSelection(app)
                 }
             }
@@ -979,13 +992,13 @@ private struct ApplicationPickerSheet: View {
             Divider()
 
             HStack {
-                Text(l10n.string("pinned.selectedCount", table: .settings, arguments: selectedBundleIdentifiers.count))
+                Text(l10n.string("pinned.selectedCount", table: .settings, arguments: selectedApplicationPaths.count))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button(l10n.string("action.cancel", table: .settings), action: { dismiss() })
                 Button(l10n.string("pinned.addShort", table: .settings), action: confirmAdd)
-                    .disabled(selectedBundleIdentifiers.isEmpty)
+                    .disabled(selectedApplicationPaths.isEmpty)
                     .keyboardShortcut(.defaultAction)
             }
             .padding(12)
@@ -1007,21 +1020,22 @@ private struct ApplicationPickerSheet: View {
             PinnedApplication(bundleIdentifier: info.bundleIdentifier,
                               name: info.name,
                               icon: workspace.icon(forFile: info.path),
-                              isInstalled: true)
+                              isInstalled: true,
+                              path: info.path)
         }
     }
 
     private func toggleSelection(_ app: PinnedApplication) {
-        if !selectedBundleIdentifiers.insert(app.bundleIdentifier).inserted {
-            selectedBundleIdentifiers.remove(app.bundleIdentifier)
+        if !selectedApplicationPaths.insert(app.id).inserted {
+            selectedApplicationPaths.remove(app.id)
         }
     }
 
     private func confirmAdd() {
-        let bundleIdentifiers = installedApps
-            .filter { selectedBundleIdentifiers.contains($0.bundleIdentifier) }
-            .map(\.bundleIdentifier)
-        model.addPinned(bundleIdentifiers: bundleIdentifiers)
+        let paths = installedApps
+            .filter { selectedApplicationPaths.contains($0.id) }
+            .map(\.path)
+        model.addPinnedApplicationPaths(paths)
         dismiss()
     }
 }

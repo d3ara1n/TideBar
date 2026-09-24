@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 
 /// 应用身份的快照：固定与临时应用 item 共享同一份进程、窗口和动作语义。
 struct AppEntry: Identifiable {
+    let itemIdentity: ApplicationItemIdentity
     let identity: AppIdentity
     /// 固定配置保留采集到的原始 bundle identifier，不用规范化身份代替 locator。
     /// 裸进程（无 bundle 的 regular GUI）为 nil，此时身份由可执行路径派生，不支持固定。
@@ -23,7 +24,7 @@ struct AppEntry: Identifiable {
     /// Dock 角标镜像值（nil = 无角标）；随模型真值 diff 驱动 UI 与汐线脉冲
     let badge: BadgeValue?
 
-    var id: AppIdentity { identity }
+    var id: ApplicationItemIdentity { itemIdentity }
     /// Finder 的常驻桌面进程不计运行；只有收录到资源管理窗口才算逻辑运行。
     var isRunning: Bool {
         AppBehavior.resolve(for: identity).logicalIsRunning(
@@ -166,7 +167,7 @@ final class AppRegistry {
     /// 本轮确认的逻辑启动合并为一次收纳事件，初始快照只建立基线。
     var onApplicationsStarted: (() -> Void)?
     private var hasRunningBaseline = false
-    private var lastKnownRunning: [AppIdentity: Bool] = [:]
+    private var lastKnownRunning: [ApplicationItemIdentity: Bool] = [:]
 
     private let windowStore = WindowStore()
     private let badgeStore = BadgeStore()
@@ -241,19 +242,19 @@ final class AppRegistry {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
     }
 
-    func requestSetHidden(_ hidden: Bool, of identity: AppIdentity) {
+    func requestSetHidden(_ hidden: Bool, of itemIdentity: ApplicationItemIdentity) {
         refresh()
-        guard let entry = entries.first(where: { $0.identity == identity }) else {
-            NSLog("TideBar visibility change ignored for unavailable app: %@", identity.bundleIdentifier)
+        guard let entry = entries.first(where: { $0.itemIdentity == itemIdentity }) else {
+            NSLog("TideBar visibility change ignored for unavailable app: %@", itemIdentity.description)
             return
         }
         AppActionDispatcher.setHidden(hidden, for: entry)
     }
 
-    func requestTermination(of identity: AppIdentity) -> Bool {
+    func requestTermination(of itemIdentity: ApplicationItemIdentity) -> Bool {
         refresh()
-        guard let entry = entries.first(where: { $0.identity == identity }) else {
-            NSLog("TideBar termination ignored for unavailable app: %@", identity.bundleIdentifier)
+        guard let entry = entries.first(where: { $0.itemIdentity == itemIdentity }) else {
+            NSLog("TideBar termination ignored for unavailable app: %@", itemIdentity.description)
             return false
         }
         return AppActionDispatcher.terminate(entry)
@@ -261,7 +262,7 @@ final class AppRegistry {
 
     func refresh() {
         let workspace = NSWorkspace.shared
-        let pinned = AppConfiguration.shared.effectivePinnedBundleIDs
+        let pinned = AppConfiguration.shared.effectivePinnedApplications
         let running = workspace.runningApplications.filter {
             guard !$0.isTerminated, $0.activationPolicy == .regular else { return false }
             // 裸进程（无 bundle 的 regular GUI）照收，身份由可执行路径派生；
@@ -272,13 +273,14 @@ final class AppRegistry {
         let descriptions = running.compactMap { app -> RunningAppDescription? in
             if let bundleIdentifier = app.bundleIdentifier {
                 return RunningAppDescription(bundleIdentifier: bundleIdentifier,
-                                             processIdentifier: app.processIdentifier)
+                                             processIdentifier: app.processIdentifier,
+                                             applicationPath: app.bundleURL?.path)
             }
             guard let executablePath = app.executablePath else { return nil }
             return RunningAppDescription(executablePath: executablePath,
                                          processIdentifier: app.processIdentifier)
         }
-        let composed = AppListComposer.compose(pinnedBundleIdentifiers: pinned,
+        let composed = AppListComposer.compose(pinnedApplications: pinned,
                                                runningApps: descriptions)
         let runningByPID = Dictionary(uniqueKeysWithValues: running.map {
             ($0.processIdentifier, $0)
@@ -298,7 +300,7 @@ final class AppRegistry {
 
         var pinnedEntries: [AppEntry] = []
         var runningEntries: [AppEntry] = []
-        var knownRunning: [AppIdentity: Bool] = [:]
+        var knownRunning: [ApplicationItemIdentity: Bool] = [:]
         var applicationsStarted = false
         for description in composed {
             let apps = description.runningInstances.compactMap {
@@ -314,14 +316,14 @@ final class AppRegistry {
             let requiresWindows = description.behavior.visibility == .whenHasKnownWindows
             if requiresWindows, !apps.isEmpty, windowKnowledge.elements == nil {
                 // 未知不是退出；恢复读取时沿用上次已确认状态。
-                knownRunning[description.identity] = lastKnownRunning[description.identity]
+                knownRunning[description.itemIdentity] = lastKnownRunning[description.itemIdentity]
             } else {
                 let isRunning = description.behavior.logicalIsRunning(
                     processIsRunning: !apps.isEmpty,
                     knownWindowCount: windowKnowledge.elements?.count
                 )
-                let previous = lastKnownRunning[description.identity]
-                knownRunning[description.identity] = isRunning
+                let previous = lastKnownRunning[description.itemIdentity]
+                knownRunning[description.itemIdentity] = isRunning
                 // 窗口驱动的应用首次获得知识只建基线，不把 AX 就绪当作启动。
                 if hasRunningBaseline, isRunning, previous != true,
                    !requiresWindows || previous != nil {
@@ -337,16 +339,20 @@ final class AppRegistry {
             let app = apps.first
             let bundleIdentifier = app?.bundleIdentifier ?? description.pinnedBundleIdentifier
             let pinnedReference = PinnedItemStore.shared.records.first {
-                $0.id == .application(description.identity) && $0.kind == .application
+                $0.id == .application(description.itemIdentity) && $0.kind == .application
             }?.reference
             let applicationURL = app?.bundleURL
                 ?? pinnedReference.flatMap(ItemReferences.applicationURL)
-                ?? bundleIdentifier.flatMap { workspace.urlForApplication(withBundleIdentifier: $0) }
+                ?? description.itemIdentity.applicationPath.map { URL(fileURLWithPath: $0) }
+                ?? (description.itemIdentity.applicationPath == nil
+                    ? bundleIdentifier.flatMap { workspace.urlForApplication(withBundleIdentifier: $0) }
+                    : nil)
                 ?? app?.executablePath.map { URL(fileURLWithPath: $0) }
             guard app != nil || applicationURL != nil else { continue }
 
             let displayName = name(locator: bundleIdentifier, app: app, applicationURL: applicationURL)
-            let entry = AppEntry(identity: description.identity,
+            let entry = AppEntry(itemIdentity: description.itemIdentity,
+                                 identity: description.identity,
                                  bundleIdentifier: bundleIdentifier,
                                  applicationURL: applicationURL,
                                  name: displayName,

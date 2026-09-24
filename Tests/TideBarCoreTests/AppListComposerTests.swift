@@ -57,6 +57,21 @@ import Testing
     #expect(result[1].isRunning)
 }
 
+@Test func sameBundleDifferentApplicationPathsComposeAsSeparateApps() {
+    let result = AppListComposer.compose(
+        pinnedApplications: [],
+        runningApps: [
+            RunningAppDescription(bundleIdentifier: "com.example.App", processIdentifier: 20, applicationPath: "/Applications/Foo.app"),
+            RunningAppDescription(bundleIdentifier: "com.example.App", processIdentifier: 21, applicationPath: "/Users/test/Applications/Foo.app"),
+        ]
+    )
+
+    #expect(result.count == 2)
+    #expect(result.allSatisfy { $0.identity == AppIdentity("com.example.app") })
+    #expect(Set(result.map(\.itemIdentity.applicationPath)) == Set(["/Applications/Foo.app", "/Users/test/Applications/Foo.app"]))
+}
+
+
 @Test func bareExecutableInstancesGroupByPathIdentity() {
     let result = AppListComposer.compose(
         pinnedBundleIdentifiers: [],

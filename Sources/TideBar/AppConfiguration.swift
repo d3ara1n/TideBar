@@ -142,8 +142,10 @@ final class AppConfiguration {
         return value
     }
 
-    /// 应用观测只消费通用固定列表的应用投影。
-    var effectivePinnedBundleIDs: [String] { PinnedItemStore.shared.applicationBundleIdentifiers }
+    /// 应用观测消费带资源位置的固定应用投影；旧记录没有 bookmark 时才退化为 bundle-only。
+    var effectivePinnedApplications: [PinnedApplicationDescription] {
+        PinnedItemStore.shared.applicationDescriptions
+    }
 
     func setPinned(_ pinned: Bool, bundleIdentifier: String) {
         do { try PinnedItemStore.shared.setPinned(pinned, bundleIdentifier: bundleIdentifier) }

@@ -51,6 +51,17 @@ enum ItemReferences {
         return ItemReference(scheme: "file-bookmark", payload: try url.bookmarkData(options: .minimalBookmark))
     }
 
+    static func refreshApplicationBookmark(_ reference: ItemReference) throws -> ItemReference {
+        guard let locator = applicationLocator(reference), let bookmark = locator.bookmark else {
+            return reference
+        }
+        var stale = false
+        let url = try URL(resolvingBookmarkData: bookmark, options: [.withoutUI, .withoutMounting],
+                          relativeTo: nil, bookmarkDataIsStale: &stale)
+        guard stale else { return reference }
+        return try application(locator.bundleIdentifier, url: url)
+    }
+
     @MainActor
     static func applicationURL(_ reference: ItemReference) -> URL? {
         guard let locator = applicationLocator(reference) else { return nil }
@@ -60,6 +71,8 @@ enum ItemReferences {
                                   relativeTo: nil, bookmarkDataIsStale: &stale),
                let actualID = Bundle(url: url)?.bundleIdentifier,
                AppIdentity(actualID) == AppIdentity(locator.bundleIdentifier) { return url }
+            // 已经拥有具体副本的 bookmark 时，解析失败不能退化到另一个同 bundle 副本。
+            return nil
         }
         return NSWorkspace.shared.urlForApplication(withBundleIdentifier: locator.bundleIdentifier)
     }
@@ -70,7 +83,12 @@ enum ItemReferences {
         let values = try url.resourceValues(forKeys: [.contentTypeKey, .isDirectoryKey, .localizedNameKey])
         if values.contentType?.conforms(to: .applicationBundle) == true {
             guard let bundleID = Bundle(url: url)?.bundleIdentifier else { throw ItemFailure("item.error.reference") }
-            return PinnedItemRecord(id: .application(AppIdentity(bundleID)), kind: .application,
+            return PinnedItemRecord(
+                                    id: .application(ApplicationItemIdentity(
+                                        bundleIdentifier: bundleID,
+                                        applicationPath: url.standardizedFileURL.resolvingSymlinksInPath().path
+                                    )),
+                                    kind: .application,
                                     reference: try application(bundleID, url: url),
                                     fallbackName: url.deletingPathExtension().lastPathComponent)
         }
@@ -78,6 +96,31 @@ enum ItemReferences {
                                 reference: ItemReference(scheme: "file-bookmark",
                                                          payload: try url.bookmarkData(options: .minimalBookmark)),
                                 fallbackName: values.localizedName ?? url.lastPathComponent)
+    }
+
+    @MainActor
+    static func sameApplicationLocation(_ a: ItemReference, _ b: ItemReference) -> Bool {
+        guard let firstLocator = applicationLocator(a),
+              let secondLocator = applicationLocator(b),
+              AppIdentity(firstLocator.bundleIdentifier) == AppIdentity(secondLocator.bundleIdentifier),
+              let first = applicationURL(a),
+              let second = applicationURL(b) else {
+            return a == b
+        }
+
+        let firstPath = first.standardizedFileURL.resolvingSymlinksInPath()
+        let secondPath = second.standardizedFileURL.resolvingSymlinksInPath()
+        if firstPath == secondPath { return true }
+
+        guard let firstID = try? first.resourceValues(forKeys: [.fileResourceIdentifierKey, .volumeIdentifierKey]),
+              let secondID = try? second.resourceValues(forKeys: [.fileResourceIdentifierKey, .volumeIdentifierKey]),
+              let firstFileID = firstID.fileResourceIdentifier as? NSObject,
+              let secondFileID = secondID.fileResourceIdentifier as? NSObject,
+              let firstVolumeID = firstID.volumeIdentifier as? NSObject,
+              let secondVolumeID = secondID.volumeIdentifier as? NSObject else {
+            return false
+        }
+        return firstFileID == secondFileID && firstVolumeID == secondVolumeID
     }
 
     static func sameFile(_ a: ItemReference, _ b: ItemReference) -> Bool {
