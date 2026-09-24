@@ -250,13 +250,13 @@ final class AppRegistry {
         AppActionDispatcher.setHidden(hidden, for: entry)
     }
 
-    func requestTermination(of identity: AppIdentity) {
+    func requestTermination(of identity: AppIdentity) -> Bool {
         refresh()
         guard let entry = entries.first(where: { $0.identity == identity }) else {
             NSLog("TideBar termination ignored for unavailable app: %@", identity.bundleIdentifier)
-            return
+            return false
         }
-        AppActionDispatcher.terminate(entry)
+        return AppActionDispatcher.terminate(entry)
     }
 
     func refresh() {

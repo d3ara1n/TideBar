@@ -97,7 +97,7 @@ final class TideBarView: NSView {
     }
     var onUserLaunch: (() -> Void)?
     var onSetHidden: ((AppIdentity, Bool) -> Void)?
-    var onTerminate: ((AppIdentity) -> Void)?
+    var onTerminate: ((AppIdentity) -> Bool)?
     var onSetPinned: ((ItemID, Bool) -> Void)?
     /// 潮涌触发透传（携图标 frame，面板内容坐标）
     var onSurge: ((ItemEntry, NSRect) -> Void)?
@@ -329,7 +329,7 @@ final class TideBarView: NSView {
         iconRow.onLaunch = { $0.primaryClick() }
         iconRow.onUserLaunch = { [weak self] in self?.onUserLaunch?() }
         iconRow.onSetHidden = { [weak self] identity, hidden in self?.onSetHidden?(identity, hidden) }
-        iconRow.onTerminate = { [weak self] identity in self?.onTerminate?(identity) }
+        iconRow.onTerminate = { [weak self] identity in self?.onTerminate?(identity) ?? false }
         iconRow.onSetPinned = { [weak self] identity, pinned in self?.onSetPinned?(identity, pinned) }
         iconRow.onSurge = { [weak self] entry, frame in self?.onSurge?(entry, frame) }
         iconRow.onRemoveWidget = { [weak self] entry in self?.onRemoveWidget?(entry) }

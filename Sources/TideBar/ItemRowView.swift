@@ -19,7 +19,7 @@ final class ItemRowView: NSView {
     var onLaunch: ((ItemEntry) -> Void)?
     var onUserLaunch: (() -> Void)?
     var onSetHidden: ((AppIdentity, Bool) -> Void)?
-    var onTerminate: ((AppIdentity) -> Void)?
+    var onTerminate: ((AppIdentity) -> Bool)?
     var onSetPinned: ((ItemID, Bool) -> Void)?
     var onSurge: ((ItemEntry, NSRect) -> Void)?
     var onRemoveWidget: ((ItemEntry) -> Void)? {
@@ -154,7 +154,7 @@ final class ItemRowView: NSView {
             }
         }
         button.onSetHidden = { [weak self] identity, hidden in self?.onSetHidden?(identity, hidden) }
-        button.onTerminate = { [weak self] identity in self?.onTerminate?(identity) }
+        button.onTerminate = { [weak self] identity in self?.onTerminate?(identity) ?? false }
         button.onSetPinned = { [weak self] identity, pinned in self?.onSetPinned?(identity, pinned) }
         button.onSurge = { [weak self] entry, frame in self?.onSurge?(entry, frame) }
         button.onRemoveWidget = { [weak self] entry in self?.onRemoveWidget?(entry) }
