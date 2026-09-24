@@ -96,8 +96,8 @@ final class TideBarView: NSView {
                                source: dragCoordinator?.liftedItemID)
     }
     var onUserLaunch: (() -> Void)?
-    var onSetHidden: ((AppIdentity, Bool) -> Void)?
-    var onTerminate: ((AppIdentity) -> Bool)?
+    var onSetHidden: ((ApplicationItemIdentity, Bool) -> Void)?
+    var onTerminate: ((ApplicationItemIdentity) -> Bool)?
     var onSetPinned: ((ItemID, Bool) -> Void)?
     /// 潮涌触发透传（携图标 frame，面板内容坐标）
     var onSurge: ((ItemEntry, NSRect) -> Void)?
@@ -591,11 +591,11 @@ final class TideBarView: NSView {
         iconRow.refreshAppearance()
     }
 
-    func setKeyboardSelection(_ identity: AppIdentity?) {
+    func setKeyboardSelection(_ identity: ApplicationItemIdentity?) {
         iconRow.setKeyboardSelection(identity)
     }
 
-    func iconFrame(for identity: AppIdentity) -> NSRect? {
+    func iconFrame(for identity: ApplicationItemIdentity) -> NSRect? {
         iconRow.button(for: identity)?.frame
     }
 

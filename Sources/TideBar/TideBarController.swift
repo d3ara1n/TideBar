@@ -226,7 +226,7 @@ final class TideBarController {
                 barSession = session
                 dismissSurge(animated: true)
                 if let state = screens[session.displayID] {
-                    state.view.setKeyboardSelection(session.selectedApplication)
+                    state.view.setKeyboardSelection(session.selectedItem)
                 }
             } else {
                 cancelBarSession()
@@ -244,24 +244,24 @@ final class TideBarController {
         case 125: // down
             if barSession?.level == .applications {
                 openSelectedSurge()
-            } else if case .windows = barSession?.level {
+            } else if barSession?.level.isWindows == true {
                 moveWindow(by: 1)
             } else {
                 return false
             }
         case 126: // up
-            guard case .windows = barSession?.level else { return false }
+            guard barSession?.level.isWindows == true else { return false }
             moveWindow(by: -1)
         case 36, 76: // return / enter
             commitBarSession()
         case 53: // escape
-            if let session = barSession, case .windows = session.level {
+            if let session = barSession, session.level.isWindows {
                 var updated = session
                 _ = updated.escape()
                 barSession = updated
                 dismissSurge(animated: true)
                 if let state = screens[updated.displayID] {
-                    state.view.setKeyboardSelection(updated.selectedApplication)
+                    state.view.setKeyboardSelection(updated.selectedItem)
                 }
             } else {
                 cancelBarSession()
@@ -318,12 +318,19 @@ final class TideBarController {
         return AppIdentity(bundleIdentifier)
     }
 
-    private func preferredInitialApplication() -> AppIdentity? {
-        if let frontmost = frontmostIdentity(),
-           navigationApplications.contains(where: { $0.identity == frontmost }) {
-            return frontmost
+    private func preferredInitialApplication() -> ApplicationItemIdentity? {
+        if let frontmost = NSWorkspace.shared.frontmostApplication {
+            if let byProcess = navigationApplications.first(where: {
+                $0.runningAppsByPID[frontmost.processIdentifier] != nil
+            }) {
+                return byProcess.itemIdentity
+            }
         }
-        return navigationApplications.first?.identity
+        if let frontmost = frontmostIdentity(),
+           let app = navigationApplications.first(where: { $0.identity == frontmost }) {
+            return app.itemIdentity
+        }
+        return navigationApplications.first?.itemIdentity
     }
 
     private func beginSession(mode: BarSessionMode, on state: ScreenState,
@@ -339,7 +346,7 @@ final class TideBarController {
                                      firstApplication: initialApplication,
                                      now: CACurrentMediaTime(),
                                      timeout: switcherTimeout)
-        state.view.setKeyboardSelection(barSession?.selectedApplication)
+        state.view.setKeyboardSelection(barSession?.selectedItem)
         if mode == .switcher { armSwitcherTimeout() }
         NSLog("TideBar keyboard session began (mode: %@, screen %u)",
               mode == .switcher ? "switcher" : "persistent", displayID)
@@ -358,7 +365,7 @@ final class TideBarController {
         return screens[id]
     }
 
-    private func selectApplication(_ identity: AppIdentity) {
+    private func selectApplication(_ identity: ApplicationItemIdentity) {
         guard var session = barSession else { return }
         session.selectApplication(identity,
                                   now: CACurrentMediaTime(),
@@ -372,19 +379,19 @@ final class TideBarController {
     private func moveApplication(by offset: Int) {
         let applications = navigationApplications
         guard !applications.isEmpty, var session = barSession else { return }
-        if case .windows = session.level {
+        if session.level.isWindows {
             _ = session.escape()
             dismissSurge(animated: true)
         }
-        let current = session.selectedApplication
-        let index = current.flatMap { identity in applications.firstIndex { $0.identity == identity } } ?? 0
+        let current = session.selectedItem
+        let index = current.flatMap { identity in applications.firstIndex { $0.itemIdentity == identity } } ?? 0
         let next = (index + offset + applications.count) % applications.count
-        session.selectApplication(applications[next].identity,
+        session.selectApplication(applications[next].itemIdentity,
                                   now: CACurrentMediaTime(),
                                   timeout: switcherTimeout)
         barSession = session
         if let state = screens[session.displayID] {
-            state.view.setKeyboardSelection(session.selectedApplication)
+            state.view.setKeyboardSelection(session.selectedItem)
         }
         if session.isSwitcher { armSwitcherTimeout() }
     }
@@ -392,8 +399,8 @@ final class TideBarController {
     private func openSelectedSurge() {
         guard let session = barSession,
               let state = screens[session.displayID],
-              let identity = session.selectedApplication,
-              let entry = items.entries.first(where: { $0.application?.identity == identity }),
+              let identity = session.selectedItem,
+              let entry = items.entries.first(where: { $0.application?.itemIdentity == identity }),
               let iconFrame = state.view.iconFrame(for: identity) else { return }
         showSurge(entry: entry, state: state, iconFrame: iconFrame, fromKeyboard: true)
         cancelSwitcherTimeout()
@@ -401,8 +408,9 @@ final class TideBarController {
 
     private func moveWindow(by offset: Int) {
         guard let session = barSession,
-              case let .windows(identity) = session.level,
-              let entry = navigationApplications.first(where: { $0.identity == identity }),
+              session.level.isWindows,
+              let itemIdentity = session.selectedItem,
+              let entry = navigationApplications.first(where: { $0.itemIdentity == itemIdentity }),
               let windows = entry.windows, !windows.isEmpty else { return }
         let ids = windows.map(\.elementIdentifier)
         let index = session.selectedWindowIdentifier.flatMap { ids.firstIndex(of: $0) } ?? 0
@@ -422,27 +430,36 @@ final class TideBarController {
             NSLog("TideBar keyboard session committed (level: inactive)")
             endBarSession(collapse: true, suppressMouse: true)
         case .applications:
-            if let identity = session.selectedApplication,
-               let entry = navigationApplications.first(where: { $0.identity == identity }) {
-                NSLog("TideBar keyboard session committed (application: %@)", identity.bundleIdentifier)
+            if let identity = session.selectedItem,
+               let entry = navigationApplications.first(where: { $0.itemIdentity == identity }) {
+                NSLog("TideBar keyboard session committed (application: %@)", identity.description)
                 entry.primaryClick()
             }
             endBarSession(collapse: session.isPersistent || session.openedBySession,
                           suppressMouse: session.openedBySession)
         case .windows(let identity):
-            NSLog("TideBar keyboard session committed (windows: %@)", identity.bundleIdentifier)
-            if let entry = navigationApplications.first(where: { $0.identity == identity }),
-               let identifier = session.selectedWindowIdentifier,
-               let window = entry.windows?.first(where: { $0.elementIdentifier == identifier }),
-               let app = entry.runningApp(for: window) {
-                AXReader.raise(window, app: app)
-            } else if let entry = navigationApplications.first(where: { $0.identity == identity }) {
-                entry.activate()
-            }
+            commitWindowSelection(session, itemIdentity: session.selectedItem
+                                  ?? ApplicationItemIdentity(bundleIdentifier: identity.bundleIdentifier,
+                                                              applicationPath: nil))
+        case .windowsItem(let itemIdentity):
+            commitWindowSelection(session, itemIdentity: itemIdentity)
             endBarSession(collapse: session.isPersistent || session.openedBySession,
                           suppressMouse: session.openedBySession)
         }
         _ = state
+    }
+
+    private func commitWindowSelection(_ session: BarSessionState,
+                                       itemIdentity: ApplicationItemIdentity) {
+        NSLog("TideBar keyboard session committed (windows: %@)", itemIdentity.description)
+        if let entry = navigationApplications.first(where: { $0.itemIdentity == itemIdentity }),
+           let identifier = session.selectedWindowIdentifier,
+           let window = entry.windows?.first(where: { $0.elementIdentifier == identifier }),
+           let app = entry.runningApp(for: window) {
+            AXReader.raise(window, app: app)
+        } else if let entry = navigationApplications.first(where: { $0.itemIdentity == itemIdentity }) {
+            entry.activate()
+        }
     }
 
     private func cancelBarSession() {
@@ -1021,19 +1038,19 @@ final class TideBarController {
               let state = screens[session.displayID] else {
             return
         }
-        let applications = Set(navigationApplications.map(\.identity))
         let windowIDs: Set<Int>?
-        if case let .windows(identity) = session.level,
-           let entry = navigationApplications.first(where: { $0.identity == identity }),
+        if session.level.isWindows,
+           let itemIdentity = session.selectedItem,
+           let entry = navigationApplications.first(where: { $0.itemIdentity == itemIdentity }),
            let windows = entry.windows {
             windowIDs = Set(windows.map(\.elementIdentifier))
         } else {
             windowIDs = nil
         }
-        session.reconcile(applications: applications, windowIdentifiers: windowIDs)
+        session.reconcile(items: Set(navigationApplications.map(\.itemIdentity)), windowIdentifiers: windowIDs)
         barSession = session
-        state.view.setKeyboardSelection(session.selectedApplication)
-        if case .windows = session.level {
+        state.view.setKeyboardSelection(session.selectedItem)
+        if session.level.isWindows {
             (surgePanel?.contentView as? SurgeContainerView)?.body.setKeyboardSelection(session.selectedWindowIdentifier)
         }
     }
@@ -1118,7 +1135,7 @@ final class TideBarController {
         surgeWindowRevision = live.application?.windowRevision
         surgeOriginDisplayID = displayID(of: state.screen)
         if fromKeyboard, let app = live.application, var session = barSession {
-            _ = session.enterWindows(for: app.identity,
+        _ = session.enterWindows(for: app.itemIdentity,
                                      firstWindowIdentifier: body.rowIdentifiers().first)
             barSession = session
             body.setKeyboardSelection(session.selectedWindowIdentifier)

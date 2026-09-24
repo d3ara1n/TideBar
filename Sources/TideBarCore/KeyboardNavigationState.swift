@@ -3,6 +3,14 @@ public enum KeyboardNavigationLevel: Equatable, Sendable {
     case inactive
     case applications
     case windows(AppIdentity)
+    case windowsItem(ApplicationItemIdentity)
+
+    public var isWindows: Bool {
+        switch self {
+        case .windows, .windowsItem: return true
+        default: return false
+        }
+    }
 }
 
 /// 键盘导航的纯状态模型；不持有 AppKit/AX 对象，便于在模型变化后安全修正选择。
@@ -10,6 +18,7 @@ public struct KeyboardNavigationState: Equatable, Sendable {
     public private(set) var level: KeyboardNavigationLevel = .inactive
     public private(set) var focusedDisplayID: UInt32?
     public private(set) var selectedApplication: AppIdentity?
+    public private(set) var selectedItem: ApplicationItemIdentity?
     public private(set) var selectedWindowIdentifier: Int?
 
     public init() {}
@@ -19,6 +28,20 @@ public struct KeyboardNavigationState: Equatable, Sendable {
         focusedDisplayID = displayID
         level = .applications
         selectedApplication = firstApplication
+        selectedItem = firstApplication.map {
+            ApplicationItemIdentity(bundleIdentifier: $0.bundleIdentifier, applicationPath: nil)
+        }
+        selectedWindowIdentifier = nil
+        return firstApplication != nil
+    }
+
+    @discardableResult
+    public mutating func enterApplications(displayID: UInt32,
+                                           firstApplication: ApplicationItemIdentity?) -> Bool {
+        focusedDisplayID = displayID
+        level = .applications
+        selectedItem = firstApplication
+        selectedApplication = firstApplication?.runtimeIdentity
         selectedWindowIdentifier = nil
         return firstApplication != nil
     }
@@ -26,6 +49,14 @@ public struct KeyboardNavigationState: Equatable, Sendable {
     public mutating func selectApplication(_ identity: AppIdentity) {
         level = .applications
         selectedApplication = identity
+        selectedItem = ApplicationItemIdentity(bundleIdentifier: identity.bundleIdentifier, applicationPath: nil)
+        selectedWindowIdentifier = nil
+    }
+
+    public mutating func selectApplication(_ item: ApplicationItemIdentity) {
+        level = .applications
+        selectedItem = item
+        selectedApplication = item.runtimeIdentity
         selectedWindowIdentifier = nil
     }
 
@@ -34,12 +65,28 @@ public struct KeyboardNavigationState: Equatable, Sendable {
         guard selectedApplication == identity || selectedApplication == nil else { return false }
         level = .windows(identity)
         selectedApplication = identity
+        selectedItem = ApplicationItemIdentity(bundleIdentifier: identity.bundleIdentifier, applicationPath: nil)
+        selectedWindowIdentifier = firstWindowIdentifier
+        return firstWindowIdentifier != nil
+    }
+
+    @discardableResult
+    public mutating func enterWindows(for item: ApplicationItemIdentity,
+                                      firstWindowIdentifier: Int?) -> Bool {
+        guard selectedItem == item || selectedItem == nil else { return false }
+        level = .windowsItem(item)
+        selectedItem = item
+        selectedApplication = item.runtimeIdentity
         selectedWindowIdentifier = firstWindowIdentifier
         return firstWindowIdentifier != nil
     }
 
     public mutating func selectWindow(_ identifier: Int?) {
-        guard case .windows = level else { return }
+        guard case .windows = level else {
+            guard case .windowsItem = level else { return }
+            selectedWindowIdentifier = identifier
+            return
+        }
         selectedWindowIdentifier = identifier
     }
 
@@ -52,7 +99,7 @@ public struct KeyboardNavigationState: Equatable, Sendable {
         case .applications:
             reset()
             return false
-        case .windows:
+        case .windows, .windowsItem:
             level = .applications
             selectedWindowIdentifier = nil
             return true
@@ -63,6 +110,7 @@ public struct KeyboardNavigationState: Equatable, Sendable {
         level = .inactive
         focusedDisplayID = nil
         selectedApplication = nil
+        selectedItem = nil
         selectedWindowIdentifier = nil
     }
 
@@ -78,7 +126,30 @@ public struct KeyboardNavigationState: Equatable, Sendable {
             reset()
             return
         }
-        if case .windows = level {
+        if level.isWindows {
+            guard let windowIdentifiers else {
+                selectedWindowIdentifier = nil
+                return
+            }
+            if let selectedWindowIdentifier, !windowIdentifiers.contains(selectedWindowIdentifier) {
+                self.selectedWindowIdentifier = windowIdentifiers.sorted().first
+            }
+        }
+    }
+
+    public mutating func clearSelectionIfMissing(
+        items: Set<ApplicationItemIdentity>,
+        windowIdentifiers: Set<Int>?
+    ) {
+        guard let selectedItem else {
+            reset()
+            return
+        }
+        guard items.contains(selectedItem) else {
+            reset()
+            return
+        }
+        if level.isWindows {
             guard let windowIdentifiers else {
                 selectedWindowIdentifier = nil
                 return

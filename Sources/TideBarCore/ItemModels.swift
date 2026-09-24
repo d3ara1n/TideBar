@@ -14,6 +14,10 @@ public struct ItemKind: RawRepresentable, Codable, Hashable, Sendable {
 public struct ItemID: RawRepresentable, Codable, Hashable, Sendable {
     public let rawValue: String
     public init(rawValue: String) { self.rawValue = rawValue }
+    public static func application(_ identity: ApplicationItemIdentity) -> Self {
+        Self(rawValue: "application:\(identity.key)")
+    }
+    /// 仅用于读取旧的 bundle-only 固定记录和兼容旧调用方。
     public static func application(_ identity: AppIdentity) -> Self {
         Self(rawValue: "application:\(identity.bundleIdentifier)")
     }

@@ -23,7 +23,11 @@ final class PinnedItemStore {
                       Set(document.records.map(\.id)).count == document.records.count else {
                     throw ItemFailure("item.error.storage")
                 }
-                records = document.records
+                records = try Self.normalizedApplicationRecords(document.records)
+                if records != document.records {
+                    let migrated = try JSONEncoder().encode(PinnedItemDocument(records: records))
+                    defaults.set(migrated, forKey: Self.key)
+                }
             } else if defaults.object(forKey: Self.legacyKey) != nil {
                 guard let ids = defaults.stringArray(forKey: Self.legacyKey) else { throw ItemFailure("item.error.storage") }
                 records = try Self.applicationRecords(ids)
@@ -49,8 +53,87 @@ final class PinnedItemStore {
         }
     }
 
+    private static func normalizedApplicationRecords(_ records: [PinnedItemRecord]) throws -> [PinnedItemRecord] {
+        var seen = Set<ItemID>()
+        return try records.compactMap { record in
+            var normalized = record
+            if record.kind == .application,
+               let locator = ItemReferences.applicationLocator(record.reference),
+               let bookmark = locator.bookmark,
+               let url = ItemReferences.applicationURL(record.reference) {
+                normalized = PinnedItemRecord(
+                    id: .application(ApplicationItemIdentity(
+                        bundleIdentifier: locator.bundleIdentifier,
+                        applicationPath: url.standardizedFileURL.resolvingSymlinksInPath().path
+                    )),
+                    kind: record.kind,
+                    reference: ItemReference(
+                    scheme: "application",
+                    payload: try JSONEncoder().encode(ItemReferences.ApplicationLocator(
+                        bundleIdentifier: locator.bundleIdentifier,
+                        bookmark: bookmark
+                    ))
+                    ),
+                    fallbackName: record.fallbackName
+                )
+            }
+            guard seen.insert(normalized.id).inserted else {
+                if normalized.kind == .application {
+                    NSLog("TideBar duplicate application location collapsed during migration: %@", normalized.id.rawValue)
+                    return nil
+                }
+                throw ItemFailure("item.error.storage")
+            }
+            return normalized
+        }
+    }
+
     var applicationBundleIdentifiers: [String] {
         records.compactMap { $0.kind == .application ? ItemReferences.applicationLocator($0.reference)?.bundleIdentifier : nil }
+    }
+
+    var applicationDescriptions: [PinnedApplicationDescription] {
+        records.compactMap { record in
+            guard record.kind == .application,
+                  let locator = ItemReferences.applicationLocator(record.reference) else { return nil }
+            return PinnedApplicationDescription(
+                bundleIdentifier: locator.bundleIdentifier,
+                applicationPath: locator.bookmark == nil ? nil : ItemReferences.applicationURL(record.reference)?.path
+            )
+        }
+    }
+
+    func reconcileApplicationLocations() throws {
+        var updated: [PinnedItemRecord] = []
+        var seen = Set<ItemID>()
+        for record in records {
+            var candidate = record
+            if record.kind == .application,
+               let locator = ItemReferences.applicationLocator(record.reference),
+               locator.bookmark != nil,
+               let url = ItemReferences.applicationURL(record.reference) {
+                candidate = PinnedItemRecord(
+                    id: .application(ApplicationItemIdentity(
+                        bundleIdentifier: locator.bundleIdentifier,
+                        applicationPath: url.path
+                    )),
+                    kind: record.kind,
+                    reference: record.reference,
+                    fallbackName: record.fallbackName
+                )
+            }
+            guard seen.insert(candidate.id).inserted else {
+                guard candidate.kind == .application else {
+                    throw ItemFailure("item.error.storage")
+                }
+                NSLog("TideBar duplicate application location collapsed: %@", candidate.id.rawValue)
+                continue
+            }
+            updated.append(candidate)
+        }
+        if updated != records {
+            try replace(updated)
+        }
     }
 
     func replace(_ records: [PinnedItemRecord]) throws {

@@ -68,7 +68,7 @@ final class ItemRegistry {
     private var usesSessionOrder = false
     private var isRefreshing = false
     /// 临时项移除仅隐藏当前运行实例；新运行实例或重启 TideBar 后自然恢复。
-    private var dismissed: [AppIdentity: Set<pid_t>] = [:]
+    private var dismissed: [ApplicationItemIdentity: Set<pid_t>] = [:]
     private var lastPinnedOrder: [ItemID] = []
     private var committingOrder = false
 
@@ -94,7 +94,13 @@ final class ItemRegistry {
         presentations.removeAll()
         var records = store.records
         for index in records.indices {
-            if let refreshed = try? ItemReferences.refreshBookmark(records[index].reference) {
+            let refreshed: ItemReference?
+            if records[index].kind == .application {
+                refreshed = try? ItemReferences.refreshApplicationBookmark(records[index].reference)
+            } else {
+                refreshed = try? ItemReferences.refreshBookmark(records[index].reference)
+            }
+            if let refreshed {
                 records[index].reference = refreshed
             }
         }
@@ -102,6 +108,8 @@ final class ItemRegistry {
             do { try store.replace(records) }
             catch { NSLog("TideBar bookmark refresh could not be saved: %@", String(describing: error)) }
         }
+        do { try store.reconcileApplicationLocations() }
+        catch { NSLog("TideBar application identity reconciliation failed: %@", String(describing: error)) }
         applications.refresh()
         rebuild()
     }
@@ -128,15 +136,15 @@ final class ItemRegistry {
                                         content: .reference(isAvailable: presentation.isAvailable)))
             }
         }
-        let liveIDs = Set(applications.entries.map(\.identity))
+        let liveIDs = Set(applications.entries.map(\.itemIdentity))
         dismissed = dismissed.filter { liveIDs.contains($0.key) }
         for app in applications.entries {
             let id = ItemID.application(app.id)
-            if pinnedIDs.contains(id) { dismissed.removeValue(forKey: app.identity); continue }
-            if let hiddenPIDs = dismissed[app.identity] {
+            if pinnedIDs.contains(id) { dismissed.removeValue(forKey: app.itemIdentity); continue }
+            if let hiddenPIDs = dismissed[app.itemIdentity] {
                 let current = Set(app.runningAppsByPID.keys)
                 if !current.isEmpty, current.isSubset(of: hiddenPIDs) { continue }
-                dismissed.removeValue(forKey: app.identity)
+                dismissed.removeValue(forKey: app.itemIdentity)
             }
             result.append(entry(for: app, record: nil))
         }
@@ -153,7 +161,7 @@ final class ItemRegistry {
 
     private func entry(for app: AppEntry, record: PinnedItemRecord?) -> ItemEntry {
         let reference = record?.reference
-            ?? app.bundleIdentifier.flatMap { try? ItemReferences.application($0) }
+            ?? app.bundleIdentifier.flatMap { try? ItemReferences.application($0, url: app.applicationURL) }
             ?? ItemReference(scheme: "running-process", payload: Data(app.identity.description.utf8))
         return ItemEntry(id: .application(app.id), kind: .application, reference: reference,
                          name: app.name, icon: app.icon, preferredBarWidth: nil,
@@ -180,7 +188,7 @@ final class ItemRegistry {
         if item.isPinned {
             try store.remove([id])
         } else if let app = item.application {
-            dismissed[app.identity] = Set(app.runningAppsByPID.keys)
+            dismissed[app.itemIdentity] = Set(app.runningAppsByPID.keys)
             rebuild()
         }
     }

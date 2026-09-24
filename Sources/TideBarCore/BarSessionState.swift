@@ -37,8 +37,28 @@ public struct BarSessionState: Equatable, Sendable {
         }
     }
 
+    public init(mode: BarSessionMode,
+                displayID: UInt32,
+                openedBySession: Bool,
+                firstApplication: ApplicationItemIdentity?,
+                now: TimeInterval? = nil,
+                timeout: TimeInterval? = nil) {
+        self.mode = mode
+        self.displayID = displayID
+        self.openedBySession = openedBySession
+        var navigation = KeyboardNavigationState()
+        _ = navigation.enterApplications(displayID: displayID, firstApplication: firstApplication)
+        self.navigation = navigation
+        if mode == .switcher, let now, let timeout {
+            self.deadline = now + timeout
+        } else {
+            self.deadline = nil
+        }
+    }
+
     public var level: KeyboardNavigationLevel { navigation.level }
     public var selectedApplication: AppIdentity? { navigation.selectedApplication }
+    public var selectedItem: ApplicationItemIdentity? { navigation.selectedItem }
     public var selectedWindowIdentifier: Int? { navigation.selectedWindowIdentifier }
     public var isPersistent: Bool { mode == .persistent }
     public var isSwitcher: Bool { mode == .switcher }
@@ -60,12 +80,29 @@ public struct BarSessionState: Equatable, Sendable {
         if let now, let timeout { touch(now: now, timeout: timeout) }
     }
 
+    public mutating func selectApplication(_ item: ApplicationItemIdentity,
+                                            now: TimeInterval? = nil,
+                                            timeout: TimeInterval? = nil) {
+        navigation.selectApplication(item)
+        if let now, let timeout { touch(now: now, timeout: timeout) }
+    }
+
     @discardableResult
     public mutating func enterWindows(for identity: AppIdentity,
                                       firstWindowIdentifier: Int?,
                                       now: TimeInterval? = nil,
                                       timeout: TimeInterval? = nil) -> Bool {
         let entered = navigation.enterWindows(for: identity, firstWindowIdentifier: firstWindowIdentifier)
+        if entered, let now, let timeout { touch(now: now, timeout: timeout) }
+        return entered
+    }
+
+    @discardableResult
+    public mutating func enterWindows(for item: ApplicationItemIdentity,
+                                      firstWindowIdentifier: Int?,
+                                      now: TimeInterval? = nil,
+                                      timeout: TimeInterval? = nil) -> Bool {
+        let entered = navigation.enterWindows(for: item, firstWindowIdentifier: firstWindowIdentifier)
         if entered, let now, let timeout { touch(now: now, timeout: timeout) }
         return entered
     }
@@ -87,5 +124,10 @@ public struct BarSessionState: Equatable, Sendable {
                                    windowIdentifiers: Set<Int>?) {
         navigation.clearSelectionIfMissing(applications: applications,
                                            windowIdentifiers: windowIdentifiers)
+    }
+
+    public mutating func reconcile(items: Set<ApplicationItemIdentity>,
+                                   windowIdentifiers: Set<Int>?) {
+        navigation.clearSelectionIfMissing(items: items, windowIdentifiers: windowIdentifiers)
     }
 }

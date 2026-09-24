@@ -18,8 +18,8 @@ final class ItemRowView: NSView {
     }
     var onLaunch: ((ItemEntry) -> Void)?
     var onUserLaunch: (() -> Void)?
-    var onSetHidden: ((AppIdentity, Bool) -> Void)?
-    var onTerminate: ((AppIdentity) -> Bool)?
+    var onSetHidden: ((ApplicationItemIdentity, Bool) -> Void)?
+    var onTerminate: ((ApplicationItemIdentity) -> Bool)?
     var onSetPinned: ((ItemID, Bool) -> Void)?
     var onSurge: ((ItemEntry, NSRect) -> Void)?
     var onRemoveWidget: ((ItemEntry) -> Void)? {
@@ -169,13 +169,13 @@ final class ItemRowView: NSView {
         }
     }
 
-    func setKeyboardSelection(_ identity: AppIdentity?) {
+    func setKeyboardSelection(_ identity: ApplicationItemIdentity?) {
         for button in buttons {
             button.setKeyboardSelected(button.entry.id == identity.map(ItemID.application))
         }
     }
 
-    func button(for identity: AppIdentity) -> ItemIconButton? {
+    func button(for identity: ApplicationItemIdentity) -> ItemIconButton? {
         buttons.first { $0.entry.id == .application(identity) }
     }
 
