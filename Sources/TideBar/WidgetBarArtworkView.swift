@@ -200,8 +200,8 @@ final class ApplicationLauncherTileView: NSView, ItemBarArtwork {
             return
         }
 
-        let inset = side * 0.2
-        let gap = side * 0.08
+        let inset = side * 0.10
+        let gap = side * 0.06
         let mini = (side - inset * 2 - gap) / 2
         for (index, icon) in icons.enumerated() {
             let column = index % 2

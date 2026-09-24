@@ -189,6 +189,13 @@ final class ItemRowView: NSView {
 
     func setDragPreview(_ newPreview: ItemDragPreview) {
         guard preview != newPreview else { return }
+        let previousReceiveTarget: ItemID?
+        let nextReceiveTarget: ItemID?
+        if case .receive(let id, _) = preview { previousReceiveTarget = id }
+        else { previousReceiveTarget = nil }
+        if case .receive(let id, _) = newPreview { nextReceiveTarget = id }
+        else { nextReceiveTarget = nil }
+        if previousReceiveTarget != nextReceiveTarget { hitLatch.reset() }
         let oldCenters = visualCenters()
         let oldExtra = extraPreviewSlots
         preview = newPreview
@@ -228,26 +235,24 @@ final class ItemRowView: NSView {
         let internalApplicationCanDeliver = liftedSource.flatMap { sourceID in
             buttons.first(where: { $0.entry.id == sourceID })?.entry.kind == .application
         } == true
-        if case .receive(let targetID, _) = preview, internalApplicationCanDeliver {
-            return ItemDropLocation(target: targetID, before: nil)
-        }
+        let overArtwork = abs(point.y - bounds.midY) <= Layout.iconSize / 2
+        let canHitTarget = (liftedSource == nil || internalApplicationCanDeliver) && overArtwork
         if preview == .none, !buttons.isEmpty {
             let candidates = buttons.sorted { $0.frame.minX < $1.frame.minX }
-            if let target = candidates.first(where: { candidate in
-                guard candidate.frame.contains(point) else { return false }
-                return liftedSource == nil || (internalApplicationCanDeliver && candidate.entry.kind == .widget)
+            if canHitTarget, let target = candidates.first(where: {
+                $0.frame.contains(point) && abs(point.x - $0.frame.midX) <= Layout.iconSize / 2
             }) {
-                return ItemDropLocation(target: target.entry.id, before: nil)
+                let right = candidates.first { point.x < $0.frame.midX }
+                return ItemDropLocation(target: target.entry.id, before: right?.entry.id)
             }
             let right = candidates.first { point.x < $0.frame.midX }
             return pinnedBoundaryClamp(ItemDropLocation(target: nil, before: right?.entry.id))
         }
         let layout = projected
         let origin = bounds.midX - CGFloat(layout.slots.count) * Layout.iconSlot / 2
-        let overArtwork = abs(point.y - bounds.midY) <= Layout.iconSize / 2
         let hit = layout.hit(at: Double((point.x - origin) / Layout.iconSlot),
                              iconFraction: Double(Layout.iconSize / Layout.iconSlot),
-                             allowsReceiving: liftedSource == nil && overArtwork)
+                             allowsReceiving: canHitTarget)
         let lower = hit.lower.isFinite ? origin + CGFloat(hit.lower) * Layout.iconSlot : bounds.minX
         let upper = hit.upper.isFinite ? origin + CGFloat(hit.upper) * Layout.iconSlot : bounds.maxX
         let y = hit.location.target == nil ? bounds.minY : bounds.midY - Layout.iconSize / 2
