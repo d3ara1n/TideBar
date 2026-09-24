@@ -202,7 +202,7 @@ final class ItemIconButton: NSView {
     /// 调用方拥有拖拽 source；按钮只处理手势，不承载跨收起／重建的会话。
     var onBeginDrag: ((ItemIconButton, NSEvent) -> Bool)?
     var onSetHidden: ((AppIdentity, Bool) -> Void)?
-    var onTerminate: ((AppIdentity) -> Void)?
+    var onTerminate: ((AppIdentity) -> Bool)?
     var onSetPinned: ((ItemID, Bool) -> Void)?
     /// 潮涌触发，携图标 frame（位于 ItemRowView 坐标系，即面板内容坐标）
     var onSurge: ((ItemEntry, NSRect) -> Void)?
@@ -421,6 +421,18 @@ final class ItemIconButton: NSView {
         }
     }
 
+    private func acknowledgeTerminationRequest() {
+        guard let layer = artworkView.layer else { return }
+        if Motion.shouldReduceMotion {
+            Motion.keyframePulse(layer, keyPath: "opacity", peak: Float(0.55), rest: Float(1),
+                                 duration: Motion.quitRequestFadeDuration, growFraction: 0.35)
+        } else {
+            Motion.keyframePulse(layer, keyPath: "transform.scale",
+                                 peak: Motion.quitRequestScale, rest: CGFloat(1),
+                                 duration: Motion.quitRequestDuration, growFraction: 0.35)
+        }
+    }
+
     override func mouseDown(with event: NSEvent) {
         hovering = true
         pressed = true
@@ -562,7 +574,11 @@ final class ItemIconButton: NSView {
             let quit = NSMenuItem(title: L10nManager.shared.current.string("appMenu.quit", table: .menus), action: #selector(MenuAction.run), keyEquivalent: "q")
             quit.keyEquivalentModifierMask = .command
             let terminate = onTerminate
-            let action = MenuAction(quit.title) { terminate?(app.id) }
+            let action = MenuAction(quit.title) { [weak self] in
+                DispatchQueue.main.async { [weak self] in
+                    if terminate?(app.id) == true { self?.acknowledgeTerminationRequest() }
+                }
+            }
             menuActions.append(action)
             quit.target = action
             menu.addItem(quit)

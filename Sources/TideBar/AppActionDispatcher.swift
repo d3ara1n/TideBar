@@ -21,18 +21,22 @@ enum AppActionDispatcher {
         }
     }
 
-    static func terminate(_ entry: AppEntry) {
+    static func terminate(_ entry: AppEntry) -> Bool {
         let behavior = AppBehavior.resolve(for: entry.identity)
         guard entry.canTerminate, behavior.canTerminate else {
             NSLog("TideBar termination denied by app behavior: %@", entry.identity.bundleIdentifier)
-            return
+            return false
         }
 
+        var requested = false
         for (pid, app, identityLabel) in validatedRunningApps(for: entry, action: "termination") {
-            if !app.terminate() {
+            if app.terminate() {
+                requested = true
+            } else {
                 NSLog("TideBar termination request failed: %@ (pid %d)", identityLabel, pid)
             }
         }
+        return requested
     }
 
     private static func validatedRunningApps(

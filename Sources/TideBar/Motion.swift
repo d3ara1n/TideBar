@@ -80,6 +80,9 @@ enum Motion {
     static var statusStiffness: CGFloat { springStiffness(420) }
     static var statusDamping: CGFloat { springDamping(30) }
     static var reducedMotionFadeDuration: TimeInterval { time(0.10) }
+    static var quitRequestDuration: TimeInterval { time(0.24) }
+    static var quitRequestFadeDuration: TimeInterval { time(0.18) }
+    static let quitRequestScale: CGFloat = 0.93
 
     // MARK: 通知角标（图标右上角）
 

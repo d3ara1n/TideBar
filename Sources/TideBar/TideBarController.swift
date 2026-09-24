@@ -567,7 +567,7 @@ final class TideBarController {
                 self?.registry.requestSetHidden(hidden, of: identity)
             }
             view.onTerminate = { [weak self] identity in
-                self?.registry.requestTermination(of: identity)
+                self?.registry.requestTermination(of: identity) ?? false
             }
             view.onSetPinned = { [weak self, weak state] identity, pinned in
                 guard let self, let state else { return }
