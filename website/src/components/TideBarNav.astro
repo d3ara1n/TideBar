@@ -14,27 +14,27 @@ const labels = lang === "en"
   <div class="tide-nav-hit">
     <div class="tide-nav-line" aria-hidden="true"></div>
     <div class="tide-nav-bar">
-      <a class="tide-nav-item" style="--i:0" href="#home" data-section="home" aria-label={labels.home}>
+      <a class="tide-nav-item" style="--i:0" href="#home" data-section="home">
         <span class="nav-icon tile-home"><House strokeWidth={1.9} aria-hidden="true" /></span>
         <span class="nav-name">{labels.home}</span>
       </a>
-      <a class="tide-nav-item" style="--i:1" href="#demo" data-section="demo" aria-label={labels.demo}>
+      <a class="tide-nav-item" style="--i:1" href="#demo" data-section="demo">
         <span class="nav-icon tile-demo"><MonitorPlay strokeWidth={1.9} aria-hidden="true" /></span>
         <span class="nav-name">{labels.demo}</span>
       </a>
-      <a class="tide-nav-item" style="--i:2" href="#features" data-section="features" aria-label={labels.features}>
+      <a class="tide-nav-item" style="--i:2" href="#features" data-section="features">
         <span class="nav-icon tile-features"><Sparkles strokeWidth={1.9} aria-hidden="true" /></span>
         <span class="nav-name">{labels.features}</span>
       </a>
-      <a class="tide-nav-item" style="--i:3" href="#privacy" data-section="privacy" aria-label={labels.privacy}>
+      <a class="tide-nav-item" style="--i:3" href="#privacy" data-section="privacy">
         <span class="nav-icon tile-privacy"><ShieldCheck strokeWidth={1.9} aria-hidden="true" /></span>
         <span class="nav-name">{labels.privacy}</span>
       </a>
-      <a class="tide-nav-item" style="--i:4" href="#download" data-section="download" aria-label={labels.download}>
+      <a class="tide-nav-item" style="--i:4" href="#download" data-section="download">
         <span class="nav-icon tile-download"><ArrowDown strokeWidth={1.9} aria-hidden="true" /></span>
         <span class="nav-name">{labels.download}</span>
       </a>
-      <a class="tide-nav-item" style="--i:5" href="#source" data-section="source" aria-label={labels.source}>
+      <a class="tide-nav-item" style="--i:5" href="#source" data-section="source">
         <span class="nav-icon tile-source"><CodeXml strokeWidth={1.9} aria-hidden="true" /></span>
         <span class="nav-name">{labels.source}</span>
       </a>
@@ -56,33 +56,64 @@ const labels = lang === "en"
     ? { home: "汐", demo: "演示", features: "功能", privacy: "隐私", download: "下载", source: "源码" }
     : { home: "TideBar", demo: "Demo", features: "Features", privacy: "Privacy", download: "Download", source: "Source" };
 
-  // 减少动态效果：不自动播放，交给用户手动控制
+  // 视频按需加载：preload="none"，仅在演示可见时播放；减少动态效果时交给用户手动控制
   if (demoVideo && reducedMotion.matches) {
-    demoVideo.removeAttribute("autoplay");
     demoVideo.controls = true;
-    demoVideo.preload = "metadata";
   }
+  const playDemo = () => {
+    if (!demoVideo || reducedMotion.matches) return;
+    demoVideo.play().catch(() => {});
+  };
 
   let current = "home";
+  let opener: HTMLElement | null = null;
 
-  function activate(id: string, syncHash = true) {
+  // 移动端堆叠布局：视频滚动进入视口才加载播放，离开即暂停
+  if (demoVideo && "IntersectionObserver" in window) {
+    new IntersectionObserver(([entry]) => {
+      if (desktopMode.matches) return;
+      if (entry.isIntersecting) playDemo();
+      else demoVideo.pause();
+    }, { threshold: 0.25 }).observe(demoVideo);
+  }
+
+  // 桌面模式下非激活窗口 inert（屏蔽焦点与读屏）；堆叠布局全部可达
+  function syncInert() {
+    for (const win of windows) {
+      win.inert = desktopMode.matches && win.dataset.window !== current;
+    }
+  }
+  desktopMode.addEventListener("change", () => {
+    syncInert();
+    if (!desktopMode.matches) demoVideo?.pause();
+    else if (current === "demo") playDemo();
+  });
+
+  function activate(id: string, syncHash = true, moveFocus = false) {
+    const previous = current;
     current = id;
     const windowOpen = id !== "home";
     desktop?.classList.toggle("has-window", windowOpen);
     for (const win of windows) {
       const active = win.dataset.window === id;
       win.classList.toggle("is-active", active);
-      win.toggleAttribute("aria-hidden", !active);
     }
+    syncInert();
     for (const item of items) {
       item.toggleAttribute("aria-current", item.dataset.section === id);
     }
-    if (demoVideo) {
+    if (demoVideo && desktopMode.matches) {
       // 演示窗口不可见时暂停视频，回到窗口再续播
-      if (id === "demo") {
-        if (!reducedMotion.matches) demoVideo.play().catch(() => {});
-      } else {
-        demoVideo.pause();
+      if (id === "demo") playDemo();
+      else demoVideo.pause();
+    }
+    if (moveFocus && desktopMode.matches) {
+      // 键盘操作：打开窗口时焦点移入，关闭时回到打开它的元素
+      if (windowOpen) {
+        windows.find((w) => w.dataset.window === id)?.querySelector<HTMLElement>("[data-close]")?.focus();
+      } else if (previous !== "home") {
+        opener?.focus();
+        opener = null;
       }
     }
     if (appName) {
@@ -95,7 +126,7 @@ const labels = lang === "en"
   }
 
   addEventListener("keydown", (event) => {
-    if (event.key === "Escape") activate("home");
+    if (event.key === "Escape" && current !== "home") activate("home", true, true);
   });
 
   // 触摸设备：点按汐线展开（桌面靠鼠标热区 hover，不用点击锁定）
@@ -113,7 +144,7 @@ const labels = lang === "en"
     const anchor = (event.target as Element).closest<HTMLAnchorElement>("a[href^='#']");
     const closer = (event.target as Element).closest("[data-close]");
     if (closer) {
-      activate("home");
+      activate("home", true, event.detail === 0);
       return;
     }
     if (!anchor) return;
@@ -121,7 +152,9 @@ const labels = lang === "en"
     if (!["home", "demo", "features", "privacy", "download", "source"].includes(id)) return;
     if (!desktopMode.matches) return; // 移动端保持锚点滚动
     event.preventDefault();
-    activate(id);
+    const keyboard = event.detail === 0;
+    if (keyboard && id !== "home") opener = anchor;
+    activate(id, true, keyboard);
     // 指针点击后交还焦点，避免 :focus-within 把栏锁定在展开态
     if (event.detail > 0) (document.activeElement as HTMLElement | null)?.blur();
   });

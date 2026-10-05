@@ -29,11 +29,11 @@ const titles = en
         : "鼠标靠近屏幕底部时展开，可启动应用、切换窗口，以及打开固定的文件和文件夹。鼠标移开后自动收起。"}
     </p>
     <div class="hero-actions">
-      <a class="button button-primary" href="#download" data-section-link="download">
+      <a class="button button-primary" href="#download" data-section="download">
         <ArrowDown strokeWidth={2.2} aria-hidden="true" />
         {en ? "Download for macOS" : "下载 macOS 版"}
       </a>
-      <a class="text-link" href="#features" data-section-link="features">
+      <a class="text-link" href="#features" data-section="features">
         {en ? "View features" : "查看功能"}
         <ChevronRight strokeWidth={2.2} aria-hidden="true" />
       </a>
@@ -51,7 +51,7 @@ const titles = en
       <span class="window-title">{titles.demo}</span>
     </div>
     <div class="window-body window-body-media">
-      <video class="demo-video" src="/demo.mp4" autoplay muted loop playsinline disablepictureinpicture
+      <video class="demo-video" src="/demo.mp4" preload="none" muted loop playsinline disablepictureinpicture
         aria-label={en ? "TideBar live demo recording" : "TideBar 实机演示录屏"}></video>
     </div>
   </section>
