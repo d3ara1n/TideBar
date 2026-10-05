@@ -16,7 +16,7 @@ const alternateLabel = lang === "en" ? "中文" : "EN";
 <html lang={lang === "en" ? "en" : "zh-CN"}>
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content={description} />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="TideBar" />
@@ -32,7 +32,9 @@ const alternateLabel = lang === "en" ? "中文" : "EN";
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#061019" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="canonical" href={Astro.url.href} />
-    <link rel="alternate" hreflang={lang === "en" ? "zh-CN" : "en"} href={`${Astro.site}${alternatePath}`} />
+    <link rel="alternate" hreflang="en" href={new URL("/", Astro.site).href} />
+    <link rel="alternate" hreflang="zh-CN" href={new URL("/zh/", Astro.site).href} />
+    <link rel="alternate" hreflang="x-default" href={new URL("/", Astro.site).href} />
     <title>{title}</title>
     <script is:inline>
       (() => {
@@ -56,7 +58,7 @@ const alternateLabel = lang === "en" ? "中文" : "EN";
     <a class="skip-link" href="#main-content">{lang === "en" ? "Skip to content" : "跳到内容"}</a>
     <header class="menubar">
       <div class="menubar-side">
-        <a class="menubar-app" href="#home" data-section-link="home">
+        <a class="menubar-app" href="#home" data-section="home">
           <span class="brand-mark" aria-hidden="true">
             <img class="mark-for-light" src="/brand-light.svg" alt="" width="15" height="15" />
             <img class="mark-for-dark" src="/brand-dark.svg" alt="" width="15" height="15" />
@@ -138,7 +140,11 @@ const alternateLabel = lang === "en" ? "中文" : "EN";
         minute: "2-digit",
       });
     const tick = () => (clock.textContent = format());
-    tick();
-    setInterval(tick, 20_000);
+    // 对齐到整分钟刷新，避免显示滞后
+    const schedule = () => {
+      tick();
+      setTimeout(schedule, 60_000 - (Date.now() % 60_000) + 50);
+    };
+    schedule();
   }
 </script>

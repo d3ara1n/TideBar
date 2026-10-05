@@ -111,6 +111,17 @@ html[data-theme="dark"] {
   box-sizing: border-box;
 }
 
+img,
+video {
+  max-width: 100%;
+}
+
+.demo-video {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -463,11 +474,6 @@ html[data-theme="dark"] .theme-toggle .icon-sun {
 
 .window {
   padding: clamp(48px, 7vh, 88px) 24px;
-}
-
-.window-inner {
-  width: min(100%, 860px);
-  margin-inline: auto;
 }
 
 .window .eyebrow {
@@ -962,12 +968,6 @@ html[data-theme="dark"] .theme-toggle .icon-sun {
     overflow: hidden;
   }
 
-  .demo-video {
-    display: block;
-    width: 100%;
-    height: auto;
-  }
-
   /* 桌面页脚 → 角落 */
   html.js .desktop-corner {
     position: absolute;
@@ -1101,7 +1101,7 @@ html[data-theme="dark"] .theme-toggle .icon-sun {
     -webkit-backdrop-filter: none;
     box-shadow: none;
     color: var(--text-3);
-    font-size: 9.5px;
+    font-size: 11px;
     opacity: 1;
     transform: none;
   }
