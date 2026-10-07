@@ -78,7 +78,9 @@ struct AppEntry: Identifiable {
     /// 主点击 = 窗口循环，无外部状态，由前台 app 与窗口聚焦即时推导：
     /// 前台不属于该 app → activate（系统切换最近窗口；全窗口最小化时还原一个，对齐 Dock）；
     /// 前台已属该 app → 按窗口序（即点点序）切换下一个，最小化窗口无差别还原激活，
-    /// 无聚焦窗口则从头开始；窗口知识不可用或为空时退化为 activate + reopen
+    /// 前台已属该 app → 按窗口序（即点点序）切换下一个，最小化窗口无差别还原激活，
+    /// 无聚焦窗口则从头开始；窗口知识不可用或为空时退化为 activate + reopen；
+    /// 有已知窗口时仅 reopen 抬升型 app（Finder）随激活补发 reopen
     @MainActor
     func primaryClick() {
         if let app = runningApp {
@@ -100,7 +102,9 @@ struct AppEntry: Identifiable {
                     AXReader.raise(window, app: owner)
                     return
                 }
-                // 已知有窗口时不补发 reopen，避免个别 app 借 reopen 误开新窗口
+                // 已知有窗口时不补发 reopen，避免个别 app 借 reopen 误开新窗口；
+                // reopen 抬升型 app 例外：纯激活不前置窗口，reopen 才是对齐 Dock 的抬升通道
+                activate(reopenIfNeeded: AppBehavior.resolve(for: identity).windowRaising == .viaReopen)
                 activate(reopenIfNeeded: false)
                 return
             }
@@ -111,7 +115,9 @@ struct AppEntry: Identifiable {
     }
 
     /// 点击：运行中 → 激活，无已知窗口时补发 reopen（对齐 Dock：无窗口时 app 会新开窗口）；
-    /// 固定未运行 → 启动。reopen 事件若需 TCC 授权则静默跳过（零权限原则）
+    /// 点击：运行中 → 激活，无已知窗口时补发 reopen（对齐 Dock：无窗口时 app 会新开窗口），
+    /// reopen 抬升型 app（Finder）有窗口也补发；固定未运行 → 启动。
+    /// reopen 事件若需 TCC 授权则静默跳过（零权限原则）
     func activate(reopenIfNeeded: Bool = true) {
         if let app = runningApp {
             // 垂死实例：不激活、不发事件，避免向死 pid 报 procNotFound

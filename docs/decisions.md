@@ -141,6 +141,7 @@ killall Dock
 3. **固定与运行状态解耦**：固定 Finder 无收录窗口也保留图标；未固定 Finder 仅逻辑运行时显示。默认固定列表不含 Finder。
 4. **系统进程引用用于动作**：Finder 的 `NSRunningApplication` 仍用于激活、reopen、隐藏/显示；固定且无窗口时点击现有进程并发送 reopen 打开资源管理器窗口，但不直接决定 `AppEntry.isRunning`。
 5. **无退出动作**：Finder 不提供终止，也不尝试终止后恢复桌面。
+6. **reopen 兼任窗口前置通道**：Finder 的资源管理窗口不随纯进程激活自动前置，点击已运行的 Finder 须随激活补发 reopen 才抬升窗口（Dock 同款；有窗口时 reopen 只抬升不新开）。标准 app 有已知窗口时不补发 reopen，防个别 app 误开新窗口。
 
 ## 应用右键菜单
 

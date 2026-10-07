@@ -11,8 +11,18 @@ public struct AppBehavior: Equatable, Sendable {
         case forbidden
     }
 
+    /// 点击已运行 app 时的窗口前置通道
+    public enum WindowRaising: Equatable, Sendable {
+        /// 纯进程激活即抬升最近窗口；不发 reopen，防个别 app 借 reopen 误开新窗口
+        case viaActivation
+        /// 资源管理窗口不随进程激活自动前置，须随激活补发 reopen（Dock 同款通道）
+        /// 才抬升；该类 app 有窗口时收到 reopen 只抬升不新开
+        case viaReopen
+    }
+
     public let visibility: Visibility
     public let termination: Termination
+    public let windowRaising: WindowRaising
 
     public var canTerminate: Bool { termination == .allowed }
 
@@ -32,8 +42,9 @@ public struct AppBehavior: Equatable, Sendable {
 
     public static func resolve(for identity: AppIdentity) -> Self {
         if identity == Self.finderIdentity {
-            return Self(visibility: .whenHasKnownWindows, termination: .forbidden)
+            return Self(visibility: .whenHasKnownWindows, termination: .forbidden,
+                        windowRaising: .viaReopen)
         }
-        return Self(visibility: .standard, termination: .allowed)
+        return Self(visibility: .standard, termination: .allowed, windowRaising: .viaActivation)
     }
 }
