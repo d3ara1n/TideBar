@@ -33,6 +33,7 @@ import Testing
     #expect(!behavior.isVisible(isPinned: false, processIsRunning: true, knownWindowCount: 0))
     #expect(behavior.isVisible(isPinned: false, processIsRunning: true, knownWindowCount: 1))
     #expect(!behavior.canTerminate)
+    #expect(behavior.windowRaising == .viaReopen)
 }
 
 @Test func standardAppsKeepPinnedAndRunningVisibility() {
@@ -43,4 +44,5 @@ import Testing
     #expect(behavior.isVisible(isPinned: false, processIsRunning: true, knownWindowCount: nil))
     #expect(!behavior.isVisible(isPinned: false, processIsRunning: false, knownWindowCount: 0))
     #expect(behavior.canTerminate)
+    #expect(behavior.windowRaising == .viaActivation)
 }
