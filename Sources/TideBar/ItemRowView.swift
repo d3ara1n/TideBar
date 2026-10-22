@@ -179,6 +179,10 @@ final class ItemRowView: NSView {
         buttons.first { $0.entry.id == .application(identity) }
     }
 
+    func button(forItem id: ItemID) -> ItemIconButton? {
+        buttons.first { $0.entry.id == id }
+    }
+
     func setDragContext(active: Bool, source: ItemID?) {
         guard dragActive != active || liftedSource != source else { return }
         dragActive = active

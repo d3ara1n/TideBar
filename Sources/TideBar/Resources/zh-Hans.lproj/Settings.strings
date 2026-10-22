@@ -166,3 +166,6 @@
 "developer.environment.mode" = "运行模式";
 "developer.environment.modeValue" = "开发预览（swift run）";
 "developer.environment.note" = "读取正式版汐的持久化设置；此处修改退出进程后即丢弃。";
+
+"widgets.taskTray" = "任务托盘";
+"widgets.taskTray.description" = "拖入文件，转换图片或移除隔离标记。";

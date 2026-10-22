@@ -4,6 +4,14 @@ import UniformTypeIdentifiers
 
 /// 仅文件／应用相关操作解释这些 schema；其他 item 的操作可以直接消费自己的引用。
 enum ItemReferences {
+    /// 非沙盒应用的书签只负责定位，不保存或自动消费跨进程的临时沙盒授权。
+    private static let bookmarkCreationOptions: URL.BookmarkCreationOptions = [
+        .minimalBookmark, .withoutImplicitSecurityScope
+    ]
+    private static let bookmarkResolutionOptions: URL.BookmarkResolutionOptions = [
+        .withoutUI, .withoutMounting, .withoutImplicitStartAccessing
+    ]
+
     struct ApplicationLocator: Codable, Hashable {
         let bundleIdentifier: String
         let bookmark: Data?
@@ -15,7 +23,7 @@ enum ItemReferences {
 
     static func application(_ bundleIdentifier: String, url: URL? = nil) throws -> ItemReference {
         let locator = ApplicationLocator(bundleIdentifier: bundleIdentifier,
-                                         bookmark: try url?.bookmarkData(options: .minimalBookmark))
+                                         bookmark: try url?.bookmarkData(options: bookmarkCreationOptions))
         return ItemReference(scheme: "application", payload: try JSONEncoder().encode(locator))
     }
 
@@ -33,7 +41,7 @@ enum ItemReferences {
             url = value
         case "file-bookmark":
             var stale = false
-            url = try URL(resolvingBookmarkData: reference.payload, options: [.withoutUI, .withoutMounting],
+            url = try URL(resolvingBookmarkData: reference.payload, options: bookmarkResolutionOptions,
                           relativeTo: nil, bookmarkDataIsStale: &stale)
         default:
             throw ItemFailure("item.error.reference")
@@ -45,10 +53,10 @@ enum ItemReferences {
     static func refreshBookmark(_ reference: ItemReference) throws -> ItemReference {
         guard reference.scheme == "file-bookmark" else { return reference }
         var stale = false
-        let url = try URL(resolvingBookmarkData: reference.payload, options: [.withoutUI, .withoutMounting],
+        let url = try URL(resolvingBookmarkData: reference.payload, options: bookmarkResolutionOptions,
                           relativeTo: nil, bookmarkDataIsStale: &stale)
         guard stale, FileManager.default.fileExists(atPath: url.path) else { return reference }
-        return ItemReference(scheme: "file-bookmark", payload: try url.bookmarkData(options: .minimalBookmark))
+        return ItemReference(scheme: "file-bookmark", payload: try url.bookmarkData(options: bookmarkCreationOptions))
     }
 
     static func refreshApplicationBookmark(_ reference: ItemReference) throws -> ItemReference {
@@ -56,7 +64,7 @@ enum ItemReferences {
             return reference
         }
         var stale = false
-        let url = try URL(resolvingBookmarkData: bookmark, options: [.withoutUI, .withoutMounting],
+        let url = try URL(resolvingBookmarkData: bookmark, options: bookmarkResolutionOptions,
                           relativeTo: nil, bookmarkDataIsStale: &stale)
         guard stale else { return reference }
         return try application(locator.bundleIdentifier, url: url)
@@ -67,7 +75,7 @@ enum ItemReferences {
         guard let locator = applicationLocator(reference) else { return nil }
         if let bookmark = locator.bookmark {
             var stale = false
-            if let url = try? URL(resolvingBookmarkData: bookmark, options: [.withoutUI, .withoutMounting],
+            if let url = try? URL(resolvingBookmarkData: bookmark, options: bookmarkResolutionOptions,
                                   relativeTo: nil, bookmarkDataIsStale: &stale),
                let actualID = Bundle(url: url)?.bundleIdentifier,
                AppIdentity(actualID) == AppIdentity(locator.bundleIdentifier) { return url }
@@ -94,7 +102,7 @@ enum ItemReferences {
         }
         return PinnedItemRecord(id: .resource(), kind: values.isDirectory == true ? .directory : .file,
                                 reference: ItemReference(scheme: "file-bookmark",
-                                                         payload: try url.bookmarkData(options: .minimalBookmark)),
+                                                         payload: try url.bookmarkData(options: bookmarkCreationOptions)),
                                 fallbackName: values.localizedName ?? url.lastPathComponent)
     }
 

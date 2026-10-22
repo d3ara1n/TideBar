@@ -77,8 +77,27 @@ final class TideBarController {
     private var nameBubblePanel: NameBubblePanel?
     private var nameBubbleTarget: ItemID?
     private var nameBubbleShowWork: DispatchWorkItem?
+    private var taskTrayDropPreviewActive = false
 
     func start() {
+        TaskTrayStore.shared.onRequestOpen = { [weak self] instanceID in
+            self?.showTaskTray(instanceID: instanceID)
+        }
+        dragCoordinator.onReceivePreview = { [weak self] entry, count, accepted, view in
+            guard let self else { return }
+            guard let entry, let state = self.screens.values.first(where: { $0.view === view }),
+                  let iconFrame = view.iconFrame(forItem: entry.id), self.surgePanel == nil else {
+                self.taskTrayDropPreviewActive = false
+                self.hideNameBubble()
+                return
+            }
+            self.taskTrayDropPreviewActive = true
+            let recipe = WidgetReferences.taskTrayConfiguration(for: entry.reference)?.defaultRecipe
+            let action = recipe.map { TaskTrayText.operation($0.operation) } ?? TaskTrayText.string("tray.chooseOperation")
+            let text = accepted ? TaskTrayText.string("tray.dropCount", action, count)
+                : TaskTrayText.string("tray.error.unsupported")
+            self.presentNameBubble(entry: entry, iconFrame: iconFrame, state: state, text: text)
+        }
         dragCoordinator.onBegin = { [weak self] in
             guard let self else { return }
             // 拖动是动作的起点而非目标动作；潮涌可能是落点，不因拖动开始而收场。
@@ -181,6 +200,7 @@ final class TideBarController {
     }
 
     func stop() {
+        TaskTrayStore.shared.onRequestOpen = nil
         NSLog("TideBar stopped")
         dragCoordinator.invalidate(reason: "controller-stopped")
         if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }
@@ -214,6 +234,8 @@ final class TideBarController {
     }
 
     private func handleKeyDown(_ event: NSEvent) -> Bool {
+        if let tray = (surgePanel?.contentView as? SurgeContainerView)?.body as? TaskTraySurgeView,
+           tray.isPresentingControl { return false }
         // 系统拖拽拥有 Esc；不让潮涌或键盘会话抢先吞掉取消事件。
         guard !dragCoordinator.isDragging else { return false }
         if event.keyCode == 53, surgePanel != nil {
@@ -603,10 +625,13 @@ final class TideBarController {
                 self?.setMenuSession(active)
             }
             view.onHoverItem = { [weak self, weak state] entry, iconFrame in
-                guard let self, let state else { return }
+                guard let self, let state, !self.taskTrayDropPreviewActive else { return }
                 self.updateNameBubble(entry: entry, iconFrame: iconFrame, state: state)
             }
-            view.onHoverClear = { [weak self] in self?.hideNameBubble() }
+            view.onHoverClear = { [weak self] in
+                guard let self, !self.taskTrayDropPreviewActive else { return }
+                self.hideNameBubble()
+            }
             panel.orderFrontRegardless()
             screens[displayID] = state
         }
@@ -748,6 +773,8 @@ final class TideBarController {
     ///（新按下即豁免已消费，豁免不跨按下存活）；按下在外、松手在内 = 拖入面板的
     /// 丢弃，不收场。右/中键在面板外按下即收场（打开菜单是明确的他处交互）。
     private func trackSurgePress(_ event: NSEvent) {
+        if let tray = (surgePanel?.contentView as? SurgeContainerView)?.body as? TaskTraySurgeView,
+           tray.isPresentingControl { return }
         let insideSurge = surgePanel?.frame.contains(NSEvent.mouseLocation) == true
         switch event.type {
         case .leftMouseDown:
@@ -1077,6 +1104,14 @@ final class TideBarController {
 
     // MARK: - 潮涌
 
+    private func showTaskTray(instanceID: UUID) {
+        guard let entry = items.entries.first(where: {
+            WidgetReferences.payload(for: $0.reference)?.instanceID == instanceID
+        }), let state = screens.values.first(where: { $0.screen.frame.contains(NSEvent.mouseLocation) }),
+              allowsExpansion(state), let frame = state.view.iconFrame(forItem: entry.id) else { return }
+        showSurge(entry: entry, state: state, iconFrame: frame)
+    }
+
     /// 长按面板：容器（窗口、玻璃、锚定、Esc、防抖）归控制器，内容由条目类型的
     /// 潮涌体提供；体构造可含按需计算（目录最近文件离主线程枚举）。
     private func showSurge(entry: ItemEntry, state: ScreenState, iconFrame: NSRect,
@@ -1117,6 +1152,8 @@ final class TideBarController {
         let container = SurgeContainerView(body: body)
         if live.kind == .widget {
             panel.allowsKey = true
+        }
+        if live.kind == .widget, !(body is TaskTraySurgeView) {
             container.onDragEntered = { [weak self] sender in
                 self?.dragCoordinator.widgetDropOperation(sender, target: live) ?? []
             }
@@ -1146,6 +1183,17 @@ final class TideBarController {
 
     /// 体只声明内容；拾取的容器侧效果（收起、会话收尾）与类型动作在控制器合流。
     private func wireSurgeActions(body: AnySurgeBody, entry: ItemEntry) {
+        if let tray = body as? TaskTraySurgeView {
+            tray.onControlSession = { [weak self] active in self?.setMenuSession(active) }
+            tray.onSizeChange = { [weak self, weak tray] in
+                guard let self, let tray, let panel = self.surgePanel,
+                      (panel.contentView as? SurgeContainerView)?.body === tray else { return }
+                var frame = panel.frame
+                let visible = panel.screen?.visibleFrame ?? frame
+                frame.size.height = min(tray.bodySize.height, visible.maxY - frame.minY)
+                panel.setFrame(frame, display: true)
+            }
+        }
         if let appBody = body as? AppSurgeView, let app = entry.application {
             appBody.onPick = { [weak self] window in
                 guard let self else { return }
@@ -1211,7 +1259,10 @@ final class TideBarController {
         alert.addButton(withTitle: l10n.string("widget.removeCancel", table: .runtime))
         NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        do { try PinnedItemStore.shared.remove([entry.id]) }
+        do {
+            try TaskTrayStore.shared.validateRemoval(of: entry.reference)
+            try PinnedItemStore.shared.remove([entry.id])
+        }
         catch { ItemErrors.report(error) }
     }
 
@@ -1244,6 +1295,7 @@ final class TideBarController {
         pressBeganOutsideSurge = true
         surgeExcusesNextLeftRelease = false
         guard let panel = surgePanel else { return }
+        ((panel.contentView as? SurgeContainerView)?.body as? TaskTraySurgeView)?.endControlSession()
         surgePanel = nil
         surgeItemID = nil
         surgeWindowRevision = nil
@@ -1293,10 +1345,11 @@ final class TideBarController {
         DispatchQueue.main.asyncAfter(deadline: .now() + Layout.nameBubbleShowDelay, execute: work)
     }
 
-    private func presentNameBubble(entry: ItemEntry, iconFrame: NSRect, state: ScreenState) {
+    private func presentNameBubble(entry: ItemEntry, iconFrame: NSRect, state: ScreenState, text: String? = nil) {
         hideNameBubble(animated: false)
-        let content = NameBubbleView(name: entry.name)
-        let size = NSSize(width: NameBubbleView.preferredWidth(for: entry.name),
+        let name = text ?? TaskTrayWidgetBehavior.hoverName(for: entry)
+        let content = NameBubbleView(name: name)
+        let size = NSSize(width: NameBubbleView.preferredWidth(for: name),
                           height: NameBubbleView.preferredHeight)
         let anchor = state.panel.convertToScreen(state.view.convert(iconFrame, to: nil))
         let visible = state.screen.visibleFrame

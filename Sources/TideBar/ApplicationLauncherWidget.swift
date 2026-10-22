@@ -33,11 +33,14 @@ enum WidgetReferences {
                           displayName: String? = nil,
                           applications: [ItemReference]? = nil) throws -> ItemReference {
         guard let payload = payload(for: reference) else { throw ItemFailure("item.error.reference") }
-        let old = try JSONDecoder().decode(ApplicationLauncherConfiguration.self, from: payload.configuration)
-        let nextConfiguration = ApplicationLauncherConfiguration(applications: applications ?? old.applications)
+        var configuration = payload.configuration
+        if let applications {
+            guard payload.type == .applicationLauncher else { throw ItemFailure("item.error.reference") }
+            configuration = try JSONEncoder().encode(ApplicationLauncherConfiguration(applications: applications))
+        }
         let next = WidgetPayload(instanceID: payload.instanceID, type: payload.type,
                                  displayName: displayName ?? payload.displayName,
-                                 configuration: try JSONEncoder().encode(nextConfiguration))
+                                 configuration: configuration)
         return ItemReference(scheme: "widget", payload: try JSONEncoder().encode(next))
     }
 }
@@ -123,6 +126,7 @@ extension ItemBehaviors {
         guard let payload = WidgetReferences.payload(for: record.reference) else { return nil }
         switch payload.type {
         case .applicationLauncher: return ApplicationLauncherWidgetBehavior()
+        case .taskTray: return TaskTrayWidgetBehavior()
         }
     }
 }
