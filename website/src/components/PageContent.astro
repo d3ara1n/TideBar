@@ -214,7 +214,11 @@ const titles = en
   </section>
 
   <footer class="desktop-corner">
-    <p>{en ? "TideBar · MIT License" : "汐 TideBar · MIT License"}</p>
+    <p>
+      {en ? "TideBar · MIT License" : "汐 TideBar · MIT License"}
+      {" · "}
+      <a href="https://dearain.dev">{en ? "By Dearain" : "作者 Dearain"} <span aria-hidden="true">↗</span></a>
+    </p>
     <p class="corner-hint">{en ? "Move the pointer near the line below to open this site's navigation." : "鼠标靠近下方细线可展开网站导航。"}</p>
   </footer>
 </main>

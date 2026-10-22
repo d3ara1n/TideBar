@@ -55,7 +55,7 @@ jobs:
               run: |
                   ver="${{ steps.ver.outputs.version }}"
                   curl -sL -o /tmp/sparkle.tar.xz \
-                      "https://github.com/sparkle-project/Sparkle/releases/download/2.9.6/Sparkle-2.9.6.tar.xz"
+                      "https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz"
                   tar xzf /tmp/sparkle.tar.xz -C /tmp
                   echo "$SPARKLE_EDDSA_KEY" | /tmp/bin/generate_appcast --ed-key-file - \
                       --download-url-prefix "https://github.com/d3ara1n/TideBar/releases/download/v$ver/" \
