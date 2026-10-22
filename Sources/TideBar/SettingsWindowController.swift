@@ -359,8 +359,22 @@ private final class SettingsModel: ObservableObject {
         refreshPinnedApps()
     }
 
+    func addTaskTrayWidget() {
+        do {
+            let name = L10nManager.shared.current.string("widgets.taskTray", table: .settings)
+            let reference = try WidgetReferences.taskTray(displayName: name)
+            let record = PinnedItemRecord(id: .resource(), kind: .widget,
+                                          reference: reference, fallbackName: name)
+            try PinnedItemStore.shared.replace(PinnedItemStore.shared.records + [record])
+        } catch { ItemErrors.report(error) }
+        refreshPinnedApps()
+    }
+
     func removeWidget(_ widget: PinnedItemInfo) {
-        do { try PinnedItemStore.shared.remove([widget.id]) }
+        do {
+            try TaskTrayStore.shared.validateRemoval(of: widget.record.reference)
+            try PinnedItemStore.shared.remove([widget.id])
+        }
         catch { ItemErrors.report(error) }
         refreshPinnedApps()
     }
@@ -765,7 +779,8 @@ private struct WidgetRow: View {
                 .frame(width: 28, height: 28)
             VStack(alignment: .leading, spacing: 2) {
                 Text(widget.name)
-                Text(l10n.string("widgets.applicationLauncher", table: .settings))
+                Text(l10n.string("widgets.\(WidgetReferences.payload(for: widget.record.reference)?.type.rawValue ?? "applicationLauncher")",
+                                 table: .settings))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -801,35 +816,40 @@ private struct WidgetPickerSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             Text(l10n.string("widgets.picker.title", table: .settings))
                 .font(.title3.weight(.semibold))
-            Button {
-                model.addApplicationLauncherWidget()
-                dismiss()
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "square.grid.2x2")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 36, height: 36)
-                        .background(Color.accentColor.opacity(0.12),
-                                    in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(l10n.string("widgets.applicationLauncher", table: .settings))
-                        Text(l10n.string("widgets.applicationLauncher.description", table: .settings))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+            ForEach(WidgetType.allCases, id: \.self) { type in
+                Button {
+                    switch type {
+                    case .applicationLauncher: model.addApplicationLauncherWidget()
+                    case .taskTray: model.addTaskTrayWidget()
                     }
-                    Spacer()
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.tertiary)
+                    dismiss()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: type == .applicationLauncher ? "square.grid.2x2" : "tray.and.arrow.down.fill")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(Color.accentColor)
+                            .frame(width: 36, height: 36)
+                            .background(Color.accentColor.opacity(0.12),
+                                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(l10n.string("widgets.\(type.rawValue)", table: .settings))
+                            Text(l10n.string("widgets.\(type.rawValue).description", table: .settings))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background(.quaternary.opacity(0.5),
+                                in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .background(.quaternary.opacity(0.5),
-                            in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             HStack {
                 Spacer()
                 Button(l10n.string("action.cancel", table: .settings)) { dismiss() }
@@ -840,7 +860,7 @@ private struct WidgetPickerSheet: View {
                 .font(.callout).foregroundStyle(.secondary)
         }
         .padding(20)
-        .frame(width: 360, height: 220)
+        .frame(width: 380, height: 310)
     }
 }
 

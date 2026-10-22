@@ -3,6 +3,7 @@ import Foundation
 /// TideBar 小工具的具体类型键；TideBar 只负责保存和路由，不解释实例配置。
 public enum WidgetType: String, Codable, CaseIterable, Sendable {
     case applicationLauncher
+    case taskTray
 }
 
 /// 小工具实例的通用外壳。configuration 由具体 widget 类型解释。
@@ -38,5 +39,28 @@ public struct ApplicationLauncherConfiguration: Codable, Hashable, Sendable {
 
     public init(applications: [ItemReference] = []) {
         self.applications = applications
+    }
+}
+
+/// 操作与参数在投递时拍快照；修改默认值不会改变已入队任务。
+public enum TaskTrayOperation: String, Codable, CaseIterable, Sendable {
+    case jpeg, png, removeQuarantine
+}
+
+public struct TaskTrayRecipe: Codable, Hashable, Sendable {
+    public var operation: TaskTrayOperation
+    public var jpegQuality: Int
+
+    public init(operation: TaskTrayOperation, jpegQuality: Int = 90) {
+        self.operation = operation
+        self.jpegQuality = jpegQuality
+    }
+}
+
+public struct TaskTrayConfiguration: Codable, Hashable, Sendable {
+    public var defaultRecipe: TaskTrayRecipe?
+
+    public init(defaultRecipe: TaskTrayRecipe? = nil) {
+        self.defaultRecipe = defaultRecipe
     }
 }

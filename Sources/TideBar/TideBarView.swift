@@ -599,6 +599,10 @@ final class TideBarView: NSView {
         iconRow.button(for: identity)?.frame
     }
 
+    func iconFrame(forItem id: ItemID) -> NSRect? {
+        iconRow.button(forItem: id)?.frame
+    }
+
     /// 立即回到收起终态（全屏抑制用）
     private func hardReset() {
         silhouette.removeAllAnimations()

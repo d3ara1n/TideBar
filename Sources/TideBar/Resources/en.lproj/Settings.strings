@@ -166,3 +166,6 @@
 "developer.environment.mode" = "Run mode";
 "developer.environment.modeValue" = "Development preview (swift run)";
 "developer.environment.note" = "Reads persisted settings from the release TideBar.app; changes made here are discarded when the process exits.";
+
+"widgets.taskTray" = "Task Tray";
+"widgets.taskTray.description" = "Drop files to convert images or remove quarantine.";

@@ -375,6 +375,7 @@ final class SurgeContainerView: NSView {
     override func layout() {
         super.layout()
         glass?.frame = bounds
+        body.frame = bounds
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {

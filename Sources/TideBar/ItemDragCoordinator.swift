@@ -8,6 +8,7 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
     var onBegin: (() -> Void)?
     var onMovement: (() -> Void)?
     var onSessionChange: (() -> Void)?
+    var onReceivePreview: ((ItemEntry?, Int, Bool, TideBarView) -> Void)?
     var allowsRemovalAt: ((NSPoint) -> Bool)?
     private let registry: ItemRegistry
 
@@ -137,6 +138,13 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
             previewTargetReference = latestTarget
             previewSourceOperations = sender.draggingSourceOperationMask
             preview = proposal(for: intent, allowed: sender.draggingSourceOperationMask)
+            if case .deliver(let references, let id) = intent,
+               let entry = registry.entries.first(where: { $0.id == id }),
+               WidgetReferences.payload(for: entry.reference)?.type == .taskTray {
+                onReceivePreview?(entry, references.count, preview != nil, view)
+            } else {
+                onReceivePreview?(nil, 0, false, view)
+            }
         }
         view.setDropFeedback(intent, accepted: preview != nil)
         guard let preview, sender.draggingSourceOperationMask.contains(preview.operation) else { return [] }
@@ -170,6 +178,7 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
     }
 
     func exit(_ view: TideBarView) {
+        onReceivePreview?(nil, 0, false, view)
         view.setDropFeedback(nil)
         guard targetView === view else { return }
         targetView = nil
@@ -243,7 +252,8 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
               let payload = payload(for: sender) else { return nil }
         let intent = routedIntent(payload, at: view.dropLocation(for: sender))
         // 模型或几何变化不能把用户看到的意图替换成另一个操作。
-        guard intent == previewIntent, preview != nil else { return nil }
+        guard intent == previewIntent, preview != nil,
+              targetReference(for: intent) == previewTargetReference else { return nil }
         return proposal(for: intent, allowed: sender.draggingSourceOperationMask)
     }
 
@@ -302,7 +312,8 @@ final class ItemDragCoordinator: NSObject, NSDraggingSource {
            let source = registry.entries.first(where: { $0.id == sourceID }),
            source.kind == .application,
            let target = registry.entries.first(where: { $0.id == targetID }),
-           target.kind == .widget {
+           target.kind == .widget,
+           WidgetReferences.payload(for: target.reference)?.type == .applicationLauncher {
             return .deliverItem(sourceID, to: targetID)
         }
         return ItemDropIntent.route(payload, at: location)
