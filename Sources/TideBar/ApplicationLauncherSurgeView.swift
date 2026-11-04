@@ -8,7 +8,7 @@ import TideBarCore
 final class ApplicationLauncherSurgeView: NSView, SurgeBody, NSDraggingSource, NSTextFieldDelegate {
     static let internalType = NSPasteboard.PasteboardType("dev.dearain.TideBar.application-launcher-item")
 
-    var onOpen: ((URL) -> Void)?
+    var onLaunchesFinished: (() -> Void)?
     var onApplicationsChange: (([ItemReference]) -> Void)?
     var onExternalDropOperation: ((any NSDraggingInfo) -> NSDragOperation)?
     var onPerformExternalDrop: ((any NSDraggingInfo) -> Bool)?
@@ -26,6 +26,11 @@ final class ApplicationLauncherSurgeView: NSView, SurgeBody, NSDraggingSource, N
     private var dragSourceIndex: Int?
     private var dragCommitted = false
     private var dropIndex: Int?
+    private var pendingApplications: Set<ApplicationItemIdentity> = []
+    private var openedApplications: Set<ApplicationItemIdentity> = []
+    private var launchObserver: NSObjectProtocol?
+    private var autoDismissWork: DispatchWorkItem?
+    private var launchFeedbackEnded = false
 
     private var onGlass: Bool { BarBackgroundFactory.usesGlass }
     private var gridHeight: CGFloat { CGFloat(Layout.launcherVisibleRows) * Layout.launcherCellHeight }
@@ -48,6 +53,15 @@ final class ApplicationLauncherSurgeView: NSView, SurgeBody, NSDraggingSource, N
         addSubview(emptyStateView)
         reloadItems()
         frame = NSRect(origin: .zero, size: bodySize)
+        let bridge = MainThreadBridge { [weak self] in self?.refreshLaunchFeedback() }
+        launchObserver = NotificationCenter.default.addObserver(
+            forName: ApplicationLaunchStore.didChange, object: nil, queue: .main
+        ) { _ in bridge() }
+    }
+
+    isolated deinit {
+        if let launchObserver { NotificationCenter.default.removeObserver(launchObserver) }
+        autoDismissWork?.cancel()
     }
 
     @available(*, unavailable)
@@ -136,9 +150,11 @@ final class ApplicationLauncherSurgeView: NSView, SurgeBody, NSDraggingSource, N
                 ?? NSImage(systemSymbolName: "questionmark.app", accessibilityDescription: name)
                 ?? NSImage()
             item.configure(name: name, icon: icon, unavailable: url == nil)
+            item.applicationURL = url
+            item.setLaunching(url.map { ApplicationLaunchStore.shared.isLaunching($0) } ?? false)
             item.onClick = { [weak self] in
                 guard let self, let url = ItemReferences.applicationURL(reference) else { return }
-                self.onOpen?(url)
+                self.openApplication(url)
             }
             item.onRemove = { [weak self] in self?.remove(reference) }
             item.onBeginDrag = { [weak self, weak item] event in
@@ -150,6 +166,60 @@ final class ApplicationLauncherSurgeView: NSView, SurgeBody, NSDraggingSource, N
         }
         emptyStateView.isHidden = !applicationReferences.isEmpty
         needsLayout = true
+    }
+
+    private func openApplication(_ url: URL) {
+        guard !launchFeedbackEnded else { return }
+        let identity = ApplicationLaunchStore.identity(for: url)
+        guard pendingApplications.insert(identity).inserted else { return }
+        openedApplications.insert(identity)
+        autoDismissWork?.cancel()
+        autoDismissWork = nil
+        ApplicationLaunchStore.shared.open(url) { [weak self] in
+            guard let self, !self.launchFeedbackEnded,
+                  self.pendingApplications.remove(identity) != nil else { return }
+            if self.pendingApplications.isEmpty { self.dismissWhenIdle() }
+        }
+    }
+
+    private func refreshLaunchFeedback() {
+        for item in itemViews {
+            item.setLaunching(!launchFeedbackEnded && (item.applicationURL.map {
+                ApplicationLaunchStore.shared.isLaunching($0)
+            } ?? false))
+        }
+    }
+
+    /// 本会话启动的应用自动激活时，其他在途请求仍需要收藏夹的 Esc 入口。
+    func keepsKeyboardFocus(afterActivationOf url: URL) -> Bool {
+        let identity = ApplicationLaunchStore.identity(for: url)
+        return !launchFeedbackEnded && openedApplications.contains(identity)
+            && pendingApplications.contains(where: { $0 != identity })
+    }
+
+    /// 自动收场不打断下一次点击、菜单、拖拽或改名；新请求会撤销待收场。
+    private func dismissWhenIdle() {
+        guard !launchFeedbackEnded, pendingApplications.isEmpty else { return }
+        if editingTitle || dragSourceIndex != nil || window?.ignoresMouseEvents == true
+            || NSEvent.pressedMouseButtons != 0 {
+            let work = DispatchWorkItem { [weak self] in
+                MainThreadBridge { [weak self] in self?.dismissWhenIdle() }.call()
+            }
+            autoDismissWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: work)
+        } else {
+            onLaunchesFinished?()
+        }
+    }
+
+    /// 只结束当前面板的展示与收场回调；已交给系统的启动继续执行。
+    func endLaunchFeedback() {
+        launchFeedbackEnded = true
+        pendingApplications.removeAll()
+        openedApplications.removeAll()
+        autoDismissWork?.cancel()
+        autoDismissWork = nil
+        refreshLaunchFeedback()
     }
 
     override func layout() {
@@ -248,12 +318,17 @@ final class ApplicationLauncherSurgeView: NSView, SurgeBody, NSDraggingSource, N
     }
 
     func update(reference: ItemReference) {
-        applicationReferences = WidgetReferences.applicationLauncherConfiguration(for: reference)?.applications ?? []
+        let applications = WidgetReferences.applicationLauncherConfiguration(for: reference)?.applications ?? []
         let payload = WidgetReferences.payload(for: reference)
-        currentDisplayName = payload?.displayName ?? currentDisplayName
-        titleField.stringValue = currentDisplayName
-        reloadItems()
-        needsLayout = true
+        let name = payload?.displayName ?? currentDisplayName
+        if name != currentDisplayName {
+            currentDisplayName = name
+            if !editingTitle { titleField.stringValue = name }
+        }
+        if applicationReferences != applications {
+            applicationReferences = applications
+            reloadItems()
+        }
     }
 
     private func remove(_ reference: ItemReference) {
@@ -458,7 +533,8 @@ private final class LauncherEmptyStateView: NSView {
 /// 收藏夹网格单元：图标 + 名称；高亮绘制与 SurgeRowView 同式（圆角行底、玻璃/回退双色路）。
 @MainActor
 private final class LauncherItemView: NSView {
-    private let imageView = NSImageView()
+    private let imageView = ApplicationIconView(icon: NSImage(), side: Layout.launcherIconSide)
+    var applicationURL: URL?
     private let label = NSTextField(labelWithString: "")
     private var hovering = false
     private var unavailable = false
@@ -473,7 +549,6 @@ private final class LauncherItemView: NSView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
-        imageView.imageScaling = .scaleProportionallyUpOrDown
         label.alignment = .center
         label.lineBreakMode = .byTruncatingTail
         label.font = NSFont.systemFont(ofSize: 11)
@@ -488,11 +563,17 @@ private final class LauncherItemView: NSView {
     func configure(name: String, icon: NSImage, unavailable: Bool) {
         label.stringValue = name
         self.unavailable = unavailable
-        imageView.image = icon
+        imageView.icon = icon
         // 失效条目的 template 回退符号需显式着色随主题，否则暗色下几乎不可见
-        imageView.contentTintColor = unavailable ? NSColor.labelColor.withAlphaComponent(0.45) : nil
+        if unavailable, let symbol = icon.withSymbolConfiguration(.init(paletteColors: [.secondaryLabelColor])) {
+            imageView.icon = symbol
+        }
         alphaValue = unavailable ? 0.55 : 1
         refreshColors()
+    }
+
+    func setLaunching(_ launching: Bool) {
+        imageView.setLaunching(launching)
     }
 
     private func refreshColors() {

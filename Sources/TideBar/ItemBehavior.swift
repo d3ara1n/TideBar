@@ -110,7 +110,7 @@ private struct ApplicationItemBehavior: ItemBehaviorProviding {
     }
     func open(_ reference: ItemReference) async throws {
         guard let url = ItemReferences.applicationURL(reference) else { throw ItemFailure("item.error.missing") }
-        try await NSWorkspace.shared.openApplication(at: url, configuration: .init())
+        ApplicationLaunchStore.shared.open(url)
     }
     func reveal(_ reference: ItemReference) throws {
         guard let url = ItemReferences.applicationURL(reference) else { throw ItemFailure("item.error.missing") }

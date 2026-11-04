@@ -178,8 +178,15 @@ final class TideBarController {
         })
         let activationBridge = MainThreadBridge { [weak self] in self?.behaviorDidChange() }
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { _ in
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] note in
+            let url = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleURL
             activationBridge()
+            MainThreadBridge { [weak self] in
+                guard let self, let url, let panel = self.surgePanel,
+                      let launcher = (panel.contentView as? SurgeContainerView)?.body as? ApplicationLauncherSurgeView,
+                      launcher.keepsKeyboardFocus(afterActivationOf: url) else { return }
+                panel.makeKey()
+            }.call()
         })
 
         let permissionBridge = MainThreadBridge { [weak self] in self?.axPermissionRestored() }
@@ -1006,6 +1013,7 @@ final class TideBarController {
     // MARK: - 数据与屏幕变更
 
     private func appsDidChange() {
+        ApplicationLaunchStore.shared.observeWindows(in: registry.entries)
         // 涟漪跟随触发者：只有触发过脉冲的 app 还挂着角标才继续；
         // 其他 app 的常驻角标不挟持本次提醒（泛化原「全部角标消失」条件）
         if !rippleSources.isEmpty {
@@ -1227,10 +1235,10 @@ final class TideBarController {
             launcherBody.onPerformExternalDrop = { [weak self] sender in
                 self?.dragCoordinator.performWidgetDrop(sender, target: entry) ?? false
             }
-            launcherBody.onOpen = { [weak self] url in
-                guard let self else { return }
-                _ = NSWorkspace.shared.open(url)
-                self.dismissSurge(animated: false)
+            launcherBody.onLaunchesFinished = { [weak self, weak launcherBody] in
+                guard let self, let launcherBody,
+                      (self.surgePanel?.contentView as? SurgeContainerView)?.body === launcherBody else { return }
+                self.dismissSurge(animated: true)
             }
             launcherBody.onRename = { [weak self] name in
                 guard let self else { return }
@@ -1296,6 +1304,7 @@ final class TideBarController {
         surgeExcusesNextLeftRelease = false
         guard let panel = surgePanel else { return }
         ((panel.contentView as? SurgeContainerView)?.body as? TaskTraySurgeView)?.endControlSession()
+        ((panel.contentView as? SurgeContainerView)?.body as? ApplicationLauncherSurgeView)?.endLaunchFeedback()
         surgePanel = nil
         surgeItemID = nil
         surgeWindowRevision = nil
