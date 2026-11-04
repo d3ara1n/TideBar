@@ -83,6 +83,7 @@ struct AppEntry: Identifiable {
     /// 有已知窗口时仅 reopen 抬升型 app（Finder）随激活补发 reopen
     @MainActor
     func primaryClick() {
+        if let applicationURL, ApplicationLaunchStore.shared.isLaunching(applicationURL) { return }
         if let app = runningApp {
             // 垂死实例（挂起期间进程已死、刷新未及消费）：不动作，等对账清场
             guard app.isProcessAlive else { return }
@@ -118,7 +119,9 @@ struct AppEntry: Identifiable {
     /// 点击：运行中 → 激活，无已知窗口时补发 reopen（对齐 Dock：无窗口时 app 会新开窗口），
     /// reopen 抬升型 app（Finder）有窗口也补发；固定未运行 → 启动。
     /// reopen 事件若需 TCC 授权则静默跳过（零权限原则）
+    @MainActor
     func activate(reopenIfNeeded: Bool = true) {
+        if let applicationURL, ApplicationLaunchStore.shared.isLaunching(applicationURL) { return }
         if let app = runningApp {
             // 垂死实例：不激活、不发事件，避免向死 pid 报 procNotFound
             guard app.isProcessAlive else { return }
@@ -129,11 +132,9 @@ struct AppEntry: Identifiable {
         }
     }
 
+    @MainActor
     private func launch(_ url: URL) {
-        Task { @MainActor in
-            do { try await NSWorkspace.shared.openApplication(at: url, configuration: .init()) }
-            catch { ItemErrors.report(error) }
-        }
+        ApplicationLaunchStore.shared.open(url)
     }
 
     private func sendReopen(to app: NSRunningApplication) {

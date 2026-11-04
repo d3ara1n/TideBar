@@ -144,8 +144,8 @@ final class ItemRowView: NSView {
     private func makeButton(_ app: ItemEntry) -> ItemIconButton {
         let button = ItemIconButton(entry: app)
         button.onBeginDrag = onBeginDrag
-        button.onClick = { [weak self] entry in
-            guard let self else { return }
+        button.onClick = { [weak self, weak button] entry in
+            guard let self, let button else { return }
             self.onUserLaunch?()
             if entry.kind == .widget {
                 self.onSurge?(entry, button.frame)

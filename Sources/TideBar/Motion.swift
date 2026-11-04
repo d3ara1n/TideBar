@@ -84,6 +84,13 @@ enum Motion {
     static var quitRequestFadeDuration: TimeInterval { time(0.18) }
     static let quitRequestScale: CGFloat = 0.93
 
+    // MARK: 应用启动（等待期间的图标脉冲与发散残影）
+
+    static var launchPulseDuration: TimeInterval { time(0.8) }
+    static let launchPulseScale: CGFloat = 1.13
+    static let launchGhostScale: CGFloat = 1.45
+    static let launchGhostOpacity: Float = 0.22
+
     // MARK: 通知角标（图标右上角）
 
     /// 出现/变化弹性轻弹（与状态点数字同律）

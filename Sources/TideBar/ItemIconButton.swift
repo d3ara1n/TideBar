@@ -8,10 +8,9 @@ private class PassthroughView: NSView {
 }
 
 @MainActor
-private final class IconArtworkView: NSView {
-    var icon: NSImage {
+private final class IconArtworkView: ApplicationIconView {
+    override var icon: NSImage {
         didSet {
-            needsDisplay = true
             effect.update(icon: icon, state: dragState)
         }
     }
@@ -19,10 +18,8 @@ private final class IconArtworkView: NSView {
     private var dragState: ItemDragIconState = .idle
 
     init(icon: NSImage) {
-        self.icon = icon
-        super.init(frame: .zero)
-        wantsLayer = true
-        layer?.addSublayer(effect.layer)
+        super.init(icon: icon, side: Layout.iconSize)
+        imageLayer.addSublayer(effect.layer)
     }
 
     func setDragState(_ state: ItemDragIconState) {
@@ -39,26 +36,16 @@ private final class IconArtworkView: NSView {
     }
 
     override func layout() {
+        iconSide = Layout.iconSize
         super.layout()
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        effect.layer.frame = NSRect(x: (bounds.width - Layout.iconSize) / 2,
-                                   y: (bounds.height - Layout.iconSize) / 2,
-                                   width: Layout.iconSize, height: Layout.iconSize)
+        effect.layer.frame = imageLayer.bounds
         CATransaction.commit()
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not supported") }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let side = Layout.iconSize
-        let rect = NSRect(x: (bounds.width - side) / 2,
-                          y: (bounds.height - side) / 2,
-                          width: side,
-                          height: side)
-        icon.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
-    }
 }
 
 @MainActor
@@ -238,6 +225,8 @@ final class ItemIconButton: NSView {
     private var dragAttempted = false
     /// 菜单追踪期间的靶对象持有（NSMenuItem 不保留 target）
     private var menuActions: [MenuAction] = []
+    private var launchObserver: NSObjectProtocol?
+    private var active = true
 
     init(entry: ItemEntry) {
         self.entry = entry
@@ -263,6 +252,15 @@ final class ItemIconButton: NSView {
         addSubview(statusIndicatorView)
         addSubview(motionPivot)
         haloView.layer?.opacity = 0
+        let bridge = MainThreadBridge { [weak self] in self?.refreshLaunchFeedback() }
+        launchObserver = NotificationCenter.default.addObserver(
+            forName: ApplicationLaunchStore.didChange, object: nil, queue: .main
+        ) { _ in bridge() }
+        refreshLaunchFeedback()
+    }
+
+    isolated deinit {
+        if let launchObserver { NotificationCenter.default.removeObserver(launchObserver) }
     }
 
     @available(*, unavailable)
@@ -280,6 +278,7 @@ final class ItemIconButton: NSView {
         customArtworkView?.update(entry: newEntry)
         statusIndicatorView.update(entry: newEntry.application, animated: statusChanged)
         if badgeChanged { badgeView.update(newEntry.badge, animated: true) }
+        refreshLaunchFeedback()
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -299,7 +298,15 @@ final class ItemIconButton: NSView {
     }
 
     func setActive(_ active: Bool) {
+        self.active = active
         customArtworkView?.setActive(active)
+        refreshLaunchFeedback()
+    }
+
+    private func refreshLaunchFeedback() {
+        let url = entry.application?.applicationURL
+        artworkView.setActive(active && !dragState.suppressesHover)
+        artworkView.setLaunching(url.map { ApplicationLaunchStore.shared.isLaunching($0) } ?? false)
     }
 
     func refreshLayout() {
@@ -308,6 +315,7 @@ final class ItemIconButton: NSView {
 
     func refreshAppearance() {
         haloView.refreshAppearance()
+        refreshLaunchFeedback()
     }
 
     override func layout() {
@@ -340,6 +348,7 @@ final class ItemIconButton: NSView {
             pressed = false
         }
         artworkView.setDragState(state)
+        refreshLaunchFeedback()
         animateVisualState(.exit)
         customArtworkView?.setDragFeedback(state)
     }
