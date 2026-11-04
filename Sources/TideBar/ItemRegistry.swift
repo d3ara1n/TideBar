@@ -64,13 +64,11 @@ final class ItemRegistry {
     var onChange: (() -> Void)?
     private var observer: NSObjectProtocol?
     private var presentations: [PinnedItemRecord: ItemPresentation] = [:]
+    /// 本次会话的展示顺序；数据刷新只对账成员，不重新应用持久化顺序。
     private var sessionOrder: [ItemID] = []
-    private var usesSessionOrder = false
     private var isRefreshing = false
     /// 临时项移除仅隐藏当前运行实例；新运行实例或重启 TideBar 后自然恢复。
     private var dismissed: [ApplicationItemIdentity: Set<pid_t>] = [:]
-    private var lastPinnedOrder: [ItemID] = []
-    private var committingOrder = false
 
     init(store: PinnedItemStore = .shared) {
         self.store = store
@@ -117,11 +115,6 @@ final class ItemRegistry {
     private func rebuild() {
         let records = store.records
         let pinnedIDs = records.map(\.id)
-        if pinnedIDs != lastPinnedOrder, !committingOrder {
-            sessionOrder = []
-            usesSessionOrder = false
-        }
-        lastPinnedOrder = pinnedIDs
         let apps = Dictionary(uniqueKeysWithValues: applications.entries.map { (ItemID.application($0.id), $0) })
         var result: [ItemEntry] = []
         for record in records {
@@ -148,10 +141,7 @@ final class ItemRegistry {
             }
             result.append(entry(for: app, record: nil))
         }
-        let available = Set(result.map(\.id))
-        if !usesSessionOrder { sessionOrder = result.map(\.id) }
-        sessionOrder = sessionOrder.filter { available.contains($0) }
-        sessionOrder += result.map(\.id).filter { !sessionOrder.contains($0) }
+        sessionOrder = ItemOrdering.reconciling(sessionOrder, with: result.map(\.id))
         let ranks = Dictionary(uniqueKeysWithValues: sessionOrder.enumerated().map { ($0.element, $0.offset) })
         result.sort { ranks[$0.id, default: 0] < ranks[$1.id, default: 0] }
         let changed = entries.count != result.count || !zip(entries, result).allSatisfy { $0.sameContent(as: $1) }
@@ -176,7 +166,8 @@ final class ItemRegistry {
                 let record = PinnedItemRecord(id: id, kind: .application,
                                               reference: try ItemReferences.application(bundleID, url: app.applicationURL),
                                               fallbackName: entry.name)
-                try store.replace(store.records + [record])
+                let byID = Dictionary(uniqueKeysWithValues: (store.records + [record]).map { ($0.id, $0) })
+                try store.replace(entries.compactMap { byID[$0.id] })
             } else if !pinned {
                 try store.remove([id])
             }
@@ -198,14 +189,13 @@ final class ItemRegistry {
             throw ItemFailure("item.error.changed")
         }
         let oldOrder = sessionOrder
-        let wasUsingSessionOrder = usesSessionOrder
         sessionOrder = order
-        usesSessionOrder = true
         let pinnedByID = Dictionary(uniqueKeysWithValues: store.records.map { ($0.id, $0) })
-        committingOrder = true
-        defer { committingOrder = false }
-        do { try store.replace(order.compactMap { pinnedByID[$0] }) }
-        catch { sessionOrder = oldOrder; usesSessionOrder = wasUsingSessionOrder; throw error }
+        // 只有固定项之间的相对次序改变才写回；临时项重排不能覆盖设置中待下次启动的顺序。
+        if oldOrder.filter({ pinnedByID[$0] != nil }) != order.filter({ pinnedByID[$0] != nil }) {
+            do { try store.replace(order.compactMap { pinnedByID[$0] }) }
+            catch { sessionOrder = oldOrder; throw error }
+        }
         NSLog("TideBar item reorder committed: %@ before %@", id.rawValue,
               anchor?.rawValue ?? "<end>")
         rebuild()
@@ -222,13 +212,9 @@ final class ItemRegistry {
         guard let order = ItemOrdering.moving(inserted, before: anchor, in: all) else { throw ItemFailure("item.error.changed") }
         let byID = Dictionary(uniqueKeysWithValues: records.map { ($0.id, $0) })
         let oldOrder = sessionOrder
-        let wasUsingSessionOrder = usesSessionOrder
         sessionOrder = order
-        usesSessionOrder = true
-        committingOrder = true
-        defer { committingOrder = false }
         do { try store.replace(order.compactMap { byID[$0] }) }
-        catch { sessionOrder = oldOrder; usesSessionOrder = wasUsingSessionOrder; throw error }
+        catch { sessionOrder = oldOrder; throw error }
         rebuild()
     }
 }

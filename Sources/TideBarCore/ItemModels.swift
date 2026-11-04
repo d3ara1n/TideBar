@@ -92,6 +92,14 @@ public enum ItemDropIntent: Equatable, Sendable {
 
 /// 按身份移动，不使用可能因窗口／应用变化而失效的下标；不存在的锚点拒绝提交。
 public enum ItemOrdering {
+    /// 启动时沿用输入顺序；会话中保留幸存项的相对顺序，新出现的条目追加到末尾。
+    public static func reconciling(_ order: [ItemID], with available: [ItemID]) -> [ItemID] {
+        let availableIDs = Set(available)
+        let surviving = order.filter { availableIDs.contains($0) }
+        var seen = Set(surviving)
+        return surviving + available.filter { seen.insert($0).inserted }
+    }
+
     public static func moving(_ moving: [ItemID], before anchor: ItemID?, in order: [ItemID]) -> [ItemID]? {
         let ids = Set(moving)
         guard ids.count == moving.count, ids.isSubset(of: Set(order)) else { return nil }
@@ -106,15 +114,5 @@ public enum ItemOrdering {
         let index = insertionAnchor.flatMap { result.firstIndex(of: $0) } ?? result.endIndex
         result.insert(contentsOf: moving, at: index)
         return result
-    }
-}
-
-/// 固定项的重排锚点不越过临时区：临时项恒居最右，
-/// 固定项落到临时区（含越过全部）时收敛到临时区首项之前（即固定项末位）。
-public enum ItemReorderBoundary {
-    public static func clampPinnedAnchor(_ anchor: ItemID?, temps: [ItemID]) -> ItemID? {
-        guard let first = temps.first else { return anchor }
-        guard let anchor else { return first }
-        return anchor == first || !temps.contains(anchor) ? anchor : first
     }
 }

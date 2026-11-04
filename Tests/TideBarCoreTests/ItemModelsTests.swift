@@ -58,18 +58,26 @@ private let itemC = ItemID(rawValue: "resource:C")
                                                               outsideBar: true, leftButtonStillDown: true))
 }
 
-/// 固定项锚点收敛：临时区恒居最右，固定项落到临时区（含越过全部）收敛到临时首项之前。
-@Test func pinnedAnchorClampsToTempBoundary() {
-    let pinnedA = ItemID.resource(), pinnedB = ItemID.resource()
-    let temp1 = ItemID.resource(), temp2 = ItemID.resource()
-    // 越过全部（nil）→ 临时区首项之前
-    #expect(ItemReorderBoundary.clampPinnedAnchor(nil, temps: [temp1, temp2]) == temp1)
-    // 指向临时区内后续项 → 收敛临时首项
-    #expect(ItemReorderBoundary.clampPinnedAnchor(temp2, temps: [temp1, temp2]) == temp1)
-    // 恰为临时首项（固定项末位边界）→ 保持
-    #expect(ItemReorderBoundary.clampPinnedAnchor(temp1, temps: [temp1, temp2]) == temp1)
-    // 指向固定项 → 不动
-    #expect(ItemReorderBoundary.clampPinnedAnchor(pinnedB, temps: [temp1]) == pinnedB)
-    // 无临时项 → 自由（nil 仍为末尾）
-    #expect(ItemReorderBoundary.clampPinnedAnchor(nil, temps: []) == nil)
+@Test func refreshKeepsMixedOrderWhenPinnedItemIsRemoved() {
+    let pinnedA = ItemID(rawValue: "pinned:A"), pinnedB = ItemID(rawValue: "pinned:B")
+    let tempX = ItemID(rawValue: "temporary:X"), tempY = ItemID(rawValue: "temporary:Y")
+    let mixed = [pinnedA, tempY, pinnedB, tempX]
+    #expect(ItemOrdering.reconciling(mixed, with: [pinnedA, pinnedB, tempX, tempY]) == mixed)
+    #expect(ItemOrdering.reconciling(mixed, with: [pinnedA, tempX, tempY]) == [pinnedA, tempY, tempX])
+}
+
+@Test func storedReorderAppliesOnlyToNewSession() {
+    let session = [itemA, itemC, itemB]
+    let stored = [itemB, itemA, itemC]
+    #expect(ItemOrdering.reconciling(session, with: stored) == session)
+    #expect(ItemOrdering.reconciling([], with: stored) == stored)
+}
+
+@Test func newlyVisibleItemsAppendAndDepartedItemsLoseTheirPosition() {
+    let newcomer = ItemID(rawValue: "newcomer")
+    let session = [itemC, itemA, itemB]
+    let afterExit = ItemOrdering.reconciling(session, with: [itemA, itemB, newcomer])
+    #expect(afterExit == [itemA, itemB, newcomer])
+    #expect(ItemOrdering.reconciling(afterExit, with: [itemC, itemA, itemB, newcomer])
+            == [itemA, itemB, newcomer, itemC])
 }
