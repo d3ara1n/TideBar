@@ -60,5 +60,5 @@ macOS Dock 替代品：平时缩成屏幕底部一条细线，鼠标靠近时如
 - **开发文档随开发者语言，用中文**：docs/、plans/、代码注释、提交信息主题——它们是开发者写给自己看的；词汇表同时记录英文名称。
 - 运行时日志（NSLog）用正式英文，保证可 grep。
 - 提交信息用 Conventional Commits 格式（type 英文小写：feat/fix/docs/chore/refactor…，主题中文）。
-- AI 辅助的提交加 `Co-Authored-By: <模型名> <邮箱>` trailer（PR 流下写在 PR 描述，随 squash 进入合并提交 body）；模型身份查 `PI_*` 环境变量，无对应邮箱用 `noreply@pi.dev`，不得伪造 provider 域名。
+- AI 辅助的提交加 `Co-Authored-By: <模型名> <邮箱>` trailer（PR 流下写在 PR 描述，随 squash 进入合并提交 body）；模型身份查 `PI_*` 环境变量，每次提交前读取，不沿用上一个提交的署名；只保留 provider 发布的模型 ID，去掉渠道标记（如 `[Kiro]`）和推理档位等变体后缀（如 `-thinking`），例如 `[Kiro]claude-opus-5-5-thinking` 写作 `claude-opus-5-5`；无对应邮箱用 `noreply@pi.dev`，不得伪造 provider 域名。
 - 代码与文档不留「原来是 A 改成 B」的历史痕迹，追溯看 git log。
