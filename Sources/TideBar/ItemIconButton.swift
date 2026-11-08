@@ -11,7 +11,7 @@ private class PassthroughView: NSView {
 private final class IconArtworkView: ApplicationIconView {
     override var icon: NSImage {
         didSet {
-            effect.update(icon: icon, state: dragState)
+            effect.update(icon: icon, state: dragState, scale: window?.backingScaleFactor ?? 2)
         }
     }
     private let effect = ItemDragIconEffect()
@@ -25,7 +25,7 @@ private final class IconArtworkView: ApplicationIconView {
     func setDragState(_ state: ItemDragIconState) {
         let previous = dragState
         dragState = state
-        effect.update(icon: icon, state: state)
+        effect.update(icon: icon, state: state, scale: window?.backingScaleFactor ?? 2)
         guard let layer = layer else { return }
         // 进入拒绝态的边沿弹一次（悬停滑过多个拒绝目标逐个触发；出拒绝态不弹）
         if state == .rejected, previous != .rejected {
@@ -42,6 +42,7 @@ private final class IconArtworkView: ApplicationIconView {
         CATransaction.setDisableActions(true)
         effect.layer.frame = imageLayer.bounds
         CATransaction.commit()
+        effect.update(icon: icon, state: dragState, scale: window?.backingScaleFactor ?? 2)
     }
 
     @available(*, unavailable)
@@ -185,7 +186,8 @@ private final class BadgeOverlayView: PassthroughView {
 final class ItemIconButton: NSView {
     private(set) var entry: ItemEntry
     var preferredWidth: CGFloat { customArtworkView?.preferredWidth ?? entry.preferredBarWidth ?? Layout.iconSlot }
-    var onClick: ((ItemEntry) -> Void)?
+    /// 发送者由调用现场传入，持有回调的按钮无需被回调捕获。
+    var onClick: ((ItemIconButton) -> Void)?
     /// 调用方拥有拖拽 source；按钮只处理手势，不承载跨收起／重建的会话。
     var onBeginDrag: ((ItemIconButton, NSEvent) -> Bool)?
     var onSetHidden: ((ApplicationItemIdentity, Bool) -> Void)?
@@ -260,6 +262,7 @@ final class ItemIconButton: NSView {
     }
 
     isolated deinit {
+        pressTimer?.invalidate()
         if let launchObserver { NotificationCenter.default.removeObserver(launchObserver) }
     }
 
@@ -297,8 +300,42 @@ final class ItemIconButton: NSView {
         return NSImage(cgImage: cgImage, size: NSSize(width: side, height: side))
     }
 
+    /// 展开重播和条目离场共享同一清理入口，不让长按回调越过交互会话。
+    func resetInteraction() {
+        pressTimer?.invalidate()
+        pressTimer = nil
+        pressed = false
+        surged = false
+        dragAttempted = false
+        mouseDownScreenPoint = nil
+        hovering = false
+        keyboardSelected = false
+        setDragState(.idle)
+        animateVisualState(.exit)
+    }
+
+    /// 终止条目拥有的活动资源；从视图树移除不等同于订阅或计时器结束。
+    func prepareForRemoval() {
+        setActive(false)
+        customArtworkView?.prepareForRemoval()
+        if let launchObserver {
+            NotificationCenter.default.removeObserver(launchObserver)
+            self.launchObserver = nil
+        }
+        menuActions.removeAll()
+        onClick = nil
+        onBeginDrag = nil
+        onSetHidden = nil
+        onTerminate = nil
+        onSetPinned = nil
+        onSurge = nil
+        onRemoveWidget = nil
+        onMenuSessionChange = nil
+    }
+
     func setActive(_ active: Bool) {
         self.active = active
+        if !active { resetInteraction() }
         customArtworkView?.setActive(active)
         refreshLaunchFeedback()
     }
@@ -506,7 +543,7 @@ final class ItemIconButton: NSView {
         if event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.option), entry.canSurge {
             onSurge?(entry, frame)
         } else {
-            onClick?(entry)
+            onClick?(self)
         }
     }
 
@@ -523,6 +560,10 @@ final class ItemIconButton: NSView {
     override func didCloseMenu(_ menu: NSMenu, with event: NSEvent?) {
         onMenuSessionChange?(false)
         window?.ignoresMouseEvents = false
+        // 关闭通知可能早于所选 action 的分发；快照只跨过当前同步派发，不持有按钮。
+        let closingActions = menuActions
+        menuActions.removeAll()
+        DispatchQueue.main.async { withExtendedLifetime(closingActions) {} }
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
@@ -572,9 +613,10 @@ final class ItemIconButton: NSView {
             menu.addItem(visibility)
         } else if entry.capabilities.contains(.open) {
             let open = NSMenuItem(title: L10nManager.shared.current.string("appMenu.open", table: .menus), action: #selector(MenuAction.run), keyEquivalent: "")
-            let entry = entry
-            let launch = onClick
-            let action = MenuAction(open.title) { launch?(entry) }
+            let action = MenuAction(open.title) { [weak self] in
+                guard let self else { return }
+                self.onClick?(self)
+            }
             menuActions.append(action)
             open.target = action
             menu.addItem(open)

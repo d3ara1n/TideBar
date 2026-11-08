@@ -455,9 +455,9 @@ final class TideBarView: NSView {
             expandGeneration += 1
             isExpandedState = true
             hoveredItemID = nil
-            iconRow.setActive(true)
             syncDragContext()
-            iconRow.update(apps: apps, rebuildAll: true)
+            iconRow.update(apps: apps, preparingExpansion: true)
+            iconRow.setActive(true)
             if Motion.shouldReduceMotion {
                 silhouette.removeAllAnimations()
                 silhouette.isHidden = glass != nil
@@ -576,7 +576,7 @@ final class TideBarView: NSView {
     /// 展开态下列表变更：差分刷新，不重播整体动画。
     @discardableResult
     func refreshApps(_ apps: [ItemEntry]) -> ItemListUpdate {
-        let result = iconRow.update(apps: apps, rebuildAll: false)
+        let result = iconRow.update(apps: apps)
         return result
     }
 

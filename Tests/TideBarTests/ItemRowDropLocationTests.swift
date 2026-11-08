@@ -15,7 +15,7 @@ import TideBarCore
                            name: "Test", icon: NSImage(), preferredBarWidth: nil,
                            isPinned: true, content: .reference(isAvailable: true))
     let row = ItemRowView(frame: NSRect(x: 0, y: 0, width: 260, height: 64))
-    row.update(apps: [app, widget], rebuildAll: true)
+    row.update(apps: [app, widget], preparingExpansion: true)
     row.layoutSubtreeIfNeeded()
     row.setDragContext(active: true, source: appID)
 
@@ -47,7 +47,7 @@ import TideBarCore
                   isPinned: id == pinnedID, content: .reference(isAvailable: true))
     }
     let row = ItemRowView(frame: NSRect(x: 0, y: 0, width: 320, height: 64))
-    row.update(apps: entries, rebuildAll: true)
+    row.update(apps: entries, preparingExpansion: true)
     row.layoutSubtreeIfNeeded()
     row.setDragContext(active: true, source: pinnedID)
 

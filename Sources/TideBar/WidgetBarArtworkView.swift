@@ -14,6 +14,7 @@ protocol ItemBarArtwork: AnyObject {
     var usesSharedHoverEffects: Bool { get }
     func setActive(_ active: Bool)
     func update(entry: ItemEntry)
+    func prepareForRemoval()
     /// 必须是 requirement，同上；默认无操作。
     func setHighlightState(hovered: Bool, selected: Bool)
     /// 拖拽接收/拒绝反馈由 widget 自己决定，避免套用通用图标效果。
@@ -21,6 +22,7 @@ protocol ItemBarArtwork: AnyObject {
 }
 
 extension ItemBarArtwork {
+    func prepareForRemoval() { setActive(false) }
     var usesSharedHoverEffects: Bool { true }
     func setHighlightState(hovered: Bool, selected: Bool) {}
     func setDragFeedback(_ state: ItemDragIconState) {}
