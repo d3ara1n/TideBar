@@ -49,7 +49,7 @@ macOS Dock 替代品：平时缩成屏幕底部一条细线，鼠标靠近时如
 - 主干 `main` 开分支保护，一切改动经独立分支与 PR squash merge 回 `main`，不直接在 `main` 上开发；一个 PR 对应一个合并提交。
 - 实现阶段可以创建分支、提交、推送并创建/更新 PR；PR 必须保持开放，直到用户明确表示验收通过。用户验收前不得执行合并、删除本地或远端分支，以及合并后的本地同步等收尾动作。
 - 用户明确表示验收通过即视为授予本次变更完整合并生命周期权限：可以执行必要的推送、远端 squash merge、删除分支和本地拉取/同步，不再逐项追加确认。
-- 合入满足确定性条件：CI 全绿，功能/交互改动另需用户运行验收；条件不满足则 PR 挂起不合。
+- CI 是非管理员贡献者的强制合入门禁；管理员永久豁免该门禁，但仍经独立分支与 PR 合入，并满足本地验证与用户验收要求。CI 的依赖下载等基础设施失败不等于代码测试失败，不伪造检查结果；管理员合入时如使用本地测试结果，应在 PR 中说明验证依据与远端阻塞原因。
 - PR 标题即合并提交首行，用 Conventional Commits 格式（见语言规范），攒批 PR 取主导 type、body 列各任务明细；分支内过程提交自由，最终以 squash 结果为准。
 - 每个 PR 打 label 进 release note 分组（`.github/release.yml`）：`feature`/`enhancement` → Features、`bug`/`fix` → Bug Fixes、`documentation` → Documentation；`chore-release` 的 PR 不进 release note。
 - 版本与发版由 release CI 自动处理（按合并提交算版本，每周一自动发版），不手动打 tag。
