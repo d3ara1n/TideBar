@@ -33,9 +33,10 @@ final class ItemRowView: NSView {
         }
     }
     private var buttons: [ItemIconButton] = []
+    private var active = false
     /// 离场项保留到动画结束，避免列表真值先删除导致视图瞬间消失。
     private var departingButtons: [ItemID: ItemIconButton] = [:]
-    private var departureTokens: [ItemID: Int] = [:]
+    private var departureTokens: [ItemID: UUID] = [:]
     var onPreviewWidthChange: (() -> Void)?
     private let placeholder = ItemDragPlaceholder()
     private var preview: ItemDragPreview = .none
@@ -58,25 +59,17 @@ final class ItemRowView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not supported") }
 
-    /// rebuildAll = true：整体重建（展开动画完整重播）
-    /// rebuildAll = false：按 identity 差分，统一处理新增、删除与保留项重排。
+    /// 视图身份只随条目成员变化；展开只重置视觉状态，不重建按钮与订阅。
+    /// preparingExpansion 时旧离场项立即退休，整栏波浪由 waveIn 统一编排。
     @discardableResult
-    func update(apps: [ItemEntry], rebuildAll: Bool) -> ItemListUpdate {
+    func update(apps: [ItemEntry], preparingExpansion: Bool = false) -> ItemListUpdate {
         if apps.map(\.id) != buttons.map(\.entry.id) { hitLatch.reset() }
-        if rebuildAll {
-            for button in buttons + Array(departingButtons.values) {
-                button.removeFromSuperview()
+        if preparingExpansion {
+            let incoming = Set(apps.map(\.id))
+            for id in Array(departingButtons.keys) where !incoming.contains(id) {
+                if let button = departingButtons.removeValue(forKey: id) { retire(button) }
+                departureTokens.removeValue(forKey: id)
             }
-            departingButtons.removeAll()
-            departureTokens.removeAll()
-            buttons = apps.map { app in
-                let button = makeButton(app)
-                addSubview(button)
-                return button
-            }
-            applyDragAppearance()
-            needsLayout = true
-            return .none
         }
 
         var oldFrames = Dictionary(uniqueKeysWithValues: buttons.map { ($0.entry.id, $0.frame) })
@@ -90,11 +83,12 @@ final class ItemRowView: NSView {
                 existing.update(entry: app)
                 next.append(existing)
             } else if let returning = departingButtons.removeValue(forKey: app.id) {
-                departureTokens[app.id, default: 0] += 1
+                departureTokens.removeValue(forKey: app.id)
                 oldFrames[app.id] = returning.frame
                 oldCenters[app.id] = returning.frame.midX
                 restoreForReuse(returning)
                 returning.update(entry: app)
+                returning.setActive(active)
                 next.append(returning)
             } else {
                 let button = makeButton(app)
@@ -106,13 +100,22 @@ final class ItemRowView: NSView {
 
         let removed = Array(kept.values)
         for button in removed {
-            beginDeparture(button)
+            if preparingExpansion { retire(button) }
+            else { beginDeparture(button) }
         }
 
         buttons = next
+        if preparingExpansion {
+            for button in buttons {
+                button.resetInteraction()
+                restoreForReuse(button)
+            }
+        }
         applyDragAppearance()
         needsLayout = true
         layoutSubtreeIfNeeded()
+
+        if preparingExpansion { return .none }
 
         let newcomerIDs = Set(newcomers.map { $0.entry.id })
         for button in buttons where !newcomerIDs.contains(button.entry.id) {
@@ -144,8 +147,10 @@ final class ItemRowView: NSView {
     private func makeButton(_ app: ItemEntry) -> ItemIconButton {
         let button = ItemIconButton(entry: app)
         button.onBeginDrag = onBeginDrag
-        button.onClick = { [weak self, weak button] entry in
-            guard let self, let button else { return }
+        button.setActive(active)
+        button.onClick = { [weak self] button in
+            guard let self else { return }
+            let entry = button.entry
             self.onUserLaunch?()
             if entry.kind == .widget {
                 self.onSurge?(entry, button.frame)
@@ -286,6 +291,7 @@ final class ItemRowView: NSView {
     }
 
     func setActive(_ active: Bool) {
+        self.active = active
         for button in buttons { button.setActive(active) }
     }
 
@@ -376,10 +382,10 @@ final class ItemRowView: NSView {
 
     private func beginDeparture(_ button: ItemIconButton) {
         let identity = button.entry.id
-        button.setHovered(false)
+        button.setActive(false)
         departingButtons[identity] = button
-        departureTokens[identity, default: 0] += 1
-        let token = departureTokens[identity]
+        let token = UUID()
+        departureTokens[identity] = token
         let reduceMotion = Motion.shouldReduceMotion
         let duration = reduceMotion ? Motion.reducedMotionFadeDuration : Motion.dropDuration
 
@@ -401,9 +407,14 @@ final class ItemRowView: NSView {
                       self.departingButtons[identity] === button else { return }
                 self.departingButtons.removeValue(forKey: identity)
                 self.departureTokens.removeValue(forKey: identity)
-                button.removeFromSuperview()
+                self.retire(button)
             }
         }
+    }
+
+    private func retire(_ button: ItemIconButton) {
+        button.prepareForRemoval()
+        button.removeFromSuperview()
     }
 
     private func restoreForReuse(_ button: ItemIconButton) {

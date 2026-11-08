@@ -78,52 +78,45 @@ enum ItemDragIconState: Equatable {
 }
 
 /// 独立图层只作用于 artwork 的不透明像素，不放大外圈、不改变 hit geometry。
-/// 拒绝态在压暗之上叠加去饱和（彩色→灰的失活信号，深浅外观下均醒目）。
+/// 接受态以白色提亮，拒绝态按图标轮廓压暗；透明态不保留遮罩位图。
 @MainActor
 final class ItemDragIconEffect {
     let layer = CALayer()
     private var state: ItemDragIconState = .idle
     private var icon: NSImage?
+    private var scale: CGFloat = 0
+    private var generation = 0
 
     init() { layer.opacity = 0 }
 
-    private static let ciContext = CIContext()
-
-    /// 去饱和（CIColorControls saturation = 0）；失败时调用方回退原色
-    private static func desaturated(_ icon: NSImage) -> NSImage? {
-        guard let cgImage = icon.cgImage(forProposedRect: nil, context: nil, hints: nil),
-              let filter = CIFilter(name: "CIColorControls") else { return nil }
-        filter.setValue(CIImage(cgImage: cgImage), forKey: kCIInputImageKey)
-        filter.setValue(0.0, forKey: "inputSaturation")
-        guard let output = filter.outputImage,
-              let rendered = ciContext.createCGImage(output, from: output.extent) else { return nil }
-        return NSImage(cgImage: rendered, size: icon.size)
-    }
-
-    func update(icon: NSImage, state: ItemDragIconState) {
-        guard self.state != state || self.icon !== icon else { return }
+    func update(icon: NSImage, state: ItemDragIconState, scale: CGFloat = 2) {
+        guard self.state != state || self.icon !== icon || self.scale != scale else { return }
         self.state = state
         self.icon = icon
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        defer { CATransaction.commit() }
-        let tint: NSColor = state == .rejected ? .black : .white
-        let base = state == .rejected ? Self.desaturated(icon) ?? icon : icon
-        let image = NSImage(size: icon.size, flipped: false) { rect in
-            base.draw(in: rect)
-            tint.setFill()
-            rect.fill(using: .sourceAtop)
-            return true
-        }
-        // 立即生成遮罩内容，避免绘制闭包在后续刷新时读取可变状态。
-        layer.contents = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        self.scale = scale
+        generation += 1
+        let currentGeneration = generation
+        let duration = Motion.shouldReduceMotion ? Motion.reducedMotionFadeDuration : Motion.dragFeedbackDuration
         let opacity: Float = switch state {
         case .receiving: ItemDragStyle.receiverBrightness
         case .rejected: ItemDragStyle.rejectionShade
         default: 0
         }
-        Motion.basic(layer, keyPath: "opacity", to: opacity,
-                     duration: Motion.shouldReduceMotion ? Motion.reducedMotionFadeDuration : Motion.dragFeedbackDuration)
+        if opacity > 0 {
+            let raster = IconRaster.makeImage(icon, side: Layout.iconSize, scale: scale)
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            layer.contents = raster.flatMap { IconRaster.tint($0, color: state == .rejected ? .black : .white) }
+            CATransaction.commit()
+        }
+        Motion.basic(layer, keyPath: "opacity", to: opacity, duration: duration)
+        // 透明态不生成遮罩；退出效果后只保留淡出时长，不把无用位图留在常驻层上。
+        if opacity == 0, layer.contents != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
+                guard let self, self.generation == currentGeneration else { return }
+                self.layer.contents = nil
+            }
+        }
     }
 }
 

@@ -74,7 +74,12 @@ final class ItemRegistry {
         self.store = store
     }
 
+    isolated deinit {
+        if let observer { NotificationCenter.default.removeObserver(observer) }
+    }
+
     func start() {
+        guard observer == nil else { return }
         applications.onChange = { [weak self] in self?.rebuild() }
         applications.start()
         observer = NotificationCenter.default.addObserver(forName: PinnedItemStore.didChange,
@@ -114,6 +119,8 @@ final class ItemRegistry {
 
     private func rebuild() {
         let records = store.records
+        let currentRecords = Set(records)
+        presentations = presentations.filter { currentRecords.contains($0.key) }
         let pinnedIDs = records.map(\.id)
         let apps = Dictionary(uniqueKeysWithValues: applications.entries.map { (ItemID.application($0.id), $0) })
         var result: [ItemEntry] = []

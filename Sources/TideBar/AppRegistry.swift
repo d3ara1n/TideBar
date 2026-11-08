@@ -182,8 +182,19 @@ final class AppRegistry {
     var onBadgePulse: (([String]) -> Void)?
     private var refreshDebounce: DispatchWorkItem?
     private var observers: [NSObjectProtocol] = []
+    private var started = false
+
+    isolated deinit {
+        refreshDebounce?.cancel()
+        for observer in observers {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
 
     func start() {
+        guard !started else { return }
+        started = true
         let center = NSWorkspace.shared.notificationCenter
         let bridge = MainThreadBridge { [weak self] in self?.refreshSoon() }
         for name: Notification.Name in [NSWorkspace.didLaunchApplicationNotification,

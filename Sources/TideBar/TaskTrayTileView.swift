@@ -54,6 +54,12 @@ final class TaskTrayTileView: NSView, ItemBarArtwork {
         refresh()
     }
 
+    func prepareForRemoval() {
+        setActive(false)
+        subscription = nil
+        session = nil
+    }
+
     func setActive(_ active: Bool) {
         self.active = active
         refresh()

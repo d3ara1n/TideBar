@@ -4,11 +4,15 @@ import AppKit
 @MainActor
 class ApplicationIconView: NSView {
     var icon: NSImage {
-        didSet { updateContents() }
+        didSet { updateContents(force: true) }
     }
     let imageLayer = CALayer()
     private let ghosts = [CALayer(), CALayer()]
-    var iconSide: CGFloat
+    var iconSide: CGFloat {
+        didSet { if iconSide != oldValue { needsLayout = true } }
+    }
+    private var renderedSide: CGFloat = 0
+    private var renderedScale: CGFloat = 0
     private var launching = false
     private var active = true
     private var animating = false
@@ -37,6 +41,7 @@ class ApplicationIconView: NSView {
 
     override func layout() {
         super.layout()
+        updateContents()
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         let rect = NSRect(x: (bounds.width - iconSide) / 2, y: (bounds.height - iconSide) / 2,
@@ -58,8 +63,30 @@ class ApplicationIconView: NSView {
         refreshAnimation()
     }
 
-    private func updateContents() {
-        let image = icon.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        needsLayout = true
+    }
+
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        needsLayout = true
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateContents(force: true)
+    }
+
+    private func updateContents(force: Bool = false) {
+        let scale = window?.backingScaleFactor ?? 2
+        guard force || renderedSide != iconSide || renderedScale != scale else { return }
+        renderedSide = iconSide
+        renderedScale = scale
+        var image: CGImage?
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            image = IconRaster.makeImage(icon, side: iconSide, scale: scale)
+        }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         for child in ghosts + [imageLayer] { child.contents = image }

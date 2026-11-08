@@ -12,7 +12,7 @@ import TideBarCore
 /// 模型更新经 `MainThreadBridge` 回主线程。
 @MainActor
 final class BadgeStore {
-    private static let badgeDemand = "dock.badges"
+    private let badgeDemand = "dock.badges.\(UUID().uuidString)"
     /// 连续失败上限：超过后清空角标（Dock 重启期间短暂保留旧值，真挂了不放僵尸数字）
     private static let failureLimit = 3
 
@@ -35,6 +35,10 @@ final class BadgeStore {
     /// 新角标出现或计数增长（合并为一次事件，携带本轮全部来源显示名；仅收起态消费）
     var onPulse: (([String]) -> Void)?
 
+    isolated deinit {
+        if started { PollScheduler.shared.unregister(badgeDemand) }
+    }
+
     func start() {
         guard !started else { return }
         guard AXIsProcessTrusted() else {
@@ -43,7 +47,7 @@ final class BadgeStore {
             return
         }
         started = true
-        PollScheduler.shared.register(Self.badgeDemand, interval: pollInterval) { [weak self] in
+        PollScheduler.shared.register(badgeDemand, interval: pollInterval) { [weak self] in
             self?.poll()
         }
     }
@@ -70,7 +74,7 @@ final class BadgeStore {
 
     private func syncPollInterval() {
         PollScheduler.shared.updateInterval(
-            Self.badgeDemand,
+            badgeDemand,
             interval: pollInterval
         )
     }
@@ -94,7 +98,7 @@ final class BadgeStore {
         guard let pid = dockPID else { return }
         busy = true
         readQueue.async { [weak self] in
-            let snapshot = Self.readDockBadges(pid: pid)
+            let snapshot = autoreleasepool { Self.readDockBadges(pid: pid) }
             MainThreadBridge { [weak self] in
                 self?.apply(snapshot)
             }.call()

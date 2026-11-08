@@ -118,9 +118,16 @@ enum AXReader {
 
 // MARK: - 后台采集契约（纯值进出，主线程 ↔ axQueue）
 
-/// 调度时的采集输入快照：除 refcon 外全为纯值；AXUIElement 在采集现场创建，
-/// 不跨线程产生。refcon 为指回 WindowStore 的不透明指针（与 AXObserver refcon
-/// 同源，仅在回传时取回），以 @unchecked 承载。
+/// C 回调上下文随 watch 与在途请求存活，只弱引用 owner。
+/// 挂载 source 的 watch 先卸载再释放上下文；未应用的后台 observer 不派发回调。
+@MainActor
+private final class AXObserverContext {
+    weak var store: WindowStore?
+    init(store: WindowStore) { self.store = store }
+}
+
+/// 调度时的采集输入快照：AXUIElement 在采集现场创建；回调上下文是稳定引用，
+/// 后台结果经弱引用回传，不通过裸指针恢复 store 生命周期。
 private struct AXEnumerationRequest: @unchecked Sendable {
     let pid: pid_t
     let generation: Int
@@ -132,8 +139,7 @@ private struct AXEnumerationRequest: @unchecked Sendable {
     /// 上一轮屏归属（缺键 = 未知，最小化/不可读帧沿用）
     let previousScreens: [Int: CGDirectDisplayID]
     let displays: [FullscreenDisplay]
-    /// 指回 WindowStore 的裸指针（与 AXObserver refcon 同源，回传时取回）
-    let refcon: UnsafeMutableRawPointer
+    let context: AXObserverContext
 }
 
 /// 采集结果：快照与 observer 为 AX 引用，跨线程传递安全（AX API 线程安全），
@@ -161,6 +167,7 @@ private struct AXEnumerationOutcome: @unchecked Sendable {
 final class WindowStore {
     private struct Watch {
         let identity: AppIdentity
+        let context: AXObserverContext
         var observer: AXObserver?
         /// nil = 窗口集合无法完整确认（降级）；否则为当前收录快照
         var snapshots: [WindowSnapshot]?
@@ -190,6 +197,18 @@ final class WindowStore {
     /// 快照集合变化（应用身份粒度）
     var onUpdate: ((AppIdentity) -> Void)?
 
+    isolated deinit {
+        let center = NSWorkspace.shared.notificationCenter
+        for observer in observers { center.removeObserver(observer) }
+        for watch in watches.values {
+            watch.reenumerateWork?.cancel()
+            if let observer = watch.observer {
+                CFRunLoopRemoveSource(RunLoop.main.getCFRunLoop(),
+                                      AXObserverGetRunLoopSource(observer), .defaultMode)
+            }
+        }
+    }
+
     func start() {
         guard !activated else { return }
         let trusted = AXIsProcessTrusted()
@@ -218,7 +237,7 @@ final class WindowStore {
             MainThreadBridge { [weak self] in self?.removeWatch(pid: app.processIdentifier) }.call()
         })
         observers.append(center.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
-                                            object: nil, queue: .main) { _ in
+                                            object: nil, queue: .main) { [weak self] _ in
             MainThreadBridge { [weak self] in self?.frontmostApplicationDidChange() }.call()
         })
 
@@ -286,6 +305,7 @@ final class WindowStore {
         guard let identity = app.bundleIdentifier.map(AppIdentity.init)
             ?? app.executablePath.map(AppIdentity.init) else { return }
         watches[pid] = Watch(identity: identity,
+                             context: AXObserverContext(store: self),
                              snapshots: nil)
         scheduleReenumerate(pid: pid, after: delay)
     }
@@ -305,7 +325,7 @@ final class WindowStore {
         if let work = watch.reenumerateWork {
             work.cancel()
         }
-        // 采集输入快照：上一轮次序与屏归属、显示器列表、前台基准、refcon 指回自身
+        // 采集输入快照：上一轮次序、屏归属、显示器、前台基准与弱 owner 上下文
         let previous = watch.snapshots ?? []
         let request = AXEnumerationRequest(
             pid: pid,
@@ -315,13 +335,12 @@ final class WindowStore {
             previousOrder: previous.map(\.elementIdentifier),
             previousScreens: previous.reduce(into: [:]) { $0[$1.elementIdentifier] = $1.screenID },
             displays: Self.currentDisplays(),
-            refcon: Unmanaged.passUnretained(self).toOpaque())
+            context: watch.context)
         // @Sendable：剥离闭包对上下文 MainActor 隔离的继承，否则 DispatchWorkItem
         // 在后台队列执行时触发运行时隔离检查（Swift 6 动态检测刷屏）
-        let work = DispatchWorkItem { @Sendable in
-            let outcome = Self.enumerate(request)
-            let store = Unmanaged<WindowStore>.fromOpaque(request.refcon).takeUnretainedValue()
-            MainThreadBridge { store.applyEnumeration(request, outcome) }.call()
+        let work = DispatchWorkItem { @Sendable [weak self] in
+            let outcome = autoreleasepool { Self.enumerate(request) }
+            MainThreadBridge { [weak self] in self?.applyEnumeration(request, outcome) }.call()
         }
         watch.reenumerateWork = work
         watches[pid] = watch
@@ -426,7 +445,8 @@ final class WindowStore {
     /// 采集结果应用：代数或 pid 失配即丢弃（app 退出、被新调度取代、重复回传）。
     /// degraded 判定、快照更新、observer swap 与重试梯语义与迁移前一致。
     private func applyEnumeration(_ request: AXEnumerationRequest, _ outcome: AXEnumerationOutcome) {
-        guard var watch = watches[request.pid], watch.generation == request.generation else { return }
+        guard var watch = watches[request.pid], watch.context === request.context,
+              watch.generation == request.generation else { return }
         watch.reenumerateWork = nil
 
         switch outcome.content {
@@ -505,7 +525,8 @@ final class WindowStore {
         }
 
         func add(_ element: AXUIElement, _ notification: String) -> Bool {
-            AXObserverAddNotification(observer, element, notification as CFString, request.refcon) == .success
+            AXObserverAddNotification(observer, element, notification as CFString,
+                                      Unmanaged.passUnretained(request.context).toOpaque()) == .success
         }
 
         // 窗口集合与最小化态决定 Finder 可见性和点点，相关通知必须完整安装。
@@ -583,7 +604,7 @@ final class WindowStore {
     }
 }
 
-/// C 回调不能捕获上下文，经 refcon 取回 store；observer 挂在主 runloop，回调即主线程。
+/// C 回调经 refcon 取回 watch 持有的上下文；observer 只挂在主 runloop。
 /// AXUIElement 非 Sendable，pid 在回调现场解析后再过桥。
 private func axObserverCallback(_ observer: AXObserver,
                                 _ element: AXUIElement,
@@ -593,6 +614,6 @@ private func axObserverCallback(_ observer: AXObserver,
     var pid: pid_t = 0
     guard AXUIElementGetPid(element, &pid) == .success else { return }
     let name = notification as String
-    let store = Unmanaged<WindowStore>.fromOpaque(refcon).takeUnretainedValue()
-    MainThreadBridge { store.handleAXEvent(pid: pid, notification: name) }.call()
+    let context = Unmanaged<AXObserverContext>.fromOpaque(refcon).takeUnretainedValue()
+    MainThreadBridge { [weak context] in context?.store?.handleAXEvent(pid: pid, notification: name) }.call()
 }
