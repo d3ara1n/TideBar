@@ -10,15 +10,9 @@ concurrency:
 jobs:
     build-and-test:
         runs-on: xcode-27
-        env:
-            SWIFTPM_CACHE_PATH: ${{ runner.temp }}/tidebar-swiftpm-cache
         steps:
             - uses: actions/checkout@v4
-            - name: Prepare verified binary dependency
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              run: python3 scripts/prepare-sparkle-artifact.py --cache-path "$SWIFTPM_CACHE_PATH"
             - name: Build
-              run: swift build --build-system native --cache-path "$SWIFTPM_CACHE_PATH"
+              run: swift build --build-system native
             - name: Test
-              run: swift test --build-system native --cache-path "$SWIFTPM_CACHE_PATH"
+              run: swift test --build-system native
