@@ -66,6 +66,7 @@ final class DockController {
         let version: Int
         let createdAt: Date
         let values: [String: StoredValue]
+        var needsDockReload: Bool? // 缺省兼容没有此字段的快照
 
         /// 只回收仍等于旧接管值的偏好；用户自行改过的值保持不动。
         func legacyAppearanceRestoration(read: (String) -> StoredValue?) -> [(key: String, value: StoredValue?)] {
@@ -81,9 +82,24 @@ final class DockController {
             }
         }
 
-        func currentFormat() -> Snapshot {
-            Snapshot(version: Self.currentVersion, createdAt: createdAt,
-                     values: values.filter { Key(rawValue: $0.key) != nil })
+        func checkpointLegacyAppearance(restore: () throws -> Void,
+                                        save: (Snapshot) throws -> Void) throws -> Snapshot {
+            guard version == 1 else { return self }
+            let checkpoint = Snapshot(version: Self.currentVersion, createdAt: createdAt,
+                                      values: values.filter { Key(rawValue: $0.key) != nil },
+                                      needsDockReload: true)
+            try restore()
+            // 偏好同步后即交还外观管理权；后续只重试重载，不再写外观。
+            try save(checkpoint)
+            return checkpoint
+        }
+
+        func reloadDockIfNeeded(reload: () throws -> Void, save: (Snapshot) throws -> Void) throws {
+            guard needsDockReload == true else { return }
+            try reload()
+            var completed = self
+            completed.needsDockReload = nil
+            try save(completed)
         }
     }
 
@@ -165,7 +181,8 @@ final class DockController {
             return
         }
         do {
-            try restoreSnapshot(snapshot)
+            let checkpoint = try checkpointLegacyAppearance(snapshot)
+            try restoreSnapshot(checkpoint)
             guard restartDock() else { throw DockError.restartFailed }
             AppConfiguration.shared.isTakeoverEnabled = false
             state = .notEnabled
@@ -224,28 +241,31 @@ final class DockController {
             }
         }
         let snapshot = Snapshot(version: Snapshot.currentVersion, createdAt: Date(), values: values)
+        try saveSnapshot(snapshot)
+    }
+
+    private func saveSnapshot(_ snapshot: Snapshot) throws {
         defaults.set(try JSONEncoder().encode(snapshot), forKey: Self.snapshotKey)
     }
 
     private func migrateSnapshotIfNeeded(_ snapshot: Snapshot) throws {
-        guard snapshot.version == 1 else { return }
-        let migrated = try JSONEncoder().encode(snapshot.currentFormat())
-        restoreLegacyAppearance(snapshot)
-        try synchronize()
-        // 先重载再提交新版本；重载失败时保留迁移资格，即使偏好已经写回。
-        guard restartDock() else { throw DockError.restartFailed }
-        defaults.set(migrated, forKey: Self.snapshotKey)
-        NSLog("TideBar released legacy Dock appearance settings")
+        let checkpoint = try checkpointLegacyAppearance(snapshot)
+        try checkpoint.reloadDockIfNeeded(reload: {
+            guard restartDock() else { throw DockError.restartFailed }
+            NSLog("TideBar reloaded Dock after releasing legacy appearance settings")
+        }, save: saveSnapshot)
     }
 
-    private func restoreLegacyAppearance(_ snapshot: Snapshot) {
-        for (key, value) in snapshot.legacyAppearanceRestoration(read: readValue) {
-            setValue(value, for: key)
-        }
+    private func checkpointLegacyAppearance(_ snapshot: Snapshot) throws -> Snapshot {
+        try snapshot.checkpointLegacyAppearance(restore: {
+            for (key, value) in snapshot.legacyAppearanceRestoration(read: readValue) {
+                setValue(value, for: key)
+            }
+            try synchronize()
+        }, save: saveSnapshot)
     }
 
     private func restoreSnapshot(_ snapshot: Snapshot) throws {
-        restoreLegacyAppearance(snapshot)
         for key in Key.allCases {
             setValue(snapshot.values[key.rawValue], for: key.rawValue)
         }

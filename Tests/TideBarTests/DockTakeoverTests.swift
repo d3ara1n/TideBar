@@ -59,7 +59,7 @@ func migratedSnapshotRetainsOnlyManagedOriginalValues() throws {
     ])
     let oldData = try JSONEncoder().encode(legacy)
     let decoded = try JSONDecoder().decode(Snapshot.self, from: oldData)
-    let migrated = decoded.currentFormat()
+    let migrated = try decoded.checkpointLegacyAppearance(restore: {}, save: { _ in })
     #expect(migrated.version == Snapshot.currentVersion)
     #expect(migrated.createdAt == legacy.createdAt)
     #expect(migrated.values == ["autohide": .bool(false), "mineffect": .string("genie")])
@@ -67,4 +67,41 @@ func migratedSnapshotRetainsOnlyManagedOriginalValues() throws {
         Issue.record("A migrated snapshot must not read or change Dock appearance preferences")
         return nil
     }.isEmpty)
+}
+
+@Test
+func retryingDockReloadDoesNotOverwriteEditsAfterMigration() throws {
+    var persisted = Snapshot(version: 1, createdAt: .distantPast, values: ["magnification": .bool(true)])
+    var dock: [String: Value] = ["magnification": .bool(false)]
+    var appearanceWrites = 0
+    func save(_ snapshot: Snapshot) throws {
+        // 模拟重启后从持久化数据读取，不依赖内存标记。
+        persisted = try JSONDecoder().decode(Snapshot.self, from: JSONEncoder().encode(snapshot))
+    }
+    func releaseAppearance() throws -> Snapshot {
+        let snapshot = persisted
+        return try snapshot.checkpointLegacyAppearance(restore: {
+            for (key, value) in snapshot.legacyAppearanceRestoration(read: { dock[$0] }) {
+                dock[key] = value
+                appearanceWrites += 1
+            }
+        }, save: save)
+    }
+
+    let checkpoint = try releaseAppearance()
+    #expect(dock["magnification"] == .bool(true))
+    #expect(throws: DockError.restartFailed) {
+        try checkpoint.reloadDockIfNeeded(reload: { throw DockError.restartFailed }, save: save)
+    }
+    #expect(persisted.needsDockReload == true)
+
+    dock["magnification"] = .bool(false)
+    let retry = try releaseAppearance()
+    var reloads = 0
+    try retry.reloadDockIfNeeded(reload: { reloads += 1 }, save: save)
+    try persisted.reloadDockIfNeeded(reload: { reloads += 1 }, save: save)
+    #expect(dock["magnification"] == .bool(false))
+    #expect(appearanceWrites == 1)
+    #expect(reloads == 1)
+    #expect(persisted.needsDockReload == nil)
 }
