@@ -4,21 +4,20 @@
 
 ## 架构：藏 UI、留进程
 
-系统 Dock 进程保留运行，仅配置级隐藏；TideBar 作为悬浮面板盖在底部。所有商业 Dock 替代品（uBar/ActiveDock）均此路线。接管参数集（uBar 方案为基底，Focus Dock 补全两项对策）：
+系统 Dock 进程保留运行，仅配置级隐藏；TideBar 作为悬浮面板盖在底部。所有商业 Dock 替代品（uBar/ActiveDock）均此路线。接管只调整自动隐藏和动画相关设置：
 
 ```bash
 defaults write com.apple.dock autohide -bool true
 defaults write com.apple.dock autohide-delay -float 1000        # 延迟 1000 秒 = 实际不可唤出
 defaults write com.apple.dock autohide-time-modifier -float 0
 defaults write com.apple.dock no-bouncing -bool true
-defaults write com.apple.dock tilesize -int 16                  # Mission Control/Exposé 无视 autohide 强显，缩到 16px 只剩细缝
-defaults write com.apple.dock magnification -bool false
-defaults write com.apple.dock largesize -int 16
 defaults write com.apple.dock mineffect -string scale           # genie 动画指向已隐藏的 Dock 位置，穿帮；scale 原地缩小
 killall Dock
 ```
 
-标配快照/恢复：接管前快照原始值，恢复时对原本不存在的键用 `CFPreferencesSetAppValue(key, nil, …)` 删回默认。
+Dock 大小和放大效果由用户管理；Mission Control / App Exposé 若显示系统 Dock，按用户设置的大小显示。接管、校验、修复和退出恢复均不管理 `tilesize`、`magnification`、`largesize`。
+
+快照仅保存受管键，恢复时删除原本不存在的受管键，交还系统默认。正式版读取到仍在接管的 v1 快照时，逐项恢复仍等于旧接管值的外观偏好（原本不存在则删除）；已被用户修改的值不动。外观偏好同步后保存只含受管键的 v2 快照；如果 Dock 尚未重载，只重试重载，不再写入外观偏好。
 
 这是对用户系统的修改，由 App 内首次启动向导引导用户执行，不静默改。
 
@@ -179,7 +178,7 @@ killall Dock
 ## 统一轮询与通知角标
 
 1. **PollScheduler 是常驻轮询唯一入口**：单一基频 Timer（= 需求最小间隔）承载全部需求；按名注册/注销，相位错开分片，容差 1/5 基频允许系统合并唤醒；主线程 tick 只做触发，重活（AX 读取）由需求自调度后台队列回桥。接近检测兜底、Dock 角标、设置页权限轮询全部迁入；设置页开窗注册、关窗注销。
-2. **角标路线（Dock AX 镜像）**：接管态（autohide-delay 1000 + tilesize 16）下 `com.apple.dock` 进程 AX 树可枚举全部 `AXDockItem`，`AXStatusLabel` 实时携带角标字符串；无变更推送，只能轮询。覆盖面 = Dock 角标镜像，与系统设置中各 app 的角标开关天然一致。
+2. **角标路线（Dock AX 镜像）**：接管态下 `com.apple.dock` 进程 AX 树可枚举全部 `AXDockItem`，`AXStatusLabel` 实时携带角标字符串；无变更推送，只能轮询。覆盖面 = Dock 角标镜像，与系统设置中各 app 的角标开关天然一致。
 3. **BadgeStore 落地**：后台读 Dock AX 树，展开 1s/收起 4s 自适应、展开瞬间立即全量读；生产未接管不轮询（本栏不存在，系统 Dock 自己在场），开发运行照常轮询以调试通知链路；badge 进 AppEntry 模型真值，不触发潮涌失效；Dock 标题与应用显示名小写规范化对位，匹配不到静默忽略。
 4. **汐线通知语言：轻涌 + 持久涟漪，展开即确认**：新角标一次轻涌，未确认期间双环错相涟漪循环（线源扁椭圆形态，横向 1.3 倍线宽、终态波高 14pt）；停止条件 = 任意一次展开（用户已知，任意屏展开即在全部屏停住）或触发过脉冲的 app 角标全部消失——其他 app 的常驻角标不挟持本次提醒；涟漪在场期间收起态角标轮询保持展开档频率，触发者角标消失在一拍内停住；减少动态效果时脉冲退化为短淡化、不做常驻循环。动机：一次性提醒与系统横幅注意力重复，持久动效表达「未被知晓」状态而非「事件发生」瞬间。
 5. **解析与展示约定**：AXStatusLabel 正整数→计数角标（99+ 封顶）、非空非数字→小圆点、空/零→不显示；连续读取失败 3 轮才清值，Dock 重启期间保留旧值防闪烁。
@@ -217,7 +216,7 @@ killall Dock
 2. **发布侧管道与应用侧一体落地**：EdDSA 密钥（私钥存 `~/.signing/tidebar/`，与签名证书同处；公钥固化在 Info.plist `SUPublicEDKey`）、`SUFeedURL` 指向 GitHub Releases 固定跳转、appcast 随 release 自动生成；应用侧 `UpdateCoordinator` 包装 `SPUStandardUpdaterController`，入口在设置页「关于」，自动检查每日一拍（`SUScheduledCheckInterval=86400`）。Sparkle.framework 随包分发（`Contents/Frameworks/`，保留官方 Developer ID 签名不重签，外层 app 签名封印嵌套完整性）。开发路径（swift run 裸可执行）不启动 updater，UI 禁用并提示，沿用「开发与发布启动路径分离」。
 3. **appcast 单条目**：每次发布全新生成，仅含最新版本；不维护历史条目，不回下载旧 zip。Sparkle 客户端拉最新条目即可完成任意旧版升级。
 4. **更新完整性走 EdDSA，与 codesign 独立**：自签证书不公证不影响更新可信性；首次下载仍需右键打开，属不公证路线既定代价。
-5. **更新重启不恢复系统 Dock**：「安装并重启」的退出不触发 Dock 恢复——Sparkle 终止宿主前回调 `updaterWillRelaunchApplication`，`applicationWillTerminate` 据此跳过 `restore()`，接管偏好、快照与开关跨重启原样保留，新实例指纹校验即回 takeover；「退出时静默安装」不重启应用，Dock 照常恢复。
+5. **更新重启不恢复系统 Dock**：「安装并重启」的退出不触发 Dock 恢复——Sparkle 终止宿主前回调 `updaterWillRelaunchApplication`，`applicationWillTerminate` 据此跳过 `restore()`，接管偏好、快照与开关跨重启原样保留，新实例按当前接管配置校验状态（如果有旧版快照，先迁移）；「退出时静默安装」不重启应用，Dock 照常恢复。
 
 ## 开机启动
 

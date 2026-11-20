@@ -151,7 +151,7 @@ orderFrontRegardless()                            // 不抢焦点置前
 
 | 调研启示 | 去向 |
 |---|---|
-| 入口替代抄行业方案（delay 1000 + tilesize 16 + mineffect scale，快照/恢复） | 已采纳，参数集与快照/恢复约定见 decisions.md「架构：藏 UI、留进程」 |
+| 隐藏入口（delay 1000 + mineffect scale，快照/恢复） | 已采纳；系统 Dock 大小和放大效果由用户管理。现行参数集见 decisions.md「架构：藏 UI、留进程」 |
 | 接近检测走全局 mouseMoved monitor，NSTrackingArea 留给面板内部 hover | 已采纳，见 decisions.md「交互与鼠标态约定」 |
 | NSPanel 组合照抄已验证配置（§四），收起态 `ignoresMouseEvents` 穿透 | 已采纳；窗口 level 演进为 `.statusBar` 顶置（decisions.md「窗口层级与避让」） |
 | 枚举/图标用标准链（KVO runningApplications + icon 兜底链 + 缓存） | 已采纳 |

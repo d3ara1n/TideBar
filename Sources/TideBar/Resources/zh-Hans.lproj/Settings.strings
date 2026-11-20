@@ -67,7 +67,7 @@
 "dock.section.recent" = "最近操作";
 "takeover.confirmTitle" = "启用汐？";
 "takeover.confirmEnable" = "启用汐";
-"takeover.confirmMessage" = "汐会保存当前 Dock 设置、应用接管配置并重新启动系统 Dock。已打开的应用不会关闭。";
+"takeover.confirmMessage" = "汐只保存并调整接管所需的设置，然后重新启动系统 Dock。已打开的应用不会关闭，Dock 的大小和放大效果也不会改变。";
 "restore.confirmTitle" = "关闭汐并恢复 macOS Dock？";
 "restore.confirmAction" = "关闭并恢复";
 "restore.confirmMessage" = "汐会恢复启用前保存的 Dock 设置，并停止屏幕底部的汐线。";
