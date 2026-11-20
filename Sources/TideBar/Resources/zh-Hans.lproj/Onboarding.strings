@@ -30,7 +30,7 @@
 "takeover.confirmTitle" = "启用汐？";
 "takeover.confirmEnable" = "启用汐";
 "takeover.cancel" = "取消";
-"takeover.confirmMessage" = "汐会保存当前 Dock 设置、应用接管配置并重新启动系统 Dock。已打开的应用不会关闭。";
+"takeover.confirmMessage" = "汐只保存并调整接管所需的设置，然后重新启动系统 Dock。已打开的应用不会关闭，Dock 的大小和放大效果也不会改变。";
 "takeover.persistenceNote" = "启用前会保存当前 Dock 配置；关闭汐或退出应用时都会自动恢复，设置中心的「Dock 与恢复」页也可随时手动恢复。";
 "takeover.working" = "正在启用汐…";
 "takeover.successTitle" = "汐已启用";

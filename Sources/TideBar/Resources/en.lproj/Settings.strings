@@ -67,7 +67,7 @@
 "dock.section.recent" = "Recent Activity";
 "takeover.confirmTitle" = "Enable Dock takeover?";
 "takeover.confirmEnable" = "Enable";
-"takeover.confirmMessage" = "TideBar will save the current Dock settings and per-app takeover configuration, then restart the system Dock. Open apps won't be closed.";
+"takeover.confirmMessage" = "TideBar will save and apply only the Dock settings it needs, then restart the Dock without closing your apps. Your Dock size and magnification settings stay unchanged.";
 "restore.confirmTitle" = "Turn off TideBar and restore the macOS Dock?";
 "restore.confirmAction" = "Turn Off & Restore";
 "restore.confirmMessage" = "TideBar will restore the Dock settings saved before takeover and stop the tide line at the bottom of the screen.";
