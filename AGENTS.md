@@ -1,64 +1,71 @@
-# TideBar 项目规范
+# TideBar Project Conventions
 
-macOS Dock 替代品：平时缩成屏幕底部一条细线，鼠标靠近时如潮汐般展开。完整定位见 `docs/product.md`。
+A macOS Dock replacement: normally collapses into a thin line at the bottom of the screen and expands like a tide when the pointer approaches. See `docs/product.md` for full product positioning.
 
-## 心智模型
+## Mental Model
 
-- **产品灵魂 = 零存在感 + 完整 Dock 功能**：空闲时细线若隐若现，展开后功能对标系统 Dock。一切实现取舍服务于此。
-- **系统级功能不自绘**：启动、运行列表、右键菜单、废纸篓等用系统能力（NSWorkspace / NSMenu / FSEvents / AX / ScreenCaptureKit），精力只花在差异化交互与窗口体验上。
-- **窗口层与事件模型是根基**：NSPanel 的 styleMask / level / collectionBehavior 组合决定一切行为；动交互之前先确认窗口层约束允许（各约束的依据见 `docs/decisions.md`）。
+- **Product soul = zero presence + full Dock functionality**: Barely visible as a thin line when idle; matches system Dock capabilities when expanded. Every implementation tradeoff serves this goal.
+- **Reuse system capabilities instead of reimplementing**: Launching, running-app lists, context menus, Trash, etc. use system frameworks (`NSWorkspace`, `NSMenu`, `FSEvents`, `AX`, `ScreenCaptureKit`). Spend effort only on differentiated interactions and window experience.
+- **Window layering and event model are foundational**: The `NSPanel` combination of `styleMask`, `level`, and `collectionBehavior` governs all behavior; verify window-layer constraints before changing interactions (see `docs/decisions.md` for the rationale behind each constraint).
 
-## 环境
+## Environment
 
-- 开发机：macOS 27 beta、Apple Silicon；Xcode 27（27A266a）
-- 技术栈：Swift 6 + SPM（swift-tools 6.2，最低 macOS 14），**轻第三方依赖**（只收少而精的单用途小库，不引重型框架），不用 Xcode 工程
-- bundle id `dev.dearain.TideBar`
+- Development machine: macOS 27 beta, Apple Silicon; Xcode 27 (`27A266a`).
+- Tech stack: Swift 6 + SPM (`swift-tools` 6.2, minimum macOS 14), **light third-party dependencies** (only small, focused single-purpose libraries; no heavy frameworks), no Xcode project file.
+- Bundle ID: `dev.dearain.TideBar`.
 
-## 构建与验证
+## Build and Verification
 
-- 日常构建与运行显式用旧后端：`swift build --build-system native` 编译；`swift run --build-system native` 运行（占终端，Ctrl-C 退出）。发布打包由 `scripts/build-app.sh` 使用 swiftbuild，以获得适配标准 `.app/Contents/Resources` 的依赖资源查找；脚本通过链接器 `platform_version` 显式写入真实 SDK，并以 `vtool` 门禁防止 Xcode 27 将 sdk 错写成部署目标（观察项见 `plans/`）。
-- **agent 的验证职责止于 `swift build`**：GUI 的运行验证由用户执行 `swift run` 并操作 UI 确认；不做「启动→等几秒→杀掉」式的自动冒烟。
-- 系统级命令（如隐藏系统 Dock 的 defaults 写入）只输出给用户执行，或经确认后执行，不静默改。
+- Build and run during development with the legacy backend explicitly: `swift build --build-system native` to compile, `swift run --build-system native` to run (occupies the terminal; exit with `Ctrl-C`). Release packaging uses `scripts/build-app.sh` with `swiftbuild` so dependency resource lookup fits standard `.app/Contents/Resources`; the script writes the real SDK via linker `platform_version` and gates with `vtool` to prevent Xcode 27 from miswriting the SDK as the deployment target (tracked in `plans/`).
+- **Agent verification stops at `swift build`**: GUI runtime verification is performed by the user running `swift run` and interacting with the UI; do not run launch-wait-kill automated smoke cycles.
+- System-level commands (such as `defaults write` to hide the system Dock) are only printed for the user to run, or executed only after explicit confirmation—never modified silently.
 
-## 文档地图
+## Documentation Map
 
-| 文档 | 内容 | 生命周期 |
+| Document | Contents | Lifecycle |
 |---|---|---|
-| `docs/product.md` | 产品定位、灵魂交互、命名、对标 | 极稳定 |
-| `docs/glossary.md` | 产品词汇的中英文名称与含义 | 随命名与含义变化同步 |
-| `docs/decisions.md` | 已定架构决策、可行性边界、权限策略 | 最终状态真值，演进看 git log |
-| `docs/research-dock-alternatives.md` | 同类应用调研档案（事实与方案） | 随调研时点固化 |
-| `plans/` | 立案任务（当前要做什么的唯一真值） | 见下 |
+| `docs/product.md` | Product positioning, core interaction, naming, benchmarks | Very stable |
+| `docs/glossary.md` | English and Chinese product terms and definitions | Updated alongside naming/meaning changes |
+| `docs/decisions.md` | Settled architectural decisions, feasibility boundaries, permission policy | Truth of current state; check `git log` for history |
+| `docs/research-dock-alternatives.md` | Research archive on similar apps (facts and approaches) | Frozen per research snapshot |
+| `plans/` | Filed tasks (single source of truth for current work) | See below |
 
-## plans 纪律
+## `plans/` Discipline
 
-- `todo-<日期>-<主题>.md`：立案任务。完成即移入 `plans/archived/`；有留存价值的结论转 docs/。
-- `plans/archived/`：已结束的计划，只进不出。
-- **延后即立案**：不做的事必须落到 plans/；聊天即焚，未入档的决策视为未发生。
-- 文件名即性质，从名字直接读出生命周期；新类型前缀按需增设（常驻手册用全大写），但必须能一句话说清其生命周期。
+- `todo-<date>-<topic>.md`: Filed task. Move to `plans/archived/` upon completion; promote lasting conclusions to `docs/`.
+- `plans/archived/`: Completed plans; append-only (never moved out).
+- **Deferral means filing**: Unfinished or deferred work must be recorded in `plans/`; chat is ephemeral, and unrecorded decisions do not count as having happened.
+- Filenames declare lifecycle directly; add new prefixes as needed (all-caps for standing manuals), provided their lifecycle can be stated in one sentence.
 
-## 决策边界
+## Decision Boundaries
 
-- **agent 自主**：内部类拆分、动画实现方式、命名、代码组织、实现层参数。
-- **必须拍板**：交互范式变更、系统级修改、涉及用户授权的能力（屏幕录制/辅助功能）、引入第三方依赖（只接受轻量单用途库）。
+- **Agent-autonomous**: Internal class decomposition, animation implementation, naming, code organization, implementation-level parameters.
+- **Requires user decision**: Interaction paradigm changes, system-level modifications, capabilities requiring user permissions (Screen Recording / Accessibility), adding third-party dependencies (only lightweight single-purpose libraries are acceptable).
 
-## 约定
+## Conventions
 
-### 分支与 PR
+### Branches and PRs
 
-- 主干 `main` 开分支保护，一切改动经独立分支与 PR squash merge 回 `main`，不直接在 `main` 上开发；一个 PR 对应一个合并提交。
-- 实现阶段可以创建分支、提交、推送并创建/更新 PR；PR 必须保持开放，直到用户明确表示验收通过。用户验收前不得执行合并、删除本地或远端分支，以及合并后的本地同步等收尾动作。
-- 用户明确表示验收通过即视为授予本次变更完整合并生命周期权限：可以执行必要的推送、远端 squash merge、删除分支和本地拉取/同步，不再逐项追加确认。
-- CI 是非管理员贡献者的强制合入门禁；管理员永久豁免该门禁，但仍经独立分支与 PR 合入，并满足本地验证与用户验收要求。CI 的依赖下载等基础设施失败不等于代码测试失败，不伪造检查结果；管理员合入时如使用本地测试结果，应在 PR 中说明验证依据与远端阻塞原因。
-- PR 标题即合并提交首行，用 Conventional Commits 格式（见语言规范），攒批 PR 取主导 type、body 列各任务明细；分支内过程提交自由，最终以 squash 结果为准。
-- 每个 PR 打 label 进 release note 分组（`.github/release.yml`）：`feature`/`enhancement` → Features、`bug`/`fix` → Bug Fixes、`documentation` → Documentation；`chore-release` 的 PR 不进 release note。
-- 版本与发版由 release CI 自动处理（按合并提交算版本，每周一自动发版），不手动打 tag。
+- `main` is branch-protected: all changes go through an independent branch and PR squash-merged into `main` rather than developing directly on `main`; one PR produces one merge commit.
+- During implementation, agents may create branches, commit, push, and open/update PRs; PRs must remain open until the user explicitly confirms acceptance. Do not merge, delete local/remote branches, or run post-merge local sync before user acceptance.
+- Explicit user acceptance grants full merge-lifecycle permission for that change: pushing, remote squash merge, branch deletion, and local pull/sync may proceed without asking step by step.
+- CI is a mandatory merge gate for non-admin contributors; admins are permanently exempt from the gate, yet still land changes via branch + PR and satisfy local verification and user acceptance. Infrastructure failures (such as CI dependency downloads) do not equal test failures and must never be spoofed; when merging as admin using local test results, note the verification basis and remote blocker in the PR.
+- The PR title becomes the merge commit subject using Conventional Commits (see Language Conventions); batched PRs use the dominant type and list each task in the body. Process commits inside a branch are free-form; only the final squash message matters.
+- Tag every PR with a label for release-note grouping (`.github/release.yml`): `feature`/`enhancement` → Features, `bug`/`fix` → Bug Fixes, `documentation` → Documentation; `chore-release` PRs are excluded from release notes.
+- Versioning and releases are automated by release CI (computed weekly on Monday from merge commits); do not tag manually.
 
-### 语言规范
+### Language Conventions
 
-- **对外文案双语，英文为主**：README、官网、软件 UI 以英文为第一语言、中文（zh-Hans）为第二语言。各载体按读者需要说明实际功能与操作；产品词汇及含义见 `docs/glossary.md`。
-- **开发文档随开发者语言，用中文**：docs/、plans/、代码注释、提交信息主题——它们是开发者写给自己看的；词汇表同时记录英文名称。
-- 运行时日志（NSLog）用正式英文，保证可 grep。
-- 提交信息用 Conventional Commits 格式（type 英文小写：feat/fix/docs/chore/refactor…，主题中文）。
-- AI 辅助的提交加 `Co-Authored-By: <模型名> <邮箱>` trailer（PR 流下写在 PR 描述，随 squash 进入合并提交 body）；模型身份查 `PI_*` 环境变量，每次提交前读取，不沿用上一个提交的署名；只保留 provider 发布的模型 ID，去掉渠道标记（如 `[Kiro]`）和推理档位等变体后缀（如 `-thinking`），例如 `[Kiro]claude-opus-5-5-thinking` 写作 `claude-opus-5-5`；无对应邮箱用 `noreply@pi.dev`，不得伪造 provider 域名。
-- 代码与文档不留「原来是 A 改成 B」的历史痕迹，追溯看 git log。
+- **User-facing copy is bilingual, English first**: README, website, and software UI use English as the primary language and Simplified Chinese (`zh-Hans`) as the secondary language. Explain actual features and usage tailored to each medium; see `docs/glossary.md` for product terms.
+- **Developer documents follow the developer's language (Chinese) where established**: `docs/`, `plans/`, code comments, and commit subjects are written in Chinese for developer clarity; `docs/glossary.md` records both English and Chinese names. `AGENTS.md` itself is written in English.
+- Runtime logs (`NSLog`) use formal English so they remain greppable.
+- Commit messages use Conventional Commits (lowercase English type: `feat`/`fix`/`docs`/`chore`/`refactor`…, Chinese subject).
+- AI-assisted commits include both a `Co-Authored-By` trailer for the model and an `Agent-Harness` trailer for the agent software in one contiguous trailer block (under the PR workflow, write them in the PR description so squash merge carries them into the merge commit body):
+  ```text
+  Co-Authored-By: <model-id> <provider-noreply>
+  Agent-Harness: <harness-name> (<harness-url>)
+  ```
+  - **Model ID**: Obtain the actual model name from available environment information before each commit (or PR) rather than reusing an earlier trailer, and extract the vendor's model ID; ask the user only when it cannot be determined. Drop relay prefixes (such as `provider/`), channel markers (such as `[Kiro]`), and variant suffixes (such as `-thinking` or `-high`), so `[Kiro]claude-opus-5-5-thinking` becomes `claude-opus-5-5`.
+  - **Provider email**: Always use the model vendor's noreply address regardless of relay or channel: `noreply@anthropic.com` (`claude-*`), `noreply@openai.com` (`gpt-*`, `o1*`, `o3*`, `o4*`, `codex-*`), `noreply@google.com` (`gemini-*`), `noreply@x.ai` (`grok-*`), `noreply@deepseek.com` (`deepseek-*`), `noreply@qwenlm.ai` (`qwen*`), `noreply@zhipuai.cn` (`glm-*`), `noreply@moonshot.cn` (`kimi-*`), or the known vendor's noreply address for other vendors. Only when the model vendor is genuinely unknown, use `noreply@unknown.invalid`; never invent a vendor domain or reuse an unrelated tool domain.
+  - **Agent harness**: Identify the agent software from available environment information and include its canonical homepage URL in parentheses when known (for example, `Agent-Harness: Asterism (https://asterism.dearain.dev)`). If the harness URL is unknown, omit the parenthesized URL and write only `<harness-name>` rather than guessing.
+- Keep code and documentation free of "was A, changed to B" historical residue; use `git log` for history.
